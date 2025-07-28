@@ -1,0 +1,339 @@
+class AnimBrowserMesh extends Actor
+	native;
+
+
+
+defaultproperties
+{
+	bStatic=False
+	DrawType=DT_Mesh
+	AmbientGlow=255
+	SoundOcclusion=OCCLUSION_None
+}
+//=============================================================================
+// Object to facilitate properties editing
+//=============================================================================
+//  Animation / Mesh editor object to expose/shuttle only selected editable
+//  parameters from UMeshAnim/ UMesh objects back and forth in the editor.
+//
+
+class AnimEditProps extends MeshObject
+	hidecategories(Object)
+	native;
+
+
+
+cpptext
+{
+	void PostEditChange();
+}
+
+var const int WBrowserAnimationPtr;
+var(Compression) float   GlobalCompression;
+var(Compression) EAnimCompressMethod CompressionMethod;
+
+defaultproperties
+{
+	GlobalCompression=1.0
+}
+//=============================================================================
+// Object to facilitate properties editing
+//
+// << GEARBOX/rmm:created -- entire file
+//
+//=============================================================================
+
+class AttachmentsEditProps extends Object
+	hidecategories(Object)
+	collapsecategories
+	native;
+
+
+
+cpptext
+{
+	void PostEditChange();
+}
+
+//============================================================================= structs
+struct native AttachmentSocketInfo
+{
+	var()	name		AttSocketName;
+	var()	name		InterfaceMaterial;
+	var()	bool		InterfaceMaterialDraw;
+	var()	bool		PositionByBone;
+	var()	name		PositionByBoneName;
+	var()	rotator		RelativeRotation;
+	var()	vector		RelativeScale;
+	var()	vector		RelativeTranslation;
+	var()	bool		SeamBlend;
+	var()	FLOAT		SeamBlendAlpha;
+	var()	FLOAT		SeamBlendThreshhold;
+};
+
+//-------------------------------------------------------
+struct native AttachmentPartInfo
+{
+	var()	name		AttPartName;
+	var()	name		InterfaceMaterial;
+	var()	bool		InterfaceMaterialDraw;
+	var()	name		MeshName;
+};
+
+//-------------------------------------------------------
+struct native NamedAttachmentGroupInfo
+{
+	var()	string			GroupName;
+	var()	array<string>	Parts;
+};
+
+//============================================================================= the vars
+
+var		const int								WBrowserExtendedAnimationPtr;
+
+var()	array<AttachmentSocketInfo>				Sockets;
+var()	array<AttachmentPartInfo>				Parts;
+var()	array<NamedAttachmentGroupInfo>			NamedGroups;
+
+
+defaultproperties
+{
+	// TODO: (RMM) handle this in code because it's in a struct
+}
+
+//============================================================================= END.
+//=============================================================================
+// Object to facilitate properties editing
+//=============================================================================
+//  Animation / Mesh editor object to expose/shuttle only selected editable
+//  parameters from UMeshAnim/ UMesh objects back and forth in the editor.
+//
+
+class MeshEditProps extends MeshObject
+	hidecategories(Object)
+	native;
+
+
+
+cpptext
+{
+	void PostEditChange();
+}
+
+// Static/smooth parts
+struct native FSectionDigest
+{
+	var() EMeshSectionMethod  MeshSectionMethod;
+	var() int     MaxRigidParts;
+	var() int     MinPartFaces;
+	var() float   MeldSize;
+};
+
+struct native AttachSocket
+{
+	var() vector  A_Translation;
+	var() rotator A_Rotation;
+	var() name AttachAlias;
+	var() name BoneName;
+	var() float      Test_Scale;
+	var() mesh       TestMesh;
+	var() staticmesh TestStaticMesh;
+};
+
+struct native MEPBonePrimSphere
+{
+	var() name		BoneName;
+	var() vector	Offset;
+	var() float		Radius;
+	var() name		SphereName;
+};
+
+struct native MEPBonePrimBox
+{
+	var() name		BoneName;
+	var() vector	Offset;
+	var() vector	Radii;
+	var() name		BoxName;
+};
+
+
+var const int WBrowserAnimationPtr;
+var(Mesh) vector			 Scale;
+var(Mesh) vector             Translation;
+var(Mesh) rotator            Rotation;
+var(Mesh) vector             MinVisBound;
+var(Mesh) vector			 MaxVisBound;
+var(Mesh) vector             VisSphereCenter;
+var(Mesh) float              VisSphereRadius;
+
+var(Redigest) int            LODStyle; //Make drop-down box w. styles...
+var(Animation) MeshAnimation DefaultAnimation;
+
+var(Skin) array<Material>					Material;
+
+// To be implemented: - material order specification to re-sort the sections (for multiple translucent materials )
+// var(RenderOrder) array<int>					MaterialOrder;
+// To be implemented: - originalmaterial names from Maya/Max
+// var(OriginalMaterial) array<name>			OrigMat;
+
+var(LOD) float				SkinTesselationFactor;
+
+// Collision cylinder: for testing/preview only, not saved with mesh (Actor property !)
+var(Collision) float TestCollisionRadius;	// Radius of collision cyllinder.
+var(Collision) float TestCollisionHeight;	// Half-height cyllinder.
+
+var(Collision) array<MEPBonePrimSphere>		CollisionSpheres;		// Array of spheres linked to bones
+var(Collision) array<MEPBonePrimBox>		CollisionBoxes;			// Array of boxes linked to bones
+var(Collision) bool bCreateKPhysicsPropsCollision;	// 'false' for hitbox collision boxes and 'true' for Karma vehicle collision boxes
+
+var(Attach) array<AttachSocket>   Sockets;  // Sockets, with or without adjustment coordinates / bone aliases.
+var(Attach) bool  ApplyNewSockets;			// Explicit switch to apply changes
+var(Attach) bool  ContinuousUpdate;			// Continuous updating (to adjust socket angles interactively)
+
+defaultproperties
+{
+	Scale=(X=1,Y=1,Z=1)
+	Rotation=(Pitch=0,Yaw=0,Roll=0)
+	Translation=(X=0,Y=0,Z=0)
+	SkinTesselationFactor=1.0;
+	ApplyNewSockets=false;
+	ContinuousUpdate=false;
+	bCreateKPhysicsPropsCollision=false;
+}class NotifyProperties extends Object
+	native
+	hidecategories(Object)
+	collapsecategories;
+
+
+
+cpptext
+{
+	void PostEditChange();
+}
+
+var int OldArrayCount;
+var const int WBrowserAnimationPtr;
+
+struct native NotifyInfo
+{
+	var() FLOAT NotifyFrame;
+	var() editinlinenotify AnimNotify Notify;
+	var INT OldRevisionNum;
+};
+
+var() Array<NotifyInfo> Notifys;
+//=============================================================================
+// Object to facilitate properties editing
+//=============================================================================
+//  Sequence / Mesh editor object to expose/shuttle only selected editable
+//
+
+class SequEditProps extends MeshObject
+	hidecategories(Object)
+	native;
+
+
+
+cpptext
+{
+	void PostEditChange();
+}
+
+var const int WBrowserAnimationPtr;
+
+var(SequenceProperties) float	Rate;
+var(SequenceProperties) float	Compression;
+var(SequenceProperties) EAnimCompressMethod ReCompressionMethod;
+var(SequenceProperties) name	SequenceName;
+var(Groups) array<name>			Groups;
+var(SequenceProperties) float	MaxFrameLODDistance;
+var(SequenceProperties) byte	MaxFrameLODLimit;
+
+defaultproperties
+{
+	Compression=1.0
+	MaxFrameLODDistance=1500.000000
+	MaxFrameLODLimit=5
+}
+//=============================================================================
+// Object to facilitate properties editing
+//
+// << GEARBOX/rmm - created -- entire file
+//
+//=============================================================================
+//
+//
+
+class SkeletalLODEditProps extends Object
+	hidecategories(Object)
+	native;
+
+
+
+cpptext
+{
+	void PostEditChange();
+}
+
+var const int WBrowserExtendedAnimationPtr;
+
+var(Properties) INT SomeVariable;
+var(Properties) INT SomeOtherVar;
+
+defaultproperties
+{
+}
+//=============================================================================
+// Object to facilitate properties editing
+//=============================================================================
+//  Preferences tab for the animation browser...
+//
+
+class SkelPrefsEditProps extends MeshObject
+	native
+	hidecategories(Object)
+	collapsecategories;
+
+
+
+cpptext
+{
+	void PostEditChange();
+}
+
+var const int WBrowserAnimationPtr;
+
+var(Import) int            LODStyle;
+var(Interface) int         RootZero;
+var(Interface) float       AnimSlomo;
+
+defaultproperties
+{
+	LODStyle = 10;
+	RootZero = 0;
+	AnimSlomo = 1.0;
+}
+class UnrealEdEngine extends EditorEngine
+	native
+	noexport
+	transient;
+
+
+
+var const int	NotifyVtbl;
+var const int	hWndMain;
+// GBX:naj - added 6/5/03 - padding
+//var byte padding[7];
+var byte padding[13];
+var bool bUseGearCraftStyle;
+// GBX:naj - end added 6/5/03
+class UnrealEdObjectReference extends Object
+    native;
+
+
+
+// This class is a way for unrealed to handle an array of UObject classes in the editor
+// and have confidence in the GarbageCollection not being a problem.
+
+var array<Object> Objects;
+

@@ -1,0 +1,127 @@
+//=============================================================================
+// SetupDefinition: Definition of the current installation.
+//=============================================================================
+class SetupDefinition extends SetupProduct
+	native
+	perobjectconfig;
+
+
+
+var localized string DefaultFolder;
+var localized string	DefaultLanguage;
+var localized string	License;
+var localized string	ReadMe;
+var localized string	Manual;
+var localized string	Logo;
+var localized string	Registration;
+var localized string	RegistrationParams;
+var localized string	SDKInstall;
+var localized string	XFire;
+var localized string	XFireImage;
+var localized string	UbisoftID;
+var localized string	SetupWindowTitle, AutoplayWindowTitle;
+var array<string> Requires;
+
+defaultproperties
+{
+	Product="Earned In Blood"
+	DefaultFolder="C:\Program Files\Ubisoft\Gearbox Software\BrothersInArms"
+	DefaultLanguage="int"
+	License="..\\System\\License.int"
+	ReadMe="..\\Help\\ReadMe.txt"
+	Manual="..\\Help\\Manual.pdf"
+	Registration="..\\Register\\RegisterReminder.exe"
+	Logo="..\\Help\\InstallerLogo.bmp"
+	SetupWindowTitle="Earned In Blood Setup"
+	AutoplayWindowTitle="Earned In Blood"
+	SDKInstall=""
+	XFireImage="..\\help\\xfire.bmp"
+	XFire=""
+	UbisoftID="PL-BIA_F-BIA_SF-BIAEIBPC_R-BIAEIBPCUS"
+}
+//=============================================================================
+// SetupGroup: Information about a group of installable files.
+//=============================================================================
+class SetupGroup extends SetupObject
+	native
+	perobjectconfig;
+
+
+
+var bool       Visible;
+var string     Title;
+var string     Description;
+
+var array<SetupGroup> RequiredGroups;
+var array<SetupLink>  Links;
+var array<string>     Files;
+
+defaultproperties
+{
+	Visible=True
+	Title="Group"
+	Description="Description"
+	RequiredGroups=()
+	Links=()
+	Files=()
+}
+//=============================================================================
+// SetupLink: Information about a Windows Shell link for the "Start" menu.
+//=============================================================================
+class SetupLink extends SetupObject
+	native
+	perobjectconfig;
+
+
+
+var bool        Folder;
+var string      Target;
+var string      IconFile;
+var string      StartPath;
+
+defaultproperties
+{
+	Folder=False
+	Target="<DESTDIR>\\System\\Program.exe"
+	IconFile="<DESTDIR>\\System\\Program.exe"
+	StartPath="<DESTDIR>"
+}
+//=============================================================================
+// SetupObject: The base class all Setup object.
+//=============================================================================
+class SetupObject extends Object
+	native
+	perobjectconfig;
+
+
+//=============================================================================
+// SetupProduct: Information about an installable product.
+//=============================================================================
+class SetupProduct extends SetupObject
+	native
+	perobjectconfig;
+
+
+
+// Per product information.
+var config string Product;
+var config string Version;
+
+// Per product, per-language information.
+var localized string LocalProduct, Developer, Publisher;
+var localized string ProductURL, VersionURL, DeveloperURL, AdobeInstallURL, XFireURL;
+
+defaultproperties
+{
+	Product="Earned In Blood"
+	Version="100"
+	LocalProduct="Earned In Blood"
+	Developer="Gearbox Software"
+	Publisher="Ubisoft"
+	ProductURL="http://www.brothersinarmsgame.com/"
+	VersionURL="http://www.brothersinarmsgame.com/"
+	DeveloperURL="http://www.gearboxsoftware.com/"
+	AdobeInstallURL="http://www.adobe.com/products/acrobat/readstep2.html?c=us"
+	XFireURL="http://www.xfire.com/xf/index.php"	
+}
+

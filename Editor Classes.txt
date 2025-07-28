@@ -1,0 +1,1155 @@
+class AnimNotifyProps extends Object
+	native
+	collapsecategories
+	hidecategories(Object);
+
+
+
+var() editinline AnimNotify Notify;
+//=============================================================================
+// BrushBuilder: Base class of UnrealEd brush builders.
+//
+// Tips for writing brush builders:
+//
+// * Always validate the user-specified and call BadParameters function
+//   if anything is wrong, instead of actually building geometry.
+//   If you build an invalid brush due to bad user parameters, you'll
+//   cause an extraordinary amount of pain for the poor user.
+//
+// * When generating polygons with more than 3 vertices, BE SURE all the
+//   polygon's vertices are coplanar!  Out-of-plane polygons will cause
+//   geometry to be corrupted.
+//=============================================================================
+class BrushBuilder
+	extends Object
+	abstract
+	native;
+
+
+
+var(BrushBuilder) string BitmapFilename;
+var(BrushBuilder) string ToolTip;
+
+// Internal state, not accessible to script.
+struct BuilderPoly
+{
+	var array<int> VertexIndices;
+	var int Direction;
+	var name Item;
+	var int PolyFlags;
+};
+var private array<vector> Vertices;
+var private array<BuilderPoly> Polys;
+var private name Group;
+var private bool MergeCoplanars;
+
+// Native support.
+native function BeginBrush( bool MergeCoplanars, name Group );
+native function bool EndBrush();
+native function int GetVertexCount();
+native function vector GetVertex( int i );
+native function int GetPolyCount();
+native function bool BadParameters( optional string msg );
+native function int Vertexv( vector v );
+native function int Vertex3f( float x, float y, float z );
+native function Poly3i( int Direction, int i, int j, int k, optional name ItemName, optional int PolyFlags );
+native function Poly4i( int Direction, int i, int j, int k, int l, optional name ItemName, optional int PolyFlags );
+native function PolyBegin( int Direction, optional name ItemName, optional int PolyFlags );
+native function Polyi( int i );
+native function PolyEnd();
+
+// Build interface.
+event bool Build();
+
+defaultproperties
+{
+	BitmapFilename="BBGeneric"
+	ToolTip="Generic Builder"
+}
+//=============================================================================
+// ConeBuilder: Builds a 3D cone brush, compatible with cylinder of same size.
+//=============================================================================
+class ConeBuilder
+	extends BrushBuilder;
+
+
+
+var() float Height, CapHeight, OuterRadius, InnerRadius;
+var() int Sides;
+var() name GroupName;
+var() bool AlignToSide, Hollow;
+
+function BuildCone( int Direction, bool AlignToSide, int Sides, float Height, float Radius, name Item )
+{
+	local int n,i,Ofs;
+	n = GetVertexCount();
+	if( AlignToSide )
+	{
+		Radius /= cos(pi/Sides);
+		Ofs = 1;
+	}
+
+	// Vertices.
+	for( i=0; i<Sides; i++ )
+		Vertex3f( Radius*sin((2*i+Ofs)*pi/Sides), Radius*cos((2*i+Ofs)*pi/Sides), 0 );
+	Vertex3f( 0, 0, Height );
+
+	// Polys.
+	for( i=0; i<Sides; i++ )
+		Poly3i( Direction, n+i, n+Sides, n+((i+1) % Sides), Item );
+}
+
+function bool Build()
+{
+	local int i;
+
+	if( Sides<3 )
+		return BadParameters();
+	if( Height<=0 || OuterRadius<=0 )
+		return BadParameters();
+	if( Hollow && (InnerRadius<=0 || InnerRadius>=OuterRadius) )
+		return BadParameters();
+	if( Hollow && CapHeight>Height )
+		return BadParameters();
+	if( Hollow && (CapHeight==Height && InnerRadius==OuterRadius) )
+		return BadParameters();
+
+	BeginBrush( false, GroupName );
+	BuildCone( +1, AlignToSide, Sides, Height, OuterRadius, 'Top' );
+	if( Hollow )
+	{
+		BuildCone( -1, AlignToSide, Sides, CapHeight, InnerRadius, 'Cap' );
+		if( OuterRadius!=InnerRadius )
+			for( i=0; i<Sides; i++ )
+				Poly4i( 1, i, ((i+1) % Sides), Sides+1+((i+1) % Sides), Sides+1+i, 'Bottom' );
+	}
+	else
+	{
+		PolyBegin( 1, 'Bottom' );
+		for( i=0; i<Sides; i++ )
+			Polyi( i );
+		PolyEnd();
+	}
+	return EndBrush();
+}
+
+defaultproperties
+{
+	Height=256
+	CapHeight=256
+	OuterRadius=512
+	InnerRadius=384
+	Sides=8
+	GroupName=Cone
+	AlignToSide=true
+	Hollow=false
+	BitmapFilename="BBCone"
+	ToolTip="Cone"
+}
+//=============================================================================
+// CubeBuilder: Builds a 3D cube brush.
+//=============================================================================
+class CubeBuilder
+	extends BrushBuilder;
+
+
+
+var() float Height, Width, Breadth;
+var() float WallThickness;
+var() name GroupName;
+var() bool Hollow;
+var() bool Tessellated;
+
+function BuildCube( int Direction, float dx, float dy, float dz, bool _tessellated )
+{
+	local int n,i,j,k;
+	n = GetVertexCount();
+
+	for( i=-1; i<2; i+=2 )
+		for( j=-1; j<2; j+=2 )
+			for( k=-1; k<2; k+=2 )
+				Vertex3f( i*dx/2, j*dy/2, k*dz/2 );
+
+	// If the user wants a Tessellated cube, create the sides out of tris instead of quads.
+	if( _tessellated )
+	{
+		Poly3i(Direction,n+0,n+1,n+3);
+		Poly3i(Direction,n+0,n+3,n+2);
+		Poly3i(Direction,n+2,n+3,n+7);
+		Poly3i(Direction,n+2,n+7,n+6);
+		Poly3i(Direction,n+6,n+7,n+5);
+		Poly3i(Direction,n+6,n+5,n+4);
+		Poly3i(Direction,n+4,n+5,n+1);
+		Poly3i(Direction,n+4,n+1,n+0);
+		Poly3i(Direction,n+3,n+1,n+5);
+		Poly3i(Direction,n+3,n+5,n+7);
+		Poly3i(Direction,n+0,n+2,n+6);
+		Poly3i(Direction,n+0,n+6,n+4);
+	}
+	else
+	{
+		Poly4i(Direction,n+0,n+1,n+3,n+2);
+		Poly4i(Direction,n+2,n+3,n+7,n+6);
+		Poly4i(Direction,n+6,n+7,n+5,n+4);
+		Poly4i(Direction,n+4,n+5,n+1,n+0);
+		Poly4i(Direction,n+3,n+1,n+5,n+7);
+		Poly4i(Direction,n+0,n+2,n+6,n+4);
+	}
+}
+
+event bool Build()
+{
+	if( Height<=0 || Width<=0 || Breadth<=0 )
+		return BadParameters();
+	if( Hollow && (Height<=WallThickness || Width<=WallThickness || Breadth<=WallThickness) )
+		return BadParameters();
+	if( Hollow && Tessellated )
+		return BadParameters("The 'Tessellated' option can't be specified with the 'Hollow' option.");
+
+	BeginBrush( false, GroupName );
+	BuildCube( +1, Breadth, Width, Height, Tessellated );
+	if( Hollow )
+		BuildCube( -1, Breadth-WallThickness, Width-WallThickness, Height-WallThickness, Tessellated );
+	return EndBrush();
+}
+
+defaultproperties
+{
+	Height=256
+	Width=256
+	Breadth=256
+	WallThickness=16
+	GroupName=Cube
+	Hollow=false
+	Tessellated=false
+	BitmapFilename="BBCube"
+	ToolTip="Cube"
+}
+//=============================================================================
+// CurvedStairBuilder: Builds a curved staircase.
+//=============================================================================
+class CurvedStairBuilder
+	extends BrushBuilder;
+
+
+
+var() int InnerRadius, StepHeight, StepWidth, AngleOfCurve, NumSteps, AddToFirstStep;
+var() name GroupName;
+var() bool CounterClockwise;
+
+function BuildCurvedStair( int Direction )
+{
+	local rotator RotStep;
+	local vector vtx, NewVtx;
+	local int x, InnerStart, OuterStart, BottomInnerStart, BottomOuterStart, Adjustment;
+
+	RotStep.Yaw = (65536.0f * (AngleOfCurve / 360.0f)) / NumSteps;
+
+	if( CounterClockwise )
+	{
+		RotStep.Yaw *= -1;
+		Direction *= -1;
+	}
+
+	// Generate the inner curve points.
+	InnerStart = GetVertexCount();
+	vtx.x = InnerRadius;
+	for( x = 0 ; x < (NumSteps + 1) ; x++ )
+	{
+		if( x == 0 )
+			Adjustment = AddToFirstStep;
+		else
+			Adjustment = 0;
+
+		NewVtx = vtx >> (RotStep * x);
+
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z - Adjustment );
+		vtx.z += StepHeight;
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z );
+	}
+
+	// Generate the outer curve points.
+	OuterStart = GetVertexCount();
+	vtx.x = InnerRadius + StepWidth;
+	vtx.z = 0;
+	for( x = 0 ; x < (NumSteps + 1) ; x++ )
+	{
+		if( x == 0 )
+			Adjustment = AddToFirstStep;
+		else
+			Adjustment = 0;
+
+		NewVtx = vtx >> (RotStep * x);
+
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z - Adjustment );
+		vtx.z += StepHeight;
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z );
+	}
+
+	// Generate the bottom inner curve points.
+	BottomInnerStart = GetVertexCount();
+	vtx.x = InnerRadius;
+	vtx.z = 0;
+	for( x = 0 ; x < (NumSteps + 1) ; x++ )
+	{
+		NewVtx = vtx >> (RotStep * x);
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z - AddToFirstStep );
+	}
+
+	// Generate the bottom outer curve points.
+	BottomOuterStart = GetVertexCount();
+	vtx.x = InnerRadius + StepWidth;
+	for( x = 0 ; x < (NumSteps + 1) ; x++ )
+	{
+		NewVtx = vtx >> (RotStep * x);
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z - AddToFirstStep );
+	}
+
+	for( x = 0 ; x < NumSteps ; x++ )
+	{
+		Poly4i( Direction, InnerStart + (x * 2) + 2, InnerStart + (x * 2) + 1, OuterStart + (x * 2) + 1, OuterStart + (x * 2) + 2, 'steptop' );
+		Poly4i( Direction, InnerStart + (x * 2) + 1, InnerStart + (x * 2), OuterStart + (x * 2), OuterStart + (x * 2) + 1, 'stepfront' );
+		Poly4i( Direction, BottomInnerStart + x, InnerStart + (x * 2) + 1, InnerStart + (x * 2) + 2, BottomInnerStart + x + 1, 'innercurve' );
+		Poly4i( Direction, OuterStart + (x * 2) + 1, BottomOuterStart + x, BottomOuterStart + x + 1, OuterStart + (x * 2) + 2, 'outercurve' );
+		Poly4i( Direction, BottomInnerStart + x, BottomInnerStart + x + 1, BottomOuterStart + x + 1, BottomOuterStart + x, 'Bottom' );
+	}
+
+	// Back panel.
+	Poly4i( Direction, BottomInnerStart + NumSteps, InnerStart + (NumSteps * 2), OuterStart + (NumSteps * 2), BottomOuterStart + NumSteps, 'back' );
+}
+
+function bool Build()
+{
+	if( AngleOfCurve<1 || AngleOfCurve>360 )
+		return BadParameters("Angle is out of range.");
+	if( InnerRadius<1 || StepWidth<1 || NumSteps<1 )
+		return BadParameters();
+
+	BeginBrush( false, GroupName );
+	BuildCurvedStair( +1 );
+	return EndBrush();
+}
+
+defaultproperties
+{
+	InnerRadius=240
+	StepHeight=16
+	StepWidth=256
+	AngleOfCurve=90
+	NumSteps=4
+	GroupName="CStair"
+	CounterClockwise=0
+	AddToFirstStep=0
+	BitmapFilename="BBCurvedStair"
+	ToolTip="Curved Staircase"
+}
+//=============================================================================
+// CylinderBuilder: Builds a 3D cylinder brush.
+//=============================================================================
+class CylinderBuilder
+	extends BrushBuilder;
+
+
+
+var() float Height, OuterRadius, InnerRadius;
+var() int Sides;
+var() name GroupName;
+var() bool AlignToSide, Hollow;
+
+function BuildCylinder( int Direction, bool AlignToSide, int Sides, float Height, float Radius )
+{
+	local int n,i,j,Ofs;
+	n = GetVertexCount();
+	if( AlignToSide )
+	{
+		Radius /= cos(pi/Sides);
+		Ofs = 1;
+	}
+
+	// Vertices.
+	for( i=0; i<Sides; i++ )
+		for( j=-1; j<2; j+=2 )
+			Vertex3f( Radius*sin((2*i+Ofs)*pi/Sides), Radius*cos((2*i+Ofs)*pi/Sides), j*Height/2 );
+
+	// Polys.
+	for( i=0; i<Sides; i++ )
+		Poly4i( Direction, n+i*2, n+i*2+1, n+((i*2+3)%(2*Sides)), n+((i*2+2)%(2*Sides)), 'Wall' );
+}
+
+function bool Build()
+{
+	local int i,j;
+
+	if( Sides<3 )
+		return BadParameters();
+	if( Height<=0 || OuterRadius<=0 )
+		return BadParameters();
+	if( Hollow && (InnerRadius<=0 || InnerRadius>=OuterRadius) )
+		return BadParameters();
+
+	BeginBrush( false, GroupName );
+	BuildCylinder( +1, AlignToSide, Sides, Height, OuterRadius );
+	if( Hollow )
+	{
+		BuildCylinder( -1, AlignToSide, Sides, Height, InnerRadius );
+		for( j=-1; j<2; j+=2 )
+			for( i=0; i<Sides; i++ )
+				Poly4i( j, i*2+(1-j)/2, ((i+1)% Sides)*2+(1-j)/2, ((i+1)% Sides)*2+(1-j)/2+Sides*2, i*2+(1-j)/2+Sides*2, 'Cap' );
+	}
+	else
+	{
+		for( j=-1; j<2; j+=2 )
+		{
+			PolyBegin( j, 'Cap' );
+			for( i=0; i<Sides; i++ )
+				Polyi( i*2+(1-j)/2 );
+			PolyEnd();
+		}
+	}
+	return EndBrush();
+}
+
+defaultproperties
+{
+	Height=256
+	OuterRadius=512
+	InnerRadius=384
+	Sides=8
+	GroupName=Cylinder
+	AlignToSide=true
+	Hollow=false
+	BitmapFilename="BBCylinder"
+	ToolTip="Cylinder"
+}
+//=============================================================================
+// EditorEngine: The UnrealEd subsystem.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class EditorEngine extends Engine
+	native
+	noexport
+	transient;
+
+
+
+#exec Texture Import File=Textures\Bad.tga				MIPS=OFF COMPRESS=DXT1
+#exec Texture Import File=Textures\BadHighlight.tga		MIPS=OFF COMPRESS=DXT1
+#exec Texture Import File=Textures\Bkgnd.dds
+#exec Texture Import File=Textures\BkgndHi.tga			MIPS=OFF COMPRESS=DXT1
+#exec Texture Import File=Textures\MaterialArrow.tga	MIPS=OFF MASKED=1 COMPRESS=DXT1A
+#exec Texture Import File=Textures\MaterialBackdrop.tga MIPS=OFF COMPRESS=DXT1
+
+#exec NEW StaticMesh File="models\TexPropCube.Ase" Name="TexPropCube"
+#exec NEW StaticMesh File="models\TexPropSphere.Ase" Name="TexPropSphere"
+#exec NEW StaticMesh File="models\TexPropCube.Ase" Name="GbxShaderPreviewCube"
+
+// Objects.
+var const level       Level;
+var const model       TempModel;
+var const texture     CurrentTexture;
+var const staticmesh  CurrentStaticMesh;
+var const mesh		  CurrentMesh;
+var const class       CurrentClass;
+var const transbuffer Trans;
+var const textbuffer  Results;
+var const int         Pad[8];
+
+// Textures.
+var const texture Bad, Bkgnd, BkgndHi, BadHighlight, MaterialArrow, MaterialBackdrop;
+
+// Used in UnrealEd for showing materials
+var staticmesh	TexPropCube;
+var staticmesh	TexPropSphere;
+var staticmesh	GbxShaderPreviewCube;
+
+// Toggles.
+var const bool bFastRebuild, bBootstrapping;
+
+// Other variables.
+var const config int AutoSaveIndex;
+var const int AutoSaveCount, Mode, TerrainEditBrush, ClickFlags;
+var const bool MightNeedSave;
+var const float MovementSpeed;
+var const package PackageContext;
+var const vector AddLocation;
+var const plane AddPlane;
+
+// Misc.
+var const array<Object> Tools;
+var const class BrowseClass;
+
+// Grid.
+var const int ConstraintsVtbl;
+var(Grid) config bool GridEnabled;
+var(Grid) config bool SnapVertices;
+var(Grid) config float SnapDistance;
+var(Grid) config vector GridSize;
+
+// Rotation grid.
+var(RotationGrid) config bool RotGridEnabled;
+var(RotationGrid) config rotator RotGridSize;
+
+// Advanced.
+var(Advanced) config bool UseSizingBox;
+var(Advanced) config bool UseAxisIndicator;
+var(Advanced) config float FovAngleDegrees;
+var(Advanced) config bool GodMode;
+var(Advanced) config bool AutoSave;
+var(Advanced) config byte AutosaveTimeMinutes;
+var(Advanced) config string GameCommandLine;
+var(Advanced) config array<string> EditPackages;
+var(Advanced) config bool AlwaysShowTerrain;
+// changed by Demiurge (3DDragRot)
+var(Advanced) config bool LoadEntirePackageWhenSaving;
+var(Advanced) config bool UseOldInterface;
+var(Advanced) config bool DontUseArcball;
+var(Advanced) config bool HideOrthoAxes;
+// end Demiurge (3DDragRot)
+// << GEARBOX/jmw:add - FEATURE: ViewCorrected3DDrag
+var(Advanced) config bool ViewCorrected3DDrag;
+// GEARBOX >>
+// << GEARBOX/ZONER:add - FEATURE: Gearcraft style camera control
+var(Advanced) config bool CameraControlGbxStyle;
+var(Advanced) config bool CameraControlNoRoll;
+var(Advanced) config bool CameraControlFlyAffectsZ;
+// GEARBOX >>
+// << GEARBOX/jmw:add - Feature: Measuring Tool displays configurable units.
+// MeasuringToolUnits defines what unit the measuring tool uses.
+// If MeasuringToolUnits == MTU_Custom, the unit multiplier is provided by
+// MeasuringToolUnitsMultiplier and string suffix is provided by MeasuringToolUnitsStr.
+var(MeasuringTool) config enum EMeasuringToolUnitType
+{
+	MTU_Unreal,
+	MTU_Inches,
+	MTU_Feet,
+	MTU_FeetAndInches,
+	MTU_Yards,
+	MTU_Miles,
+	MTU_Centimeters,
+	MTU_Meters,
+	MTU_Kilometers,
+	MTU_Custom
+} MeasuringToolUnits;
+var(MeasuringTool) config float		MeasuringToolUnitsMultiplier;
+var(MeasuringTool) config string	MeasuringToolUnitsStr;
+// GEARBOX >>
+
+defaultproperties
+{
+     Bad=Bad
+     Bkgnd=Bkgnd
+     BkgndHi=BkgndHi
+	 MaterialArrow=MaterialArrow
+	 MaterialBackdrop=MaterialBackdrop
+	 BadHighlight=BadHighlight
+	 GridSize=(X=16,Y=16,Z=16)
+	 TexPropCube=StaticMesh'TexPropCube'
+	 TexPropSphere=StaticMesh'TexPropSphere'
+	 GbxShaderPreviewCube=StaticMesh'GbxShaderPreviewCube'
+}
+//=============================================================================
+// LinearStairBuilder: Builds a Linear Staircase.
+//=============================================================================
+class LinearStairBuilder
+	extends BrushBuilder;
+
+
+
+var() int StepLength, StepHeight, StepWidth, NumSteps, AddToFirstStep;
+var() name GroupName;
+
+event bool Build()
+{
+	local int i, LastIdx, CurrentX, CurrentY, CurrentZ, Adjustment;
+
+	// Check for bad input.
+	if( StepLength<=0 || StepHeight<=0 || StepWidth<=0 )
+		return BadParameters();
+	if( Numsteps<=1 || Numsteps>45 )
+		return BadParameters("NumSteps must be greater than 1 and less than 45.");
+
+	//
+	// Build the brush.
+	//
+	BeginBrush( false, GroupName );
+
+	CurrentX = 0;
+	CurrentY = 0;
+	CurrentZ = 0;
+
+	LastIdx = GetVertexCount();
+
+	// Bottom poly.
+	Vertex3f( 0,						0,			-StepHeight );
+	Vertex3f( 0,						StepWidth,	-StepHeight );
+	Vertex3f( StepLength * NumSteps,	StepWidth,	-StepHeight );
+	Vertex3f( StepLength * NumSteps,	0,			-StepHeight );
+	Poly4i(1, 0, 1, 2, 3, 'Base');
+	LastIdx += 4;
+
+	// Back poly.
+	Vertex3f( StepLength * NumSteps,	StepWidth,	-StepHeight );
+	Vertex3f( StepLength * NumSteps,	StepWidth,	(StepHeight * (NumSteps - 1)) + AddToFirstStep );
+	Vertex3f( StepLength * NumSteps,	0,			(StepHeight * (NumSteps - 1)) + AddToFirstStep );
+	Vertex3f( StepLength * NumSteps,	0,			-StepHeight );
+	Poly4i(1, 4, 5, 6, 7, 'Back');
+	LastIdx += 4;
+
+	// Tops of steps.
+	for( i = 0 ; i < Numsteps ; i++ )
+	{
+		CurrentX = (i * StepLength);
+		CurrentZ = (i * StepHeight) + AddToFirstStep;
+
+		// Top of the step
+		Vertex3f( CurrentX,					CurrentY,				CurrentZ );
+		Vertex3f( CurrentX,					CurrentY + StepWidth,	CurrentZ );
+		Vertex3f( CurrentX + StepLength,	CurrentY + StepWidth,	CurrentZ );
+		Vertex3f( CurrentX + StepLength,	CurrentY,				CurrentZ );
+
+		Poly4i(1,
+			LastIdx+(i*4)+3,
+			LastIdx+(i*4)+2,
+			LastIdx+(i*4)+1,
+			LastIdx+(i*4), 'Step');
+	}
+	LastIdx += (NumSteps*4);
+
+	// Fronts of steps.
+	for( i = 0 ; i < Numsteps ; i++ )
+	{
+		CurrentX = (i * StepLength);
+		CurrentZ = (i * StepHeight) + AddToFirstStep;
+		if( i == 0 )
+			Adjustment = AddToFirstStep;
+		else
+			Adjustment = 0;
+
+		// Top of the step
+		Vertex3f( CurrentX,		CurrentY,				CurrentZ );
+		Vertex3f( CurrentX,		CurrentY,				CurrentZ - StepHeight - Adjustment );
+		Vertex3f( CurrentX,		CurrentY + StepWidth,	CurrentZ - StepHeight - Adjustment );
+		Vertex3f( CurrentX,		CurrentY + StepWidth,	CurrentZ );
+
+		Poly4i(1,
+			LastIdx+(i*12)+3,
+			LastIdx+(i*12)+2,
+			LastIdx+(i*12)+1,
+			LastIdx+(i*12), 'Rise');
+
+		// Sides of the step
+		Vertex3f( CurrentX,								CurrentY,		CurrentZ );
+		Vertex3f( CurrentX,								CurrentY,		CurrentZ - StepHeight - Adjustment );
+		Vertex3f( CurrentX + (StepLength*(Numsteps-i)),	CurrentY,		CurrentZ - StepHeight - Adjustment );
+		Vertex3f( CurrentX + (StepLength*(Numsteps-i)),	CurrentY,		CurrentZ );
+
+		Poly4i(1,
+			LastIdx+(i*12)+4,
+			LastIdx+(i*12)+5,
+			LastIdx+(i*12)+6,
+			LastIdx+(i*12)+7, 'Side');
+
+		Vertex3f( CurrentX,								CurrentY + StepWidth,		CurrentZ );
+		Vertex3f( CurrentX,								CurrentY + StepWidth,		CurrentZ - StepHeight - Adjustment );
+		Vertex3f( CurrentX + (StepLength*(Numsteps-i)),	CurrentY + StepWidth,		CurrentZ - StepHeight - Adjustment );
+		Vertex3f( CurrentX + (StepLength*(Numsteps-i)),	CurrentY + StepWidth,		CurrentZ );
+
+		Poly4i(1,
+			LastIdx+(i*12)+11,
+			LastIdx+(i*12)+10,
+			LastIdx+(i*12)+9,
+			LastIdx+(i*12)+8, 'Side');
+	}
+
+	return EndBrush();
+}
+
+defaultproperties
+{
+	StepLength=32
+	StepHeight=16
+	StepWidth=256
+	NumSteps=8
+	AddToFirstStep=0
+	GroupName=LinearStair
+	BitmapFilename="BBLinearStair"
+	ToolTip="Linear Staircase"
+}
+class MaterialFactory extends Object
+	abstract
+	native;
+
+
+
+var string Description;
+
+const RF_Standalone = 0x00080000;
+
+event Material CreateMaterial( Object InOuter, string InPackage, string InGroup, string InName );
+native function ConsoleCommand(string Cmd);
+class RawMaterialFactory extends MaterialFactory;
+
+var() Class<Material> MaterialClass;
+
+function Material CreateMaterial( Object InOuter, string InPackage, string InGroup, string InName )
+{		
+	if( MaterialClass == None )
+		return None;
+
+	return New(InOuter, InName, RF_Public+RF_Standalone) MaterialClass;
+}
+
+defaultproperties
+{
+	MaterialClass=class'Cubemap';
+	Description="Raw Material"
+}//=============================================================================
+// SheetBuilder: Builds a simple sheet.
+//=============================================================================
+class SheetBuilder
+	extends BrushBuilder;
+
+
+
+var() int Height, Width, HorizBreaks, VertBreaks;
+var() enum ESheetAxis
+{
+	AX_Horizontal,
+	AX_XAxis,
+	AX_YAxis,
+} Axis;
+var() name GroupName;
+
+event bool Build()
+{
+	local int x, y, XStep, YStep, count;
+
+	if( Height<=0 || Width<=0 || HorizBreaks<=0 || VertBreaks<=0 )
+		return BadParameters();
+
+	BeginBrush( false, GroupName );
+	XStep = Width/HorizBreaks;
+	YStep = Height/VertBreaks;
+
+	count = 0;
+	for( x = 0 ; x < HorizBreaks ; x++ )
+	{
+		for( y = 0 ; y < VertBreaks ; y++ )
+		{
+			if( Axis==AX_Horizontal )
+			{
+				Vertex3f(  (x*XStep)-Width/2, (y*YStep)-Height/2, 0 );
+				Vertex3f(  (x*XStep)-Width/2, ((y+1)*YStep)-Height/2, 0 );
+				Vertex3f(  ((x+1)*XStep)-Width/2, ((y+1)*YStep)-Height/2, 0 );
+				Vertex3f(  ((x+1)*XStep)-Width/2, (y*YStep)-Height/2, 0 );
+			}
+			else if( Axis==AX_XAxis )
+			{
+				Vertex3f(  0, (x*XStep)-Width/2, (y*YStep)-Height/2 );
+				Vertex3f(  0, (x*XStep)-Width/2, ((y+1)*YStep)-Height/2 );
+				Vertex3f(  0, ((x+1)*XStep)-Width/2, ((y+1)*YStep)-Height/2 );
+				Vertex3f(  0, ((x+1)*XStep)-Width/2, (y*YStep)-Height/2 );
+			}
+			else
+			{
+				Vertex3f(  (x*XStep)-Width/2, 0, (y*YStep)-Height/2 );
+				Vertex3f(  (x*XStep)-Width/2, 0, ((y+1)*YStep)-Height/2 );
+				Vertex3f(  ((x+1)*XStep)-Width/2, 0, ((y+1)*YStep)-Height/2 );
+				Vertex3f(  ((x+1)*XStep)-Width/2, 0, (y*YStep)-Height/2 );
+			}
+
+			Poly4i(+1,count,count+1,count+2,count+3,'Sheet',0x00000108); // PF_TwoSided|PF_NotSolid.
+			count = GetVertexCount();
+		}
+	}
+
+	return EndBrush();
+}
+
+defaultproperties
+{
+	Height=256
+	Width=256
+	HorizBreaks=1
+	VertBreaks=1
+	Axis=SHEETAXIS_FloorCeiling
+	GroupName=Sheet
+	BitmapFilename="BBSheet"
+	ToolTip="Sheet"
+}
+//=============================================================================
+// SpiralStairBuilder: Builds a spiral staircase.
+//=============================================================================
+class SpiralStairBuilder
+	extends BrushBuilder;
+
+
+
+var() int InnerRadius, StepWidth, StepHeight, StepThickness, NumStepsPer360, NumSteps;
+var() name GroupName;
+var() bool SlopedCeiling, SlopedFloor, CounterClockwise;
+
+function BuildCurvedStair( int Direction )
+{
+	local rotator RotStep;
+	local vector vtx, NewVtx, Template[8];
+	local int x, y, idx, VertexStart;
+
+	RotStep.Yaw = 65536.0f * ((360.0f / NumStepsPer360) / 360.0f);
+	if( CounterClockwise )
+	{
+		RotStep.Yaw *= -1;
+		Direction *= -1;
+	}
+
+	// Generate the vertices for the first stair.
+	idx = 0;
+	VertexStart = GetVertexCount();
+	vtx.x = InnerRadius;
+	for( x = 0 ; x < 2 ; x++ )
+	{
+		NewVtx = vtx >> (RotStep * x);
+
+		vtx.z = 0;
+		if( SlopedCeiling && x == 1 )
+			vtx.z = StepHeight;
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z );
+		Template[idx].x = NewVtx.x;		Template[idx].y = NewVtx.y;		Template[idx].z = vtx.z;		idx++;
+
+		vtx.z = StepThickness;
+		if( SlopedFloor && x == 0 )
+			vtx.z -= StepHeight;
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z );
+		Template[idx].x = NewVtx.x;		Template[idx].y = NewVtx.y;		Template[idx].z = vtx.z;		idx++;
+	}
+
+	vtx.x = InnerRadius + StepWidth;
+	for( x = 0 ; x < 2 ; x++ )
+	{
+		NewVtx = vtx >> (RotStep * x);
+
+		vtx.z = 0;
+		if( SlopedCeiling && x == 1 )
+			vtx.z = StepHeight;
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z );
+		Template[idx].x = NewVtx.x;		Template[idx].y = NewVtx.y;		Template[idx].z = vtx.z;		idx++;
+
+		vtx.z = StepThickness;
+		if( SlopedFloor && x == 0 )
+			vtx.z -= StepHeight;
+		Vertex3f( NewVtx.x, NewVtx.y, vtx.z );
+		Template[idx].x = NewVtx.x;		Template[idx].y = NewVtx.y;		Template[idx].z = vtx.z;		idx++;
+	}
+
+	// Create steps from the template
+	for( x = 0 ; x < NumSteps - 1 ; x++ )
+	{
+		if( SlopedFloor )
+		{
+			Poly3i( Direction, VertexStart + 3, VertexStart + 1, VertexStart + 5, 'steptop' );
+			Poly3i( Direction, VertexStart + 3, VertexStart + 5, VertexStart + 7, 'steptop' );
+		}
+		else
+			Poly4i( Direction, VertexStart + 3, VertexStart + 1, VertexStart + 5, VertexStart + 7, 'steptop' );
+
+		Poly4i( Direction, VertexStart + 0, VertexStart + 1, VertexStart + 3, VertexStart + 2, 'inner' );
+		Poly4i( Direction, VertexStart + 5, VertexStart + 4, VertexStart + 6, VertexStart + 7, 'outer' );
+		Poly4i( Direction, VertexStart + 1, VertexStart + 0, VertexStart + 4, VertexStart + 5, 'stepfront' );
+		Poly4i( Direction, VertexStart + 2, VertexStart + 3, VertexStart + 7, VertexStart + 6, 'stepback' );
+
+		if( SlopedCeiling )
+		{
+			Poly3i( Direction, VertexStart + 0, VertexStart + 2, VertexStart + 6, 'stepbottom' );
+			Poly3i( Direction, VertexStart + 0, VertexStart + 6, VertexStart + 4, 'stepbottom' );
+		}
+		else
+			Poly4i( Direction, VertexStart + 0, VertexStart + 2, VertexStart + 6, VertexStart + 4, 'stepbottom' );
+
+		VertexStart = GetVertexCount();
+		for( y = 0 ; y < 8 ; y++ )
+		{
+			NewVtx = Template[y] >> (RotStep * (x + 1));
+			Vertex3f( NewVtx.x, NewVtx.y, NewVtx.z + (Stepheight * (x + 1)) );
+		}
+	}
+}
+
+function bool Build()
+{
+	if( InnerRadius<1 || StepWidth<1 || NumSteps<1 || NumStepsPer360<3 )
+		return BadParameters();
+
+	BeginBrush( false, GroupName );
+	BuildCurvedStair( +1 );
+	return EndBrush();
+}
+
+defaultproperties
+{
+	InnerRadius=64
+	StepWidth=256
+	StepHeight=16
+	StepThickness=32
+	NumStepsPer360=8
+	NumSteps=8
+	SlopedCeiling=true
+	SlopedFloor=false
+	GroupName="Spiral"
+	CounterClockwise=0
+	BitmapFilename="BBSpiralStair"
+	ToolTip="Spiral Staircase"
+}
+//=============================================================================
+// TerrainBuilder: Builds a 3D cube brush, with a tessellated bottom.
+//=============================================================================
+class TerrainBuilder
+	extends BrushBuilder;
+
+
+
+var() float Height, Width, Breadth;
+var() int WidthSegments, DepthSegments;		// How many breaks to have in each direction
+var() name GroupName;
+
+function BuildTerrain( int Direction, float dx, float dy, float dz, int WidthSeg, int DepthSeg )
+{
+	local int n,nbottom,ntop,i,j,k,x,y;
+	local float WidthStep, DepthStep;
+
+	//
+	// TOP
+	//
+
+	n = GetVertexCount();
+
+	// Create vertices
+	for( i=-1; i<2; i+=2 )
+		for( j=-1; j<2; j+=2 )
+			for( k=-1; k<2; k+=2 )
+				Vertex3f( i*dx/2, j*dy/2, k*dz/2 );
+
+	// Create the top
+	Poly4i(Direction,n+3,n+1,n+5,n+7, 'sky');
+
+	//
+	// BOTTOM
+	//
+
+	nbottom = GetVertexCount();
+
+	// Create vertices
+	WidthStep = dx / WidthSeg;
+	DepthStep = dy / DepthSeg;
+
+	for( x = 0 ; x < WidthSeg + 1 ; x++ )
+		for( y = 0 ; y < DepthSeg + 1 ; y++ )
+			Vertex3f( (WidthStep * x) - dx/2, (DepthStep * y) - dy/2, -(dz/2) );
+
+	ntop = GetVertexCount();
+
+	for( x = 0 ; x < WidthSeg + 1 ; x++ )
+		for( y = 0 ; y < DepthSeg + 1 ; y++ )
+			Vertex3f( (WidthStep * x) - dx/2, (DepthStep * y) - dy/2, dz/2 );
+
+	// Create the bottom as a mesh of triangles
+	for( x = 0 ; x < WidthSeg ; x++ )
+		for( y = 0 ; y < DepthSeg ; y++ )
+		{
+			Poly3i(-Direction,
+				(nbottom+y)		+ ((DepthSeg+1) * x),
+				(nbottom+y)		+ ((DepthSeg+1) * (x+1)),
+				((nbottom+1)+y)	+ ((DepthSeg+1) * (x+1)),
+				'ground');
+			Poly3i(-Direction,
+				(nbottom+y)		+ ((DepthSeg+1) * x),
+				((nbottom+1)+y) + ((DepthSeg+1) * (x+1)),
+				((nbottom+1)+y) + ((DepthSeg+1) * x),
+				'ground');
+		}
+
+	//
+	// SIDES
+	//
+	// The bottom poly of each side is basically a triangle fan.
+	//
+	for( x = 0 ; x < WidthSeg ; x++ )
+	{
+		Poly4i(-Direction,
+			nbottom + DepthSeg + ((DepthSeg+1) * x),
+			nbottom + DepthSeg + ((DepthSeg+1) * (x + 1)),
+			ntop + DepthSeg + ((DepthSeg+1) * (x + 1)),
+			ntop + DepthSeg + ((DepthSeg+1) * x),
+			'sky' );
+		Poly4i(-Direction,
+			nbottom + ((DepthSeg+1) * (x + 1)),
+			nbottom + ((DepthSeg+1) * x),
+			ntop + ((DepthSeg+1) * x),
+			ntop + ((DepthSeg+1) * (x + 1)),
+			'sky' );
+	}
+	for( y = 0 ; y < DepthSeg ; y++ )
+	{
+		Poly4i(-Direction,
+			nbottom + y,
+			nbottom + (y + 1),
+			ntop + (y + 1),
+			ntop + y,
+			'sky' );
+		Poly4i(-Direction,
+			nbottom + ((DepthSeg+1) * WidthSeg) + (y + 1),
+			nbottom + ((DepthSeg+1) * WidthSeg) + y,
+			ntop + ((DepthSeg+1) * WidthSeg) + y,
+			ntop + ((DepthSeg+1) * WidthSeg) + (y + 1),
+			'sky' );
+	}
+}
+
+event bool Build()
+{
+	if( Height<=0 || Width<=0 || Breadth<=0 || WidthSegments<=0 || DepthSegments<=0 )
+		return BadParameters();
+
+	BeginBrush( false, GroupName );
+	BuildTerrain( +1, Breadth, Width, Height, WidthSegments, DepthSegments );
+	return EndBrush();
+}
+
+defaultproperties
+{
+	Height=256
+	Width=256
+	Breadth=512
+	WidthSegments=4
+	DepthSegments=2
+	GroupName=Terrain
+	BitmapFilename="BBTerrain"
+	ToolTip="BSP Based Terrain"
+}
+//=============================================================================
+// TetrahedronBuilder: Builds an octahedron (not tetrahedron) - experimental.
+//=============================================================================
+class TetrahedronBuilder
+	extends BrushBuilder;
+
+
+
+var() float Radius;
+var() int SphereExtrapolation;
+var() name GroupName;
+
+function Extrapolate( int a, int b, int c, int Count, float Radius )
+{
+	local int ab,bc,ca;
+	if( Count>1 )
+	{
+		ab=Vertexv( Radius*Normal(GetVertex(a)+GetVertex(b)) );
+		bc=Vertexv( Radius*Normal(GetVertex(b)+GetVertex(c)) );
+		ca=Vertexv( Radius*Normal(GetVertex(c)+GetVertex(a)) );
+		Extrapolate(a,ab,ca,Count-1,Radius);
+		Extrapolate(b,bc,ab,Count-1,Radius);
+		Extrapolate(c,ca,bc,Count-1,Radius);
+		Extrapolate(ab,bc,ca,Count-1,Radius);
+		//wastes shared vertices
+	}
+	else Poly3i(+1,a,b,c);
+}
+
+function BuildTetrahedron( float R, int SphereExtrapolation )
+{
+	vertex3f( R,0,0);
+	vertex3f(-R,0,0);
+	vertex3f(0, R,0);
+	vertex3f(0,-R,0);
+	vertex3f(0,0, R);
+	vertex3f(0,0,-R);
+
+	Extrapolate(2,1,4,SphereExtrapolation,Radius);
+	Extrapolate(1,3,4,SphereExtrapolation,Radius);
+	Extrapolate(3,0,4,SphereExtrapolation,Radius);
+	Extrapolate(0,2,4,SphereExtrapolation,Radius);
+	Extrapolate(1,2,5,SphereExtrapolation,Radius);
+	Extrapolate(3,1,5,SphereExtrapolation,Radius);
+	Extrapolate(0,3,5,SphereExtrapolation,Radius);
+	Extrapolate(2,0,5,SphereExtrapolation,Radius);
+}
+
+event bool Build()
+{
+	if( Radius<=0 || SphereExtrapolation<=0 )
+		return BadParameters();
+
+	BeginBrush( false, GroupName );
+	BuildTetrahedron( Radius, SphereExtrapolation );
+	return EndBrush();
+}
+
+defaultproperties
+{
+	Radius=256
+	SphereExtrapolation=1
+	GroupName=Tetrahedron
+	BitmapFilename="BBSphere"
+	ToolTip="Tetrahedron (Sphere)"
+}
+//=============================================================================
+// VolumetricBuilder: Builds a volumetric brush (criss-crossed sheets).
+//=============================================================================
+class VolumetricBuilder
+	extends BrushBuilder;
+
+
+
+var() float Height, Radius;
+var() int NumSheets;
+var() name GroupName;
+
+function BuildVolumetric( int Direction, int NumSheets, float Height, float Radius )
+{
+	local int n,x,y;
+	local rotator RotStep;
+	local vector vtx, NewVtx;
+
+	n = GetVertexCount();
+	RotStep.Yaw = 65536.0f / (NumSheets * 2);
+
+	// Vertices.
+	vtx.x = Radius;
+	vtx.z = Height / 2;
+	for( x = 0 ; x < (NumSheets * 2) ; x++ )
+	{
+		NewVtx = vtx >> (RotStep * x);
+		Vertex3f( NewVtx.x, NewVtx.y, NewVtx.z );
+		Vertex3f( NewVtx.x, NewVtx.y, NewVtx.z - Height );
+	}
+
+	// Polys.
+	for( x = 0 ; x < NumSheets ; x++ )
+	{
+		y = (x*2) + 1;
+		if( y >= (NumSheets * 2) ) y -= (NumSheets * 2);
+		Poly4i( Direction, n+(x*2), n+y, n+y+(NumSheets*2), n+(x*2)+(NumSheets*2), 'Sheets', 0x00000108); // PF_TwoSided|PF_NotSolid.
+	}
+}
+
+function bool Build()
+{
+	if( NumSheets<2 )
+		return BadParameters();
+	if( Height<=0 || Radius<=0 )
+		return BadParameters();
+
+	BeginBrush( true, GroupName );
+	BuildVolumetric( +1, NumSheets, Height, Radius );
+	return EndBrush();
+}
+
+defaultproperties
+{
+	Height=128
+	Radius=64
+	NumSheets=2
+	GroupName=Volumetric
+	BitmapFilename="BBVolumetric"
+	ToolTip="Volumetric (Torches, Chains, etc)"
+}
+

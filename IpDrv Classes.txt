@@ -1,0 +1,1838 @@
+//=============================================================================
+// BufferedTcpLink
+//=============================================================================
+class BufferedTcpLink extends TcpLink;
+
+
+
+var string			InputBuffer;
+var string 			OutputBuffer;
+
+var string			CRLF;
+var string			CR;
+var string			LF;
+
+var bool			bWaiting;
+var float			WaitTimeoutTime;
+var string			WaitingFor;
+var int				WaitForCountChars;		// if we're waiting for X bytes
+var string			WaitResult;
+var int				WaitMatchData;
+
+function ResetBuffer()
+{
+	InputBuffer = "";
+	OutputBuffer = "";
+	bWaiting = False;
+	CRLF = Chr(10)$Chr(13);
+	CR = Chr(13);
+	LF = Chr(10);
+}
+
+function WaitFor(string What, float TimeOut, int MatchData)
+{
+	bWaiting = True;
+	WaitingFor = What;
+	WaitForCountChars = 0;
+	WaitTimeoutTime = Level.TimeSeconds + TimeOut;
+	WaitMatchData = MatchData;
+	WaitResult = "";
+}
+
+function WaitForCount(int Count, float TimeOut, int MatchData)
+{
+	bWaiting = True;
+	WaitingFor = "";
+	WaitForCountChars = Count;
+	WaitTimeoutTime = Level.TimeSeconds + TimeOut;
+	WaitMatchData = MatchData;
+	WaitResult = "";
+}
+
+function GotMatch(int MatchData)
+{
+	// called when a match happens
+}
+
+function GotMatchTimeout(int MatchData)
+{
+	// when a match times out
+}
+
+function string ParseDelimited(string Text, string Delimiter, int Count, optional bool bToEndOfLine)
+{
+	local string Result;
+	local int Found, i;
+	local string s;
+
+	Result = "";
+	Found = 1;
+
+	for(i=0;i<Len(Text);i++)
+	{
+		s = Mid(Text, i, 1);
+		if(InStr(Delimiter, s) != -1)
+		{
+			if(Found == Count)
+			{
+				if(bToEndOfLine)
+					return Result$Mid(Text, i);
+				else
+					return Result;
+			}
+
+			Found++;
+		}
+		else
+		{
+			if(Found >= Count)
+				Result = Result $ s;
+		}
+	}
+
+	return Result;
+}
+
+// Read an individual character, returns 0 if no characters waiting
+function int ReadChar()
+{
+	local int c;
+
+	if(InputBuffer == "")
+		return 0;
+	c = Asc(Left(InputBuffer, 1));
+	InputBuffer = Mid(InputBuffer, 1);
+	return c;
+}
+
+// Take a look at the next waiting character, return 0 if no characters waiting
+function int PeekChar()
+{
+	//local int c;
+
+	if(InputBuffer == "")
+		return 0;
+	return Asc(Left(InputBuffer, 1));
+}
+
+function bool ReadBufferedLine(out string Text)
+{
+	local int i;
+
+	i = InStr(InputBuffer, Chr(13));
+	if(i == -1)
+		return False;
+
+	Text = Left(InputBuffer, i);
+	if(Mid(InputBuffer, i+1, 1) == Chr(10))
+		i++;
+
+	InputBuffer = Mid(InputBuffer, i+1);
+	return True;
+}
+
+function SendBufferedData(string Text)
+{
+	OutputBuffer = OutputBuffer $ Text;
+}
+
+event ReceivedText(string Text)
+{
+	InputBuffer = InputBuffer $ Text;
+}
+
+// DoQueueIO is intended to be called from Tick();
+function DoBufferQueueIO()
+{
+	local int i;
+
+	while(bWaiting)
+	{
+		if(Level.TimeSeconds > WaitTimeoutTime)
+		{
+			bWaiting = False;
+			GotMatchTimeout(WaitMatchData);
+		}
+
+		if(WaitForCountChars > 0)
+		{
+			if(Len(InputBuffer) < WaitForCountChars)
+				break;
+
+			WaitResult = Left(InputBuffer, WaitForCountChars);
+			InputBuffer = Mid(InputBuffer, WaitForCountChars);
+			bWaiting = False;
+			GotMatch(WaitMatchData);
+		}
+		else
+		{
+			i = InStr(InputBuffer, WaitingFor);
+			if(i == -1 && WaitingFor == CR)
+				i = InStr(InputBuffer, LF);
+			if(i != -1)
+			{
+				WaitResult = Left(InputBuffer, i + Len(WaitingFor));
+				InputBuffer = Mid(InputBuffer, i + Len(WaitingFor));
+				bWaiting = False;
+				GotMatch(WaitMatchData);
+			}
+			else
+				break;
+		}
+	}
+
+	if(IsConnected())
+	{
+		if( OutputBuffer != "" )
+		{
+			i = SendText(OutputBuffer);
+			OutputBuffer = Mid(OutputBuffer, i);
+		}
+	}
+}
+
+defaultproperties
+{
+	LinkMode=MODE_Text
+	ReceiveMode=RMODE_Event
+}
+//=============================================================================
+// ClientBeaconReceiver: Receives LAN beacons from servers.
+//=============================================================================
+class ClientBeaconReceiver extends UdpBeacon
+	transient;
+
+
+
+var struct BeaconInfo
+{
+	var IpAddr      Addr;
+	var float       Time;
+	var string      Text;
+	// sjs ---
+    var string      RemoteSessionID;
+    var string      RemoteExchangeKey;
+    var string      RemoteHostAddr;
+    // --- sjs
+} Beacons[32];
+
+var float			RefreshTimer;
+var bool			bListIsDirty;
+
+function int GetBeaconCount()
+{
+    return (ArrayCount (Beacons));
+}
+
+function string GetBeaconAddress( int i )
+{
+    local string s;
+    local string mapFile;
+
+	log("GetBeaconAddress: text=" $Beacons[i].Text);
+	s = Beacons[i].Text;
+    // sjs - linearized clients must know the map file
+    mapFile = class'GameInfo'.static.ParseToken( s );
+    mapFile = class'GameInfo'.static.ParseToken( s );
+    mapFile = class'GameInfo'.static.ParseToken( s );
+    mapFile = class'GameInfo'.static.ParseToken( s );
+    
+    s = IpAddrToString(Beacons[i].Addr)
+      $ "/" $ mapFile
+//      $ "/" $ "mp_crossroads.gbxmap"
+      $ "?XSessionID=" $ Beacons[i].RemoteSessionID 
+      $ "?XExchangeKey=" $ Beacons[i].RemoteExchangeKey
+      $ "?XHostAddr=" $ Beacons[i].RemoteHostAddr
+    ;
+    
+    return s;
+}
+
+function string GetBeaconText(int i)
+{
+	return Beacons[i].Text;
+}
+
+function BeginPlay()
+{	
+	if( BindPort( BeaconPort, true ) > 0 )
+		SetTimer( RefreshTimer, true );
+	else
+		warn( "ClientBeaconReceiver failed: Beacon port in use." );
+}
+
+function Timer()
+{
+	local int i, j;
+
+    // Remove any stale beacons and compress the list
+
+    j = 0;
+
+	for (i = 0; i < ArrayCount(Beacons); i++)
+    {
+		if (Beacons[i].Addr.Addr == 0)
+            continue;
+
+        if (Level.TimeSeconds - Beacons[i].Time >= BeaconTimeout)
+        {
+            bListIsDirty = true;
+            continue;
+        }
+
+        if (i != j)
+		{
+    		Beacons[j] = Beacons[i];
+			bListIsDirty = true;
+		}
+
+        j++;
+    }
+    
+	while (j < ArrayCount(Beacons))
+    {
+		Beacons[j].Addr.Addr = 0;
+        Beacons[j].Text = "";
+        j++;
+    }
+
+    BroadcastQuery();
+}
+
+function BroadcastQuery ()
+{
+    local IpAddr Addr;
+
+	Addr.Addr = BroadcastAddr;
+	Addr.Port = ServerBeaconPort;
+
+	SendText( Addr, "REPORT" );
+}
+
+event ReceivedText (IpAddr Addr, string Text)
+{
+	local int i, n;
+    local String Product;
+    local String RemoteSessionID;
+    local String RemoteExchangeKey;
+    local String RemoteHostAddr;
+    local String BeaconText;
+    
+	n = Len (BeaconProduct);
+
+    Product = Left (Text, n + 1);
+
+	if (!(Product ~= (BeaconProduct$" ")))
+        return;
+
+	Text = Mid (Text, n + 1);
+
+	Addr.Port = int (Text);
+
+    // eat leading spaces
+    if( InStr(Text,"?")>=0 )
+    {
+        Text = Mid(Text,InStr(Text,"?"));
+    }
+
+    RemoteSessionID = class'GameInfo'.static.ParseOption ( Text, "XSessionID");
+    RemoteExchangeKey = class'GameInfo'.static.ParseOption ( Text, "XExchangeKey" );
+    RemoteHostAddr = class'GameInfo'.static.ParseOption ( Text, "XHostAddr" );
+    BeaconText = class'GameInfo'.static.ParseOption ( Text, "BeaconText" );
+
+	for (i = 0; i < ArrayCount(Beacons); i++)
+		if (Beacons[i].Addr == Addr && Beacons[i].RemoteSessionID == RemoteSessionID
+            && Beacons[i].RemoteExchangeKey == RemoteExchangeKey && Beacons[i].RemoteHostAddr == RemoteHostAddr)
+			break;
+
+    // no match, so add it
+	if (i == ArrayCount(Beacons))
+	    for (i = 0; i< ArrayCount(Beacons); i++)
+			if (Beacons[i].Addr.Addr == 0)
+				break;
+
+	if (i == ArrayCount(Beacons))
+		return;
+
+	if (!(Beacons[i].Text ~= BeaconText))
+		bListIsDirty = true;
+
+	Beacons[i].Addr = Addr;
+	Beacons[i].Time = Level.TimeSeconds;
+	Beacons[i].Text = BeaconText;
+    Beacons[i].RemoteSessionID = RemoteSessionID;
+    Beacons[i].RemoteExchangeKey = RemoteExchangeKey;
+    Beacons[i].RemoteHostAddr = RemoteHostAddr;
+}
+
+defaultproperties
+{
+	RefreshTimer=1.0
+	bListIsDirty=false
+}
+
+//=============================================================================
+// InternetLink: Parent class for Internet connection classes
+//=============================================================================
+class InternetLink extends InternetInfo
+	native
+	transient;
+
+
+
+cpptext
+{
+	AInternetLink();
+	void Destroy();
+	UBOOL Tick( FLOAT DeltaTime, enum ELevelTick TickType );
+	SOCKET& GetSocket()
+	{
+		return *(SOCKET*)&Socket;
+	}
+	FResolveInfo*& GetResolveInfo()
+	{
+		return *(FResolveInfo**)&PrivateResolveInfo;
+	}
+}
+
+//-----------------------------------------------------------------------------
+// Types & Variables.
+
+// An IP address.
+struct IpAddr
+{
+	var int Addr;
+	var int Port;
+};
+
+// Data receive mode.
+// Cannot be set in default properties.
+var enum ELinkMode
+{
+	MODE_Text,
+	MODE_Line,
+	MODE_Binary
+} LinkMode;
+
+// Internal
+var	const int Socket;
+var const int Port;
+var	const int RemoteSocket;
+var private native const int PrivateResolveInfo;
+var const int DataPending;
+
+// Receive mode.
+// If mode is MODE_Manual, received events will not be called.
+// This means it is your responsibility to check the DataPending
+// var and receive the data.
+// Cannot be set in default properties.
+var enum EReceiveMode
+{
+	RMODE_Manual,
+	RMODE_Event
+} ReceiveMode;
+
+//-----------------------------------------------------------------------------
+// Natives.
+
+// Returns true if data is pending on the socket.
+native function bool IsDataPending();
+
+// Parses an Unreal URL into its component elements.
+// Returns false if the URL was invalid.
+native function bool ParseURL
+(
+	coerce string URL,
+	out string Addr,
+	out int Port,
+	out string LevelName,
+	out string EntryName
+);
+
+// Resolve a domain or dotted IP.
+// Nonblocking operation.
+// Triggers Resolved event if successful.
+// Triggers ResolveFailed event if unsuccessful.
+native function Resolve( coerce string Domain );
+
+// Returns most recent winsock error.
+native function int GetLastError();
+
+// Convert an IP address to a string.
+native function string IpAddrToString( IpAddr Arg );
+
+// Convert a string to an IP
+native function bool StringToIpAddr( string Str, out IpAddr Addr );
+
+// Validate: Takes a challenge string and returns an encoded validation string.
+native function string GameSpyValidate( string ValidationString );
+native function string GameSpyGameName();
+
+native function GetLocalIP(out IpAddr Arg );
+
+//-----------------------------------------------------------------------------
+// Events.
+
+// Called when domain resolution is successful.
+// The IpAddr struct Addr contains the valid address.
+event Resolved( IpAddr Addr );
+
+// Called when domain resolution fails.
+event ResolveFailed();
+
+defaultproperties
+{
+}
+class LANQueryClient extends ServerQueryClient;
+
+
+
+defaultproperties
+{
+	bLANQuery=1
+}
+class MasterServerClient extends ServerQueryClient
+	native;
+
+
+
+cpptext
+{
+	// AActor interface
+	void Destroy();
+	void PostScriptDestroyed();
+	// MasterServerLink interface
+	UBOOL Poll( INT WaitTime );
+	// ServerQueryClient interface
+	void Init();
+}
+
+enum EClientToMaster
+{
+	CTM_Query,
+	CTM_GetMOTD,
+	CTM_QueryUpgrade,
+};
+
+enum EQueryType
+{
+	QT_Equals,
+	QT_NotEquals,
+	QT_LessThan,
+	QT_LessThanEquals,
+	QT_GreaterThan,
+	QT_GreaterThanEquals,
+};
+
+struct native export QueryData
+{
+	var() string Key;
+	var() string Value;
+	var() EQueryType QueryType;
+};
+
+enum EResponseInfo
+{
+	RI_AuthenticationFailed,
+	RI_ConnectionFailed,
+	RI_ConnectionTimeout,
+	RI_Success,
+	RI_MustUpgrade,
+};
+
+enum EMOTDResponse
+{
+	MR_MOTD,
+	MR_MandatoryUpgrade,
+	MR_OptionalUpgrade,
+	MR_NewServer,
+	MR_IniSetting,
+	MR_Command,
+};
+
+// Internal
+var native const int MSLinkPtr;
+
+
+var(Query) array<QueryData> Query;
+var(Query) const int ResultCount;
+
+native function StartQuery( EClientToMaster Command );
+native function Stop();
+native function LaunchAutoUpdate();
+
+delegate OnQueryFinished( EResponseInfo ResponseInfo, int Info );
+delegate OnReceivedServer( GameInfo.ServerResponseLine s );
+delegate OnReceivedMOTDData( EMOTDResponse Command, string Value );
+
+defaultproperties
+{
+	bLANQuery=0
+}
+class MasterServerGameStats extends GameStats
+	native;
+
+
+
+var MasterServerUplink Uplink;
+
+function Init()
+{
+	Log("MasterServerGameStats initializing");
+}
+
+function Shutdown()
+{
+}
+
+function Logf(string LogString)
+{
+	if( Uplink == None )
+	{
+		// Log("Couldn't log stat line as MasterServerUplink was not found >>"$LogString$"<<");
+	}
+	else
+	if( !Uplink.LogStatLine(LogString) )		// If master server rejects stats for us, disconnect from the Uplink actor.
+		Uplink = None;
+}
+class MasterServerLink extends Info
+	native
+	transient;
+
+
+
+cpptext
+{
+	virtual UBOOL Poll( INT WaitTime ) { return 0; }
+}
+
+var native const int LinkPtr;
+var globalconfig int LANPort;
+var globalconfig int LANServerPort;
+var globalconfig int CurrentMasterServer;
+var globalconfig int MasterServerPort[5];
+var globalconfig string MasterServerAddress[5];
+
+native function bool Poll( int WaitTime );
+
+event GetMasterServer( out string OutAddress, out int OutPort )
+{
+	if( CurrentMasterServer<0 || CurrentMasterServer>=5 || CurrentMasterServer>=5 || MasterServerAddress[CurrentMasterServer]=="" || MasterServerPort[CurrentMasterServer]==0 )
+		CurrentMasterServer = 0;
+
+	if( MasterServerAddress[0]=="" || MasterServerPort[0]==0 )
+	{
+		Log("Warning: No master servers found in the INI file");
+        OutAddress = "ut2003master1.epicgames.com";
+		OutPort = 28902;
+	}
+	else
+	{
+		OutAddress	= MasterServerAddress[CurrentMasterServer];
+		OutPort		= MasterServerPort[CurrentMasterServer];
+	}
+}
+
+simulated function Tick( float Delta )
+{
+	Poll(0);
+}
+
+defaultproperties
+{
+	bAlwaysTick=True
+	LANPort=11777
+	LANServerPort=10777
+	CurrentMasterServer=0
+	MasterServerPort(0)=28902
+	MasterServerAddress(0)="ut2003master1.epicgames.com"
+	MasterServerPort(1)=28902
+	MasterServerAddress(1)="ut2003master1.epicgames.com"
+}
+class MasterServerUplink extends MasterServerLink
+    config
+	native;
+
+
+
+cpptext
+{
+	// AActor interface
+	void Destroy();
+	void PostScriptDestroyed();
+	// AServerQueryLink interface
+	UBOOL Poll( INT WaitTime );
+}
+
+enum EServerToMaster
+{
+	STM_ClientResponse,
+	STM_GameState,
+	STM_Stats,
+	STM_ClientDisconnectFailed,
+	STM_MD5Version,
+};
+
+enum EMasterToServer
+{
+	MTS_ClientChallenge,
+	MTS_ClientAuthFailed,
+	MTS_Shutdown,
+	MTS_MatchID,
+	MTS_MD5Update,
+};
+
+enum EHeartbeatType
+{
+	HB_QueryInterface,
+	HB_GamePort,
+	HB_GamespyQueryPort,
+};
+
+// MD5 data coming from the master server.
+struct native export MD5UpdateData
+{
+	var string Guid;
+	var string MD5;
+	var INT Revision;
+};
+
+var GameInfo.ServerResponseLine ServerState;
+var MasterServerGameStats GameStats;
+var UdpLink	GamespyQueryLink;
+var const int MatchID;
+var float ReconnectTime;
+var bool bReconnectPending;
+
+// config
+var globalconfig bool DoUplink;
+var globalconfig bool UplinkToGamespy;
+var globalconfig bool SendStats;
+var globalconfig bool ServerBehindNAT;
+var globalconfig bool DoLANBroadcast;
+
+// sorry, no code for you!
+native function Reconnect();
+
+event BeginPlay()
+{
+	local UdpGamespyQuery  GamespyQuery;
+	local UdpGamespyUplink GamespyUplink;
+
+	if( DoUplink )
+	{
+		// if we're uplinking to gamespy, also spawn the gamespy actors.
+		if( UplinkToGamespy )
+		{
+			GamespyQuery  = Spawn( class'UdpGamespyQuery' );
+			GamespyUplink = Spawn( class'UdpGamespyUplink' );
+
+			// FMasterServerUplink needs this for NAT.
+			GamespyQueryLink = GamespyQuery;
+		}
+
+		// If we're sending stats,
+		if( SendStats )
+		{
+			foreach AllActors(class'MasterServerGameStats', GameStats )
+			{
+				if( GameStats.Uplink == None )
+					GameStats.Uplink = Self;
+				else
+					GameStats = None;
+				break;
+			}
+			if( GameStats == None )
+				Log("MasterServerUplink: MasterServerGameStats not found - stats uploading disabled.");
+		}
+	}
+
+	Reconnect();
+}
+
+// Called when the connection to the master server fails or doesn't connect.
+event ConnectionFailed( bool bShouldReconnect )
+{
+	Log("Master server connection failed");
+	bReconnectPending = bShouldReconnect;
+	ReconnectTime = 0;
+}
+
+// Called when we should refresh the game state
+event Refresh()
+{
+	Level.Game.GetServerInfo(ServerState);
+	Level.Game.GetServerDetails(ServerState);
+	Level.Game.GetServerPlayers(ServerState);
+}
+
+// Call to log a stat line
+native event bool LogStatLine( string StatLine );
+
+// Handle disconnection.
+simulated function Tick( float Delta )
+{
+	Super.Tick(Delta);
+	ReconnectTime = ReconnectTime + Delta;
+	if( bReconnectPending )
+	{
+		if( ReconnectTime > 10.0 )
+		{
+			Log("Attempting to reconnect to master server");
+			bReconnectPending = False;
+			Reconnect();
+		}
+	}
+}
+
+defaultproperties
+{
+	DoUplink=True
+	UplinkToGamespy=True
+	SendStats=True
+	MatchID=0
+}
+class PingManagerInterface extends Object
+	native;
+
+native static function Init();
+native static function UnInit();
+native static function Poll();
+native static function AddPing(int ServerPingAddr, int ServerPingPort);
+native static function int DeletePing(int ServerAddr, int ServerPingPort);
+native static function CancelPings();
+native static function int FetchPing(int ServerAddr, int ServerPingPort);
+	
+class ServerQueryClient extends MasterServerLink
+	native;
+
+
+
+cpptext
+{
+	// AActor interface
+	void Destroy();
+	void PostScriptDestroyed();
+	// MasterServerLink interface
+	UBOOL Poll( INT WaitTime );
+	// ServerQueryClient interface
+	void Init();
+}
+
+enum EQueryInterfaceCommand
+{
+	QI_Ping,
+	QI_Rules,
+	QI_Players,
+	QI_RulesAndPlayers,
+	QI_SmallPing,
+};
+
+enum EPingCause
+{
+	PC_Unknown,
+	PC_Clicked,
+	PC_AutoPing,
+	PC_LANBroadcast,
+};
+
+var bool bLANQuery;
+
+delegate OnReceivedPingInfo( int ListID, EPingCause PingCause, GameInfo.ServerResponseLine s );
+delegate OnPingTimeout( int ListID, EPingCause PingCause );
+
+native function PingServer( int ListID, EPingCause PingCause, string IP, int Port, EQueryInterfaceCommand Command, GameInfo.ServerResponseLine CurrentState );
+native function CancelPings();
+
+function BroadcastPingRequest()
+{
+	local GameInfo.ServerResponseLine Temp;
+	if (class'MasterServerUplink'.default.LANServerPort >= 0)
+	   PingServer( -1, PC_LANBroadcast, "BROADCAST", class'MasterServerUplink'.default.LANServerPort, QI_Ping, Temp );
+}
+
+defaultproperties
+{
+	bLANQuery=0
+}
+//=============================================================================
+// TcpLink: An Internet TCP/IP connection.
+//=============================================================================
+class TcpLink extends InternetLink
+	native
+	transient;
+
+
+
+cpptext
+{
+	ATcpLink();
+	void PostScriptDestroyed();
+	UBOOL Tick( FLOAT DeltaTime, enum ELevelTick TickType );
+
+	void CheckConnectionAttempt();
+	void CheckConnectionQueue();
+	void PollConnections();
+	UBOOL FlushSendBuffer();
+	void ShutdownConnection();
+	virtual UBOOL ShouldTickInEntry() { return true; }
+}
+
+//-----------------------------------------------------------------------------
+// Variables.
+
+// LinkState is only valid for TcpLink at this time.
+var enum ELinkState
+{
+	STATE_Initialized,		// Sockets is initialized
+	STATE_Ready,			// Port bound, ready for activity
+	STATE_Listening,		// Listening for connections
+	STATE_Connecting,		// Attempting to connect
+	STATE_Connected,		// Open and connected
+	STATE_ListenClosePending,// Socket in process of closing
+	STATE_ConnectClosePending,// Socket in process of closing
+	STATE_ListenClosing,	// Socket in process of closing
+	STATE_ConnectClosing	// Socket in process of closing
+} LinkState;
+
+var IpAddr	  RemoteAddr;	// Contains address of peer connected to from a Listen()
+
+// If AcceptClass is not None, an actor of class AcceptClass will be spawned when an
+// incoming connecting is accepted, leaving the listener open to accept more connections.
+// Accepted() is called only in the child class.  You can use the LostChild() and GainedChild()
+// events to track your children.
+var class<TcpLink> AcceptClass;
+var const Array<byte> SendFIFO; // send fifo
+//-----------------------------------------------------------------------------
+// natives.
+
+// BindPort: Binds a free port or optional port specified in argument one.
+native function int BindPort( optional int Port, optional bool bUseNextAvailable );
+
+// Listen: Listen for connections.  Can handle up to 5 simultaneous connections.
+// Returns false if failed to place socket in listen mode.
+native function bool Listen();
+
+// Open: Open a connection to a foreign host.
+native function bool Open( IpAddr Addr );
+
+// Close: Closes the current connection.
+native function bool Close();
+
+// IsConnected: Returns true if connected.
+native function bool IsConnected();
+
+// SendText: Sends text string.
+// Appends a cr/lf if LinkMode=MODE_Line.  Returns number of bytes sent.
+native function int SendText( coerce string Str );
+
+// SendBinary: Send data as a byte array.
+native function int SendBinary( int Count, byte B[255] );
+
+// ReadText: Reads text string.
+// Returns number of bytes read.
+native function int ReadText( out string Str );
+
+// ReadBinary: Read data as a byte array.
+native function int ReadBinary( int Count, out byte B[255] );
+
+//-----------------------------------------------------------------------------
+// Events.
+
+// Accepted: Called during STATE_Listening when a new connection is accepted.
+event Accepted();
+
+// Opened: Called when socket successfully connects.
+event Opened();
+
+// Closed: Called when Close() completes or the connection is dropped.
+event Closed();
+
+// ReceivedText: Called when data is received and connection mode is MODE_Text.
+event ReceivedText( string Text );
+
+// ReceivedLine: Called when data is received and connection mode is MODE_Line.
+event ReceivedLine( string Line );
+
+// ReceivedBinary: Called when data is received and connection mode is MODE_Binary.
+event ReceivedBinary( int Count, byte B[255] );
+
+defaultproperties
+{
+     bAlwaysTick=True
+}
+//=============================================================================
+// UdpBeacon: Base class of beacon sender and receiver.
+//=============================================================================
+class UdpBeacon extends UdpLink
+	config
+	transient;
+
+
+
+var() globalconfig bool       DoBeacon;
+var() globalconfig int        ServerBeaconPort;		// Listen port
+var() globalconfig int        BeaconPort;			// Reply port
+var() globalconfig float      BeaconTimeout;
+var() globalconfig string     BeaconProduct;
+
+var int	UdpServerQueryPort;
+var int boundport;
+
+var IpAddr                    BroadcastReplyAddr; // sjs
+
+function BeginPlay()
+{
+	boundport = BindPort(ServerBeaconPort, True);
+
+	if ( boundport == 0 )
+	{
+		log( "UdpBeacon failed to bind a port." );
+		return;
+	}
+
+	BroadcastReplyAddr.Addr = BroadcastAddr;
+	BroadcastReplyAddr.Port = BeaconPort;	
+
+	// BroadcastBeacon(Addr); // Initial notification.
+}
+
+function BroadcastBeacon(IpAddr Addr)
+{
+    local string response;
+
+    response = BeaconProduct @ Mid(Level.GetAddressURL(),InStr(Level.GetAddressURL(),":")+1)
+        $ "?XSessionID=" $ LocalXSessionID
+        $ "?XExchangeKey=" $ LocalXExchangeKey
+        $ "?XHostAddr=" $ LocalXHostAddr
+        $ "?BeaconText=" $ Level.Game.GetBeaconText();
+
+	SendText( BroadcastReplyAddr, response  );
+}
+
+function BroadcastBeaconQuery(IpAddr Addr)
+{
+	SendText( BroadcastReplyAddr, BeaconProduct @ UdpServerQueryPort );
+	// Log( "UdpBeacon: sending query reply to "$IpAddrToString(BroadcastReplyAddr) );
+}
+
+event ReceivedText( IpAddr Addr, string Text )
+{	
+    // gam ---
+    if( Level.AuthMode != AM_SystemLink)
+    {
+        Destroy();
+        return;
+    }
+    // --- gam
+
+	if( Text == "REPORT" )
+		BroadcastBeacon(Addr);
+
+	if( Text == "REPORTQUERY" )
+		BroadcastBeaconQuery(Addr);
+}
+
+function Destroyed()
+{
+	Super.Destroyed();
+	//Log("ServerBeacon Destroyed");
+}
+
+defaultproperties
+{
+     DoBeacon=True
+	 ServerBeaconPort=8777
+     BeaconPort=9777
+     BeaconTimeout=5.000000
+     BeaconProduct="unreal"
+	 RemoteRole=ROLE_None
+}
+//=============================================================================
+// UdpGameSpyQuery
+//
+// Version: 1.5
+//
+// This query server is compliant with the GameSpy Uplink Specification.
+// The specification is available at http://www.gamespy.com/developer
+// and might be of use to progammers who are writing or maintaining
+// their own stat gathering/game querying software.
+//
+// Note: Currently, SendText returns false if successful.
+//
+// Full documentation on this class is available at http://unreal.epicgames.com/
+//
+//=============================================================================
+class UdpGameSpyQuery extends UdpLink config;
+
+
+
+// Game Server Config.
+var() name					QueryName;			// Name to set this object's Tag to.
+var int					    CurrentQueryNum;	// Query ID Number.
+//crt
+var string ReplyData;
+
+var globalconfig int		MinNetVer;
+
+//!! Hack to prevent port swapping
+var globalconfig int		OldQueryPortNumber;
+var globalconfig bool		bRestartServerOnPortSwap;
+
+
+
+// Initialize.
+function PreBeginPlay()
+{
+	local int boundport;
+
+	// Set the Tag
+	Tag = QueryName;
+
+	// Bind the listen socket
+	boundport = BindPort(Level.Game.GetServerPort()+10, true);
+	if( boundport == 0 )
+	{
+		Log("UdpServerQuery: Port failed to bind.");
+		return;
+	}
+	Log("UdpServerQuery(crt): Port "$boundport$" successfully bound.");
+
+	if( bRestartServerOnPortSwap )
+	{
+		if( OldQueryPortNumber != 0 )
+			assert( OldQueryPortNumber == boundport );
+		OldQueryPortNumber = boundport;
+		SaveConfig();
+	}
+}
+
+function PostBeginPlay()
+{
+	local UdpBeacon	Beacon;
+
+	foreach AllActors(class'UdpBeacon', Beacon)
+	{
+		Beacon.UdpServerQueryPort = Port;
+	}
+	Super.PostBeginPlay();
+}
+
+// Received a query request.
+event ReceivedText( IpAddr Addr, string Text )
+{
+	local string Query;
+	local bool QueryRemaining;
+	local int  QueryNum, PacketNum;
+
+	// Assign this packet a unique value from 1 to 100
+	CurrentQueryNum++;
+	if (CurrentQueryNum > 100)
+		CurrentQueryNum = 1;
+	QueryNum = CurrentQueryNum;
+
+	Query = Text;
+	if (Query == "")		// If the string is empty, don't parse it
+		QueryRemaining = false;
+	else
+		QueryRemaining = true;
+	//crt
+	PacketNum =  0;
+	ReplyData = "";
+	while (QueryRemaining) {
+		Query = ParseQuery(Addr, Query, QueryNum, PacketNum);
+		if (Query == "")
+			QueryRemaining = false;
+		else
+			QueryRemaining = true;
+	}
+}
+
+function bool ParseNextQuery( string Query, out string QueryType, out string QueryValue, out string QueryRest, out int bFinalPacket )
+{
+	local string TempQuery;
+	local int ClosingSlash;
+
+	if (Query == "")
+		return false;
+
+	// Query should be:
+	//   \[type]\<value>
+	if (Left(Query, 1) == "\\")
+	{
+		// Check to see if closed.
+		ClosingSlash = InStr(Right(Query, Len(Query)-1), "\\");
+		if (ClosingSlash == 0)
+			return false;
+
+		TempQuery = Query;
+
+		// Query looks like:
+		//  \[type]\
+		QueryType = Right(Query, Len(Query)-1);
+		QueryType = Left(QueryType, ClosingSlash);
+
+		QueryRest = Right(Query, Len(Query) - (Len(QueryType) + 2));
+
+		if ((QueryRest == "") || (Len(QueryRest) == 1))
+		{
+			bFinalPacket = 1;
+			return true;
+		} else if (Left(QueryRest, 1) == "\\")
+			return true;	// \type\\
+
+		// Query looks like:
+		//  \type\value
+		ClosingSlash = InStr(QueryRest, "\\");
+		if (ClosingSlash >= 0)
+			QueryValue = Left(QueryRest, ClosingSlash);
+		else
+			QueryValue = QueryRest;
+
+		QueryRest = Right(Query, Len(Query) - (Len(QueryType) + Len(QueryValue) + 3));
+		if (QueryRest == "")
+		{
+			bFinalPacket = 1;
+			return true;
+		} else
+			return true;
+	} else {
+		return false;
+	}
+}
+
+function string ParseQuery( IpAddr Addr, coerce string Query, int QueryNum, out int PacketNum )
+{
+	local string QueryType, QueryValue, QueryRest, ValidationString;
+	local bool Result;
+	local int bFinalPacket;
+
+	bFinalPacket = 0;
+	Result = ParseNextQuery(Query, QueryType, QueryValue, QueryRest, bFinalPacket);
+	if( !Result )
+		return "";
+
+	//Log("Got  Query: "  $ QueryNum $ "." $ PacketNum $ ":" $ QueryType);
+
+	if( QueryType=="basic" )
+	{
+		Result = SendQueryPacket(Addr, GetBasic(), QueryNum, PacketNum, bFinalPacket);
+	}
+	else if( QueryType=="info" )
+	{
+		Result = SendQueryPacket(Addr, GetInfo(), QueryNum, PacketNum, bFinalPacket);
+	}
+	else if( QueryType=="rules" )
+	{
+		Result = SendQueryPacket(Addr, GetRules(), QueryNum, PacketNum, bFinalPacket);
+	}
+	else if( QueryType=="players" )
+	{
+		if( Level.Game.NumPlayers > 0 )
+			Result = SendPlayers(Addr, QueryNum, PacketNum, bFinalPacket);
+		else
+			Result = SendQueryPacket(Addr, "", QueryNum, PacketNum, bFinalPacket);
+	}
+	else if( QueryType=="status" )
+	{
+		Result = SendQueryPacket(Addr, GetBasic(), QueryNum, PacketNum, 0);
+		Result = SendQueryPacket(Addr, GetInfo(), QueryNum, PacketNum, 0);
+		if( Level.Game.NumPlayers == 0 )
+		{
+			Result = SendQueryPacket(Addr, GetRules(), QueryNum, PacketNum, bFinalPacket);
+		}
+		else
+		{
+			Result = SendQueryPacket(Addr, GetRules(), QueryNum, PacketNum, 0);
+			Result = SendPlayers(Addr, QueryNum, PacketNum, bFinalPacket);
+		}
+	}
+	else if( QueryType=="echo" )
+	{
+		// Respond to an echo with the same string
+		//!! disabled due to security problem - the remote ip/port could be spoofed to cause an echo loop!
+		Result = SendQueryPacket(Addr, "\\ignoring\\"$QueryValue, QueryNum, PacketNum, bFinalPacket);
+	}
+	else if( QueryType=="secure" )
+	{
+		ValidationString = "\\validate\\"$GameSpyValidate(QueryValue);
+		Result = SendQueryPacket(Addr, ValidationString, QueryNum, PacketNum, bFinalPacket);
+	}
+	else if( QueryType=="level_property" )
+	{
+		Result = SendQueryPacket(Addr, GetLevelProperty(QueryValue), QueryNum, PacketNum, bFinalPacket);
+	}
+	else if( QueryType=="game_property" )
+	{
+			Result = SendQueryPacket(Addr, GetGameProperty(QueryValue), QueryNum, PacketNum, bFinalPacket);
+	}
+	else if( QueryType=="player_property" )
+	{
+		Result = SendQueryPacket(Addr, GetPlayerProperty(QueryValue), QueryNum, PacketNum, bFinalPacket);
+	}
+	return QueryRest;
+}
+
+function bool SendAPacket(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalPacket)
+{
+	local bool Result;
+
+	ReplyData = ReplyData$"\\queryid\\"$QueryNum$"."$++PacketNum;
+	if (bFinalPacket == 1) {
+		ReplyData = ReplyData $ "\\final\\";
+	}
+	Result = SendText(Addr, ReplyData);
+	ReplyData = "";
+
+	return Result;
+
+}
+
+// SendQueryPacket is a wrapper for SendText that allows for packet numbering.
+function bool SendQueryPacket(IpAddr Addr, coerce string SendString, int QueryNum, out int PacketNum, int bFinalPacket)
+{
+	local bool Result;
+
+	//Log("Send Query: "  $ QueryNum $ "." $ PacketNum $ ":" $ bFinalPacket);
+	result = true;
+	if (len(ReplyData) + len(SendString) > 1000)
+		result = SendAPacket(Addr, QueryNum, PacketNum, 0);
+
+	ReplyData = ReplyData $ SendString;
+
+	if (bFinalPacket == 1)
+		result = SendAPacket(Addr, QueryNum, PacketNum, bFinalPacket);
+
+	return Result;
+}
+
+// Return a string of basic information.
+function string GetBasic() {
+	local string ResultSet;
+
+	// The name of this game.
+	ResultSet = "\\gamename\\"$GameSpyGameName();
+
+	// The version of this game.
+	ResultSet = ResultSet$"\\gamever\\"$Level.EngineVersion;
+
+	// The most recent network compatible version.
+	if( MinNetVer >= Int(Level.MinNetVersion) &&
+		MinNetVer <= Int(Level.EngineVersion) )
+		ResultSet = ResultSet$"\\minnetver\\"$string(MinNetVer);
+	else
+		ResultSet = ResultSet$"\\minnetver\\"$Level.MinNetVersion;
+
+	// The regional location of this game.
+	ResultSet = ResultSet$"\\location\\"$class'UdpGamespyUplink'.default.ServerRegion;
+
+	return ResultSet;
+}
+
+// Return a string of important system information.
+function string GetInfo() {
+	local string ResultSet;
+	local string ServerName;
+
+	ServerName = Level.Game.GameReplicationInfo.ServerName;
+	ReplaceText(ServerName,"\\","");	// strip \'s
+
+	// The server name, i.e.: Bob's Server
+	ResultSet = "\\hostname\\"$ServerName;
+
+	// The short server name
+	//ResultSet = ResultSet$"\\shortname\\"$Level.Game.GameReplicationInfo.ShortName;
+
+	// The server port.
+	ResultSet = ResultSet$"\\hostport\\"$Level.Game.GetServerPort();
+
+	// (optional) The server IP
+	// if (ServerIP != "")
+	//	ResultSet = ResultSet$"\\hostip\\"$ServerIP;
+
+	// The map/level title
+	ResultSet = ResultSet$"\\maptitle\\"$Level.Title;
+
+	// Map name
+	ResultSet = ResultSet$"\\mapname\\"$Level.GetLevelFileName();
+
+	// The mod or game type
+	ResultSet = ResultSet$"\\gametype\\"$GetItemName(string(Level.Game.Class));
+
+	// The number of players
+	ResultSet = ResultSet$"\\numplayers\\"$Level.Game.GetNumPlayers();
+
+	// The maximum number of players
+	ResultSet = ResultSet$"\\maxplayers\\"$Level.Game.MaxPlayers;
+
+	// The game mode: openplaying
+	ResultSet = ResultSet$"\\gamemode\\openplaying";
+
+	// The version of this game.
+	ResultSet = ResultSet$"\\gamever\\"$Level.EngineVersion;
+
+	// The most recent network compatible version.
+	if( MinNetVer >= Int(Level.MinNetVersion) &&
+		MinNetVer <= Int(Level.EngineVersion) )
+		ResultSet = ResultSet$"\\minnetver\\"$string(MinNetVer);
+	else
+		ResultSet = ResultSet$"\\minnetver\\"$Level.MinNetVersion;
+
+	//ResultSet = ResultSet$Level.Game.GetInfo();
+
+	return ResultSet;
+}
+
+// Return a string of miscellaneous information.
+// Game specific information, user defined data, custom parameters for the command line.
+function string GetRules()
+{
+	local string ResultSet;
+
+	//ResultSet = Level.Game.GetRules();
+
+	// Admin's Name
+	if( Level.Game.GameReplicationInfo.AdminName != "" )
+		ResultSet = ResultSet$"\\AdminName\\"$Level.Game.GameReplicationInfo.AdminName;
+
+	// Admin's Email
+	if( Level.Game.GameReplicationInfo.AdminEmail != "" )
+		ResultSet = ResultSet$"\\AdminEMail\\"$Level.Game.GameReplicationInfo.AdminEmail;
+
+	// Whether the server is password protected.
+	if( Level.Game.AccessControl != None && Level.Game.AccessControl.RequiresPassword() )
+		ResultSet = ResultSet$"\\password\\1";
+	else
+		ResultSet = ResultSet$"\\password\\0";
+
+	return ResultSet;
+}
+
+// Return a string of information on a player.
+function string GetPlayer( PlayerController P, int PlayerNum )
+{
+	local string ResultSet;
+	local string PlayerName;
+
+	PlayerName = P.PlayerReplicationInfo.PlayerName;
+
+	// Name
+	ReplaceText(PlayerName,"\\","");	// strip \'s
+	ResultSet = "\\player_"$PlayerNum$"\\"$PlayerName;
+
+	// Frags
+	ResultSet = ResultSet$"\\frags_"$PlayerNum$"\\"$int(P.PlayerReplicationInfo.Score);
+
+	// Ping
+	ResultSet = ResultSet$"\\ping_"$PlayerNum$"\\"$P.ConsoleCommand("GETPING");
+
+	// Team
+	if(P.PlayerReplicationInfo.Team != None)
+		ResultSet = ResultSet$"\\team_"$PlayerNum$"\\"$P.PlayerReplicationInfo.Team.TeamIndex;
+	else
+		ResultSet = ResultSet$"\\team_"$PlayerNum$"\\0";
+
+	return ResultSet;
+}
+
+// Send data for each player
+function bool SendPlayers(IpAddr Addr, int QueryNum, out int PacketNum, int bFinalPacket)
+{
+	local Controller C;
+	local int i;
+	local bool Result, SendResult;
+
+	Result = false;
+
+	C = Level.ControllerList;
+	while( i < Level.Game.NumPlayers )
+	{
+		if (C == None)
+		{
+			if(bFinalPacket==1)
+				SendResult = SendAPacket(Addr,QueryNum,PacketNum,bFinalPacket);
+			Result = SendResult || Result;
+			break;
+		}
+		else if (C.IsA('PlayerController') && C.PlayerReplicationInfo != None && !C.PlayerReplicationInfo.bOnlySpectator)
+		{
+			if( i==Level.Game.NumPlayers-1 && bFinalPacket==1)
+				SendResult = SendQueryPacket(Addr, GetPlayer(PlayerController(C), i), QueryNum, PacketNum, 1);
+			else
+				SendResult = SendQueryPacket(Addr, GetPlayer(PlayerController(C), i), QueryNum, PacketNum, 0);
+			Result = SendResult || Result;
+			i++;
+		}
+		C = C.NextController;
+	}
+
+	return Result;
+}
+
+// Get an arbitrary property from the level object.
+function string GetLevelProperty( string Prop )
+{
+	local string ResultSet;
+
+	ResultSet = "\\"$Prop$"\\"$Level.GetPropertyText(Prop);
+
+	return ResultSet;
+}
+
+// Get an arbitrary property from the game object.
+function string GetGameProperty( string Prop )
+{
+	local string ResultSet;
+
+	ResultSet = "\\"$Prop$"\\"$Level.Game.GetPropertyText(Prop);
+
+	return ResultSet;
+}
+
+// Get an arbitrary property from the players.
+function string GetPlayerProperty( string Prop )
+{
+	local string ResultSet;
+	local int i;
+	local Controller C;
+
+	foreach AllActors(class'Controller', C)
+	{
+		if( C.PlayerReplicationInfo!=None && !C.PlayerReplicationInfo.bBot )
+		{
+			i++;
+			ResultSet = ResultSet$
+				"\\"$
+				Prop$
+				"_"$
+				i$
+				"\\"$
+				C.GetPropertyText(Prop);
+		}
+	}
+
+
+	return ResultSet;
+}
+
+defaultproperties
+{
+     QueryName=MasterUplink
+     RemoteRole=ROLE_None
+}
+//=============================================================================
+// UdpGameSpyUplink
+//
+// Version: 1.3
+//
+// This uplink is compliant with the GameSpy Uplink Specification.
+// The specification is available at http://www.gamespy.com/developer
+// and might be of use to progammers who want to adapt their own
+// server uplinks.
+//
+// UdpGameSpyUplink sends a heartbeat to the specified master server
+// every five minutes.  The heartbeat is in the form:
+//    \heartbeat\QueryPort\gamename\unreal
+//
+// Full documentation on this class is available at http://unreal.epicgames.com/
+//
+//=============================================================================
+class UdpGameSpyUplink extends UdpLink config;
+
+
+
+// Master Uplink Config.
+var() config int		UpdateMinutes;			// Period of update (in minutes)
+var() string			MasterServerAddress;	// Address of the master server
+var() config int		MasterServerPort;		// Optional port that the master server is listening on
+var() config int 		ServerRegion;			// Region of the game server
+
+
+var() name				TargetQueryName;		// Name of the query server object to use.
+var IpAddr				MasterServerIpAddr;		// Master server's address.
+var string		        HeartbeatMessage;		// The message that is sent to the master server.
+var UdpGameSpyQuery		Query;					// The query object.
+var int				    CurrentQueryNum;		// Query ID Number.
+
+// Initialize.
+function PreBeginPlay()
+{
+	// Find a the server query handler.
+	foreach AllActors(class'UdpGameSpyQuery', Query, TargetQueryName)
+		break;
+
+	if( Query==None )
+	{
+		Log("UdpGameSpyUplink: Could not find a UdpGameSpyQuery object, aborting.");
+		return;
+	}
+
+	HeartbeatMessage = "\\heartbeat\\"$Query.Port$"\\gamename\\"$GameSpyGameName();
+
+	// Set the Port.
+	MasterServerIpAddr.Port = MasterServerPort;
+
+	// Resolve the Address.
+	if( MasterServerAddress=="" )
+		MasterServerAddress = "master"$ServerRegion$".gamespy.com";
+	Resolve( MasterServerAddress );
+}
+
+// When master server address is resolved.
+function Resolved( IpAddr Addr )
+{
+	local int UplinkPort;
+
+	// Set the address
+	MasterServerIpAddr.Addr = Addr.Addr;
+
+	// Handle failure.
+	if( MasterServerIpAddr.Addr == 0 )
+	{
+		Log("UdpGameSpyUplink: Invalid master server address, aborting.");
+		return;
+	}
+
+	// Display success message.
+	Log("UdpGameSpyUplink: Master Server is "$MasterServerAddress$":"$string(MasterServerIpAddr.Port));
+
+	// Bind the local port.
+	UplinkPort = Query.Port + 1;
+	if( BindPort(UplinkPort, true) == 0 )
+	{
+		Log( "UdpGameSpyUplink: Error binding port, aborting." );
+		return;
+	}
+	Log("UdpGameSpyUplink: Port "$UplinkPort$" successfully bound.");
+
+	// Start transmitting.
+	Resume();
+}
+
+// Host resolution failue.
+function ResolveFailed()
+{
+	Log("UdpGameSpyUplink: Failed to resolve master server address, aborting.");
+}
+
+// Notify the MasterServer we exist.
+function Timer()
+{
+	local bool Result;
+
+//	Log("Sending GameSpy heartbeat:"@HeartbeatMessage);
+	Result = SendText( MasterServerIpAddr, HeartbeatMessage );
+	if ( !Result )
+		Log( "Failed to send heartbeat to master server.");
+}
+
+// Stop the uplink.
+function Halt()
+{
+	SetTimer(0.0, false);
+}
+
+// Resume the uplink.
+function Resume()
+{
+	SetTimer(UpdateMinutes * 60, true);
+	Timer();
+}
+
+// Received a query request.
+event ReceivedText( IpAddr Addr, string Text )
+{
+	local string Query;
+	local bool QueryRemaining;
+	local int  QueryNum, PacketNum;
+
+	// Assign this packet a unique value from 1 to 100
+	CurrentQueryNum++;
+	if (CurrentQueryNum > 100)
+		CurrentQueryNum = 1;
+	QueryNum = CurrentQueryNum;
+
+	Query = Text;
+	if (Query == "")		// If the string is empty, don't parse it
+		QueryRemaining = false;
+	else
+		QueryRemaining = true;
+
+	while (QueryRemaining) {
+		Query = ParseQuery(Addr, Query, QueryNum, PacketNum);
+		if (Query == "")
+			QueryRemaining = false;
+		else
+			QueryRemaining = true;
+	}
+}
+
+function bool ParseNextQuery( string Query, out string QueryType, out string QueryValue, out string QueryRest, out string FinalPacket )
+{
+	local string TempQuery;
+	local int ClosingSlash;
+
+	if (Query == "")
+		return false;
+
+	// Query should be:
+	//   \[type]\<value>
+	if (Left(Query, 1) == "\\")
+	{
+		// Check to see if closed.
+		ClosingSlash = InStr(Right(Query, Len(Query)-1), "\\");
+		if (ClosingSlash == 0)
+			return false;
+
+		TempQuery = Query;
+
+		// Query looks like:
+		//  \[type]\
+		QueryType = Right(Query, Len(Query)-1);
+		QueryType = Left(QueryType, ClosingSlash);
+
+		QueryRest = Right(Query, Len(Query) - (Len(QueryType) + 2));
+
+		if ((QueryRest == "") || (Len(QueryRest) == 1))
+		{
+			FinalPacket = "final";
+			return true;
+		} else if (Left(QueryRest, 1) == "\\")
+			return true;	// \type\\
+
+		// Query looks like:
+		//  \type\value
+		ClosingSlash = InStr(QueryRest, "\\");
+		if (ClosingSlash >= 0)
+			QueryValue = Left(QueryRest, ClosingSlash);
+		else
+			QueryValue = QueryRest;
+
+		QueryRest = Right(Query, Len(Query) - (Len(QueryType) + Len(QueryValue) + 3));
+		if (QueryRest == "")
+		{
+			FinalPacket = "final";
+			return true;
+		} else
+			return true;
+	} else {
+		return false;
+	}
+}
+
+function string ParseQuery( IpAddr Addr, coerce string QueryStr, int QueryNum, out int PacketNum )
+{
+	local string QueryType, QueryValue, QueryRest, ValidationString;
+	local bool Result;
+	local string FinalPacket;
+
+	Result = ParseNextQuery(QueryStr, QueryType, QueryValue, QueryRest, FinalPacket);
+	if( !Result )
+		return "";
+
+	if( QueryType=="basic" )
+	{
+		// Ignore.
+		Result = true;
+	}
+	else if( QueryType=="secure" )
+	{
+		ValidationString = "\\validate\\"$GameSpyValidate(QueryValue);
+		Result = SendQueryPacket(Addr, ValidationString, QueryNum, ++PacketNum, FinalPacket);
+	}
+	return QueryRest;
+}
+
+// SendQueryPacket is a wrapper for SendText that allows for packet numbering.
+function bool SendQueryPacket(IpAddr Addr, coerce string SendString, int QueryNum, int PacketNum, string FinalPacket)
+{
+	local bool Result;
+	if (FinalPacket == "final") {
+		SendString = SendString$"\\final\\";
+	}
+	SendString = SendString$"\\queryid\\"$QueryNum$"."$PacketNum;
+
+	Result = SendText(Addr, SendString);
+
+	return Result;
+}
+
+defaultproperties
+{
+     UpdateMinutes=1
+     TargetQueryName=MasterUplink
+     MasterServerPort=27900
+	 ServerRegion=0
+     RemoteRole=ROLE_None
+}
+//=============================================================================
+// UdpLink: An Internet UDP connectionless socket.
+//=============================================================================
+class UdpLink extends InternetLink
+	native
+	transient;
+
+
+
+cpptext
+{
+	AUdpLink();
+	void PostScriptDestroyed();
+	UBOOL Tick( FLOAT DeltaTime, enum ELevelTick TickType );
+	FSocketData GetSocketData();
+}
+
+//-----------------------------------------------------------------------------
+// Variables.
+
+var() const int BroadcastAddr;
+
+// sjs ---
+var() string LocalXSessionID;
+var() string LocalXExchangeKey;
+var() string LocalXHostAddr;
+// --- sjs
+
+//-----------------------------------------------------------------------------
+// Natives.
+
+// BindPort: Binds a free port or optional port specified in argument one.
+native function int BindPort( optional int Port, optional bool bUseNextAvailable );
+
+// SendText: Sends text string.
+// Appends a cr/lf if LinkMode=MODE_Line .
+native function bool SendText( IpAddr Addr, coerce string Str );
+
+// SendBinary: Send data as a byte array.
+native function bool SendBinary( IpAddr Addr, int Count, byte B[255] );
+
+// ReadText: Reads text string.
+// Returns number of bytes read.
+native function int ReadText( out IpAddr Addr, out string Str );
+
+// ReadBinary: Read data as a byte array.
+native function int ReadBinary( out IpAddr Addr, int Count, out byte B[255] );
+
+native function string XboxName();
+
+//-----------------------------------------------------------------------------
+// Events.
+
+// ReceivedText: Called when data is received and connection mode is MODE_Text.
+event ReceivedText( IpAddr Addr, string Text );
+
+// ReceivedLine: Called when data is received and connection mode is MODE_Line.
+event ReceivedLine( IpAddr Addr, string Line );
+
+// ReceivedBinary: Called when data is received and connection mode is MODE_Binary.
+event ReceivedBinary( IpAddr Addr, int Count, byte B[255] );
+
+defaultproperties
+{
+     bAlwaysTick=True
+	 BroadcastAddr=-1;
+    LocalXSessionID="1200"
+    LocalXExchangeKey="123456"
+    LocalXHostAddr="0.0.0.0"
+}
+

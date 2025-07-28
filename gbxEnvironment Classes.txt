@@ -1,0 +1,1349 @@
+class gbxAnimationCycler extends Actor
+	placeable;
+
+
+
+var() bool UseFixedAnimationRate;
+var() float AnimationRate;
+var() float AnimationRateMinimum;
+var() float AnimationRateStepSize;
+var() bool DisplaySequenceName;
+var float CurrentAnimationRate;
+var() name AnimationName;
+var name NextAnimationName;
+
+function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+}
+
+/* Reset()
+reset actor to initial state - used when restarting level without reloading.
+*/
+function Reset()
+{
+	GotoState('Initialize');
+}
+
+auto state Initialize
+{
+Begin:
+	if (DrawType != DT_Mesh)
+	{
+		Log(class $ "." $ name $ ".state Initialize - ERROR!  DrawType not set to DT_Mesh!" );
+	}
+	else
+	{
+		if (Mesh == None)
+		{
+			Log(class $ "." $ name $ ".state Initialize - ERROR!  Couldn't load animation (skeletal mesh): " $ Mesh);
+		}
+		else
+		{
+			// all is well, let's start animating it...
+//			AnimationName = '';
+			GetNextAnimName(AnimationName, AnimationName);
+
+			if (AnimationName != '')
+				GotoState('Animate');
+			else
+				Log(class $ "." $ name $ ".state Initialize - ERROR!  Can't find first animation sequence!" );
+		}
+	}
+}
+
+state Animate
+{
+	function AnimEnd(int Channel)
+	{
+		if (!UseFixedAnimationRate)
+		{
+			if (CurrentAnimationRate > AnimationRateMinimum)
+				CurrentAnimationRate -= AnimationRateStepSize;
+			else
+				CurrentAnimationRate = AnimationRate;
+		}
+
+		PlayAnim(AnimationName, CurrentAnimationRate);
+	}
+
+	event bool UsedBy(Pawn User)
+	{
+		StopAnimating();
+
+		GetNextAnimName(AnimationName, NextAnimationName);
+
+		if (NextAnimationName != '')
+			AnimationName = NextAnimationName;
+		else
+			GetNextAnimName('', AnimationName);  // get the first one again
+
+		if (DisplaySequenceName)
+		{
+			User.ClientMessage(AnimationName);
+		}
+
+		CurrentAnimationRate = AnimationRate;
+
+		PlayAnim(AnimationName, CurrentAnimationRate);
+
+		return true;
+	}
+
+Begin:
+	CurrentAnimationRate = AnimationRate;
+	PlayAnim(AnimationName, CurrentAnimationRate);
+}
+
+defaultproperties
+{
+	bBlockPlayers=false
+	bCollideActors=true
+	bCollideWorld=true
+	bUseCylinderCollision=true
+	CollisionRadius=+0120.000000
+	CollisionHeight=+0040.000000
+	UseFixedAnimationRate=false
+	AnimationRate=1.0
+	AnimationRateMinimum=0.4
+	AnimationRateStepSize=0.2
+	DisplaySequenceName=false
+}
+// ====================================================================
+//  Class:  gbxCratesBeacon
+//
+//  <Enter a description here>
+//
+// (c) 2001, Epic Games, Inc - All Rights Reserved
+// ====================================================================
+
+class gbxCratesBeacon extends gbxBeacons;
+
+var()	Material		CrateTexture; // Will use a custom image for the bar in the Oracle camera.
+var()	float			CrateTextureSize;
+
+simulated function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+	if (CrateTexture != None)
+	{
+		CustomTexture.Icon = CrateTexture;	
+		CustomTexture.UL=Texture(CrateTexture).USize;
+		CustomTexture.VL=Texture(CrateTexture).VSize;
+		CustomTexture.PivotU=0.5;
+		CustomTexture.PivotV=0.5;
+		CustomTexture.ScaleX=CrateTextureSize;
+		CustomTexture.ScaleY=CrateTextureSize;
+	}	
+}
+
+defaultproperties
+{
+	CustomTexture = (DrawColor=(R=255,G=255,B=255,A=255))
+	bNotInSAView = false
+	bNoDirectionArrow = true
+	bNoDistanceArc = true
+	CrateTextureSize = 1.0
+}
+
+// ====================================================================
+//  Class:  gbxFollowBeacon
+//
+//  <Enter a description here>
+//
+// (c) 2001, Epic Games, Inc - All Rights Reserved
+// ====================================================================
+
+class gbxFollowBeacon extends gbxWaypointBeacon;
+
+
+
+var () Actor m_anOwner;
+
+simulated function Tick(float Delta)
+{
+	if (m_anOwner == None)
+		return;
+
+	if (bEnabled)
+		SetLocation( m_anOwner.Location );
+}
+
+defaultproperties
+{
+}
+//*********************************************************
+// * gbxJerryCan *
+// Karma jerry can object.
+//*********************************************************
+class gbxJerryCan extends KActor
+	placeable;
+
+//#exec OBJ LOAD FILE=..\staticmesh\s_npc_item_us.usx
+
+//---------------------------------------------------------
+// Properties
+//---------------------------------------------------------
+
+//---------------------------------------------------------
+// Variables
+//---------------------------------------------------------
+var float		AirBurstThreshold;		// Distance from ground where explosion is considered to be exploding in air
+
+//*********************************************************
+//	TakeDamage
+//*********************************************************
+function TakeDamage(int Damage, Pawn instigatedBy, Vector hitlocation,
+						Vector momentum, class<DamageType> damageType, optional name HitBoxName)
+{
+	Log("TakeDamage: "$self);
+
+	if( bKTakeShot )
+	{
+		Explode( instigatedBy );
+	}
+}
+
+//*********************************************************
+//	Explode
+//*********************************************************
+function Explode( Pawn EventInstigator )
+{
+	local IImpactManager ImpactMgr;
+	local Material FloorMat;
+	local Vector HitLoc, HitNormal;
+	local float AirBurstDistance;
+
+	TriggerEvent( Event, self, EventInstigator );
+
+	// spawn the explosion effects...
+	Trace( HitLoc, HitNormal, Location - Vect(0, 0, 4096), Location, false,, FloorMat );
+	AirBurstDistance = VSize(Location - HitLoc);
+
+	// Clear the floor material so the impact manager will understand the explosion as an air burst
+    if( AirBurstDistance > AirBurstThreshold )
+        FloorMat = None;
+
+    ImpactMgr = class'ImpactManager'.static.GetInstance( Level.Outer, self );
+    if (ImpactMgr != None)
+        ImpactMgr.HandleExplosionImpact(self, FloorMat, WC_Grenade, Location, rotator( HitNormal ));
+
+	SetCollision(False);
+	Destroy();
+}
+
+//*********************************************************
+//	Trigger
+//*********************************************************
+//
+// Default behaviour when triggered is to explode
+function Trigger( actor Other, Pawn EventInstigator )
+{
+	Explode( EventInstigator);
+}
+
+//=========================================================
+//	Default Properties
+//=========================================================
+defaultproperties
+{
+	bKTakeShot=true;
+	DrawType=DT_StaticMesh
+	// GBX:najnaj
+	// StaticMesh=StaticMesh's_npc_item_us.OLD_HUB_Demo_Object.jerry_can'
+
+	Begin Object Class=KarmaParams Name=KarmaParams1
+        KMass=0.250000
+		KStartEnabled=False
+        KActorGravScale=0.800000
+        bHighDetailOnly=False
+        KFriction=0.250000
+        KRestitution=0.020000
+		bKStayUpright=false
+		KLinearDamping=0.2
+		KAngularDamping=0.1
+        Name="KarmaParams1"
+    End Object
+    KParams=KarmaParams'KarmaParams1'
+
+    Physics=PHYS_Karma
+	bEdShouldSnap=True
+	bGameRelevant=True
+	bStatic=False
+	bShadowCast=False
+	bCollideActors=True
+	bCollideWorld=True
+    bProjTarget=True
+	bBlockActors=True
+	bBlockNonZeroExtentTraces=True
+	bBlockZeroExtentTraces=True
+	bBlockPlayers=True
+	bWorldGeometry=False
+	bBlockKarma=True
+	bAcceptsProjectors=True
+    CollisionHeight=+000001.000000
+	CollisionRadius=+000001.000000
+	bNoDelete=False
+	RemoteRole=ROLE_None
+	bTriggerOnce=true
+	bTriggered=false
+	AirBurstThreshold=150
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// * gbxKarmaJerryCanSpawner *
+// This class can be used within a level to create Karma jerry cans at runtime.
+// Trigger this actor to make it spawn a Karma jerry can.
+//////////////////////////////////////////////////////////////////////////////////////////
+
+class gbxKarmaJerryCanSpawner extends gbxKarmaSpawner
+	hidecategories(Collision,Lighting,LightColor,Karma,Force)
+	placeable;
+
+
+
+//*********************************************************
+//	BeginPlay
+//*********************************************************
+function BeginPlay()
+{
+	// Let base class do its thang chicken wang
+	Super.BeginPlay();
+
+	// Now handle my business
+}
+
+//*********************************************************
+//	PostBeginPlay
+//*********************************************************
+function PostBeginPlay()
+{
+	// Let base class do its thang chicken wang
+	Super.PostBeginPlay();
+
+	// Now handle my business
+}
+
+//*********************************************************
+//	Trigger
+//*********************************************************
+function Trigger( actor Other, Pawn EventInstigator )
+{
+	// Let base class do its thang chicken wang
+	Super.Trigger( Other, EventInstigator );
+
+	// Now handle my business
+}
+
+//*********************************************************
+//	SpawnKarmaActor
+//	Spawn the karma actor
+//*********************************************************
+function KActor SpawnKarmaActor()
+{
+	local KActor newActor;
+
+	if ( TargetTag == '')
+	{
+		Log(name $ ".SpawnKarmaActor() - WARNING, TargetTag is NULL!");
+		return None;
+	}
+
+	//newActor = Spawn( ActorClass,,, Location, Rotation );
+	newActor = Spawn( class'gbxJerryCan',,, Location, Rotation );
+
+	if( newActor == None )
+	{
+		Log( "WARNING: " $ class $ ".SpawnKarmaActor() unable to spawn Actor gbxJerryCan." );
+	}
+	else
+	{
+		// Set em up...and knock em out
+		ConfigureActor( newActor );
+
+		// give derived class a chance to be returned to...
+		if ( bDestroyAfterSpawn )
+			SetTimer(0.1, false);
+	}
+
+	return newActor;
+}
+
+//*********************************************************
+//	ConfigureActor
+//	Called after SpawnKarmaActor to setup properties and
+//	Assume newActor != None because calling function
+//	handles this for us...
+//*********************************************************
+function ConfigureActor( KActor newActor )
+{
+	local vector v_push, v_pushAngVel;
+	local rotator currentRot;
+	local int nRandomNum;
+
+	// Let base class do its thang chicken wang
+	Super.ConfigureActor( newActor );
+
+	// Setup Event
+	newActor.Event = Event;
+
+	Log("ConfigureActor in gbxKarmaSpawner!");
+
+	if (TargetActor == None)
+	{
+		Log( name $ ".ConfigureActor( '" $ TargetTag $ "' ): no Target Actor with that tag found.", 'gbxKarmaSpawner' );
+		return;
+	}
+
+	// Calculate trajectory
+	v_push = Normal(TargetActor.Location - Location);
+
+	// Apply random direction if requested
+	if ( RandomRotation.Pitch != 0 || RandomRotation.Yaw != 0 || RandomRotation.Roll != 0 )
+	{
+		currentRot = Rotator(Normal(v_push));
+
+		if ( RandomRotation.Yaw != 0 )
+		{
+			nRandomNum = rand(RandomRotation.Yaw * 2);
+			if ( nRandomNum < RandomRotation.Yaw )
+				nRandomNum *= -1;
+			currentRot.Yaw += nRandomNum;
+		}
+
+		if ( RandomRotation.Pitch != 0 )
+		{
+			nRandomNum = rand(RandomRotation.Pitch * 2);
+			if ( nRandomNum < RandomRotation.Pitch )
+				nRandomNum *= -1;
+			currentRot.Pitch += nRandomNum;
+		}
+
+		if ( RandomRotation.Roll != 0 )
+		{
+			nRandomNum = rand(RandomRotation.Roll * 2);
+			if ( nRandomNum < RandomRotation.Roll )
+				nRandomNum *= -1;
+			currentRot.Roll += nRandomNum;
+		}
+
+		v_push = Vector(currentRot);
+	}
+
+	v_push = v_push * fPushForce;
+
+	// Wake jerry can's ass up and send it on its way...wee!
+	newActor.KWake();
+	v_pushAngVel = Normal(v_push) Cross ( Normal(v_push) * vect(1,1,0)) * fPushForce;
+	newActor.KAddImpulse( v_push, newActor.Location );
+}
+
+//---------------------------------------------------------
+// Default Properties
+//---------------------------------------------------------
+defaultproperties
+{
+	bGameRelevant = True
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// * gbxKarmaSpawner *
+// This class can be used within a level to create Karma objects at runtime.
+// Trigger this actor to make it spawn a Karma object.
+//////////////////////////////////////////////////////////////////////////////////////////
+
+class gbxKarmaSpawner extends Actor
+	abstract
+	hidecategories(Collision,Lighting,LightColor,Karma,Force)
+	notplaceable;
+
+
+
+//---------------------------------------------------------
+// Properties
+//---------------------------------------------------------
+
+var() bool			bWaitForTrigger;		// If false, Pawn is spawned when level loaded. Otherwise, the Pawn is spawned when this actor is triggered.
+var() bool			bDestroyAfterSpawn;		// If true, this actor self-destructs after spawning its Pawn. Otherwise, it stays around and can spawn additional pawns when triggered again.
+var() name			TargetTag;				// The tag name of the target that we'll use to calculate our firing direction.  Random angles will use this as reference direction.
+var() float			fPushForce;				// The force that will be applied to this Karma actor when spawned.
+var() rotator		RandomRotation;			// Random +/- rotation from reference angle calculated by target object and spawner location.
+
+//var(ActorPawn) class<KActor>		ActorClass;
+//var(ActorPawn) float				ActorMass;
+//var(ActorPawn) float				ActorLinearDamping;
+//var(ActorPawn) float				ActorAngularDamping;
+//var(ActorPawn) float				ActorGravScale;
+
+//---------------------------------------------------------
+// Variables
+//---------------------------------------------------------
+
+var array< KActor >	KarmaActorArray;
+var LookTarget		TargetActor;
+
+//*********************************************************
+//	BeginPlay
+//*********************************************************
+function BeginPlay()
+{
+	// Find the target actor and save a reference to it
+	ForEach AllActors( class'LookTarget', TargetActor, TargetTag )
+		break;
+
+	if ( TargetActor == None )
+		Log( "WARNING: " $ name $ ".BeginPlay failed to find TargetActor " $ TargetTag );
+
+}
+
+//*********************************************************
+//	PostBeginPlay
+//*********************************************************
+function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+
+	if( !bWaitForTrigger )
+	{
+		SpawnKarmaActor();
+	}
+}
+
+//*********************************************************
+//	Trigger
+//*********************************************************
+function Trigger( actor Other, Pawn EventInstigator )
+{
+	Super.Trigger( Other, EventInstigator );
+
+	SpawnKarmaActor();
+}
+
+//*********************************************************
+//	SpawnKarmaActor
+//	Spawn the karma actor
+//*********************************************************
+function KActor SpawnKarmaActor();
+
+//*********************************************************
+//	SpawnKarmaActor
+//	Timer function used to auto-destroy spawner
+//	Note: Derived classes need to make sure they destroy
+//	spawned objects
+//*********************************************************
+function Timer()
+{
+	DestroySelf();
+}
+
+//*********************************************************
+//	DestroySelf
+//*********************************************************
+function DestroySelf()
+{
+	// Clean up any Karma actors we've spawned
+	Reset();
+
+	Super.Destroy();
+}
+
+//*********************************************************
+//	Reset
+//	Reset spawner to initial state and destroy any spawned
+//	objects still alive.
+//*********************************************************
+function Reset()
+{
+	local int i;
+
+	// Traverse KActor array looking for objects alive and destroy them and clear out array.
+	for( i = 0; i < KarmaActorArray.Length; i++ )
+	{
+		if (KarmaActorArray[i] != None)
+		{
+			KarmaActorArray[i].Destroy();
+			KarmaActorArray.Remove( i, 1 );
+		}
+	}
+}
+
+//*********************************************************
+//	ConfigureActor
+//	Called after SpawnKarmaActor to setup properties and
+//*********************************************************
+function ConfigureActor( KActor newActor )
+{
+	local int currentLength;
+	currentLength = KarmaActorArray.Length;
+
+	// Insert newly created actor into our KarmaActorArray
+	KarmaActorArray.Insert( currentLength, 1 );
+	KarmaActorArray[currentLength] = newActor;
+}
+
+//---------------------------------------------------------
+// Default Properties
+//---------------------------------------------------------
+
+defaultproperties
+{
+	bHidden=true
+	bStatic=false
+	bDirectional=true
+	CollisionHeight=90
+
+	bWaitForTrigger=true
+	bDestroyAfterSpawn=false
+}
+
+//=====================================================================================
+// gbxLandmine: a placeable actor that explodes when touched, triggered, or fired upon
+//=====================================================================================
+
+class gbxLandmine extends Trigger
+	placeable;
+
+#exec OBJ LOAD FILE=..\staticmesh\s_military_us.usx
+
+
+
+var() float		DelaySeconds;
+//var() bool		bIsBouncingBetty;
+var() float		Damage;
+var() float		DamageRadius;
+var() float		MomentumTransfer; // Momentum magnitude imparted by impacting projectile.
+var() float		ShakeRadius;			// radius within which to shake player views
+var() float		ViewRollTime;			// how long to roll the instigator's view
+var() float		RollMag;				// how far to roll view
+var() float		RollRate;				// how fast to roll view
+var() float		OffsetMagVertical;		// max view offset vertically
+var() float		OffsetRateVertical;		// how fast to offset view vertically
+var() float		OffsetMagHorizontal;	// max view offset horizontally
+var() float		OffsetRateHorizontal;	// how fast to offset view horizontally
+var() float		OffsetIterations;		// how many iterations to offset view
+
+var class<DamageType>	MyDamageType;
+
+var() class<Emitter> MineEffect;
+
+var Trigger MyTrigger;  // Trigger created internally to handle damage taken from weapons
+
+// Create internal shoot trigger
+function BeginPlay()
+{
+	MyTrigger = spawn(class 'Trigger', self,, Location, );
+	MyTrigger.SetBase(self);
+	MyTrigger.bInitiallyActive = self.bInitiallyActive;
+	MyTrigger.Event = self.Tag;
+	MyTrigger.TriggerType = TT_Shoot;
+	MyTrigger.bHidden = false;
+	MyTrigger.OnlyAffectPawns(false);
+	MyTrigger.bProjTarget = true;
+	MyTrigger.SetDrawType(DT_None);
+}
+
+function PostBeginPlay()
+{
+	if ( MyTrigger != NONE )
+		MyTrigger.PostBeginPlay();
+}
+
+function Explode()
+{
+	local Controller C;
+	local vector OffsetMag, OffsetRate;
+
+	// spawn the explosion effects...
+	spawn(MineEffect, self,, Location, );
+
+	// shake the player's a bit...
+	OffsetMag = OffsetMagHorizontal * vect(1,1,0) + OffsetMagVertical * vect(0,0,1);
+	OffsetRate = OffsetRateHorizontal * vect(1,1,0) + OffsetRateVertical * vect(0,0,1);
+	for ( C=Level.ControllerList; C!=None; C=C.NextController )
+		if ( (PlayerController(C) != None) && (VSize(Location - PlayerController(C).ViewTarget.Location) < ShakeRadius) )
+			C.ShakeView(ViewRollTime,RollMag,OffsetMag,RollRate,OffsetRate,OffsetIterations);
+
+	// do the radius damage...
+	HurtRadius(Damage, DamageRadius, MyDamageType, MomentumTransfer, Location );
+
+	if ( Role == ROLE_Authority )
+		MakeNoise(1.0);  // make some noise
+}
+
+function Timer()
+{
+//	if (bIsBouncingBetty)
+//	{
+//		// do Bouncing Betty stuff here!!!
+//	}
+//	else
+//	{
+		Explode();
+//	}
+	MyTrigger.Destroy();
+	Destroy();
+}
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+	TriggerEvent(Event,Other,EventInstigator);
+
+	// Landmines are destroyed so remove collision
+	SetCollision(False);
+
+	Explode();
+	//MyTrigger.Destroy();
+	//Destroy();
+	bHidden = true;
+	MyTrigger.bHidden = true;
+}
+
+function Touch( actor Other )
+{
+	// Broadcast the Trigger message to all matching actors.
+	TriggerEvent(Event, Other, Other.Instigator);
+
+	if( (Message != "") && (Other.Instigator != None) )
+		// Send a string message to the toucher.
+		Other.Instigator.ClientMessage( Message );
+
+	// Landmines are destroyed so remove collision
+	SetCollision(False);
+
+	if (DelaySeconds > 0.0)
+	{
+		SetTimer(DelaySeconds, false);
+		return;
+	}
+
+//	if (bIsBouncingBetty)
+//	{
+//		// do Bouncing Betty stuff here!!!
+//	}
+//	else
+//	{
+		Explode();
+//	}
+
+	// Make sure to destroy internal fire trigger
+	MyTrigger.Destroy();
+	Destroy();
+}
+
+defaultproperties
+{
+	DrawType=DT_StaticMesh
+	// GBX:najnaj
+	// StaticMesh=StaticMesh's_military_us.Weapon.mine'
+
+	bMovable=false
+	bCollideActors=true
+	bCollideWorld=true
+	bUseCylinderCollision=true
+	bHiddenEd=false
+	bHidden=false
+	bStatic=false
+	bNoDelete=false
+	CollisionHeight=20
+	CollisionRadius=100
+	PrePivot=(X=0,Y=0,Z=20)
+	DelaySeconds=0.0
+//	bIsBouncingBetty=false
+	Damage=500.000000
+	DamageRadius=512.000000
+	MomentumTransfer=50000
+
+	MyDamageType=class'gbxDamageExploded'
+	MineEffect=class'ExplosionLandmine'
+
+    ShakeRadius=3000.000000
+    ViewRollTime=0.250000
+    RollMag=20.000000
+    RollRate=100.000000
+    OffsetMagVertical=20.000000
+    OffsetRateVertical=1000.000000
+    OffsetMagHorizontal=20.000000
+    OffsetRateHorizontal=1000.000000
+    OffsetIterations=10.000000
+}
+// GEARBOX 2004-09-29 JWS created
+class gbxLocalizedWaypointBeacon extends gbxWaypointBeacon
+	native;
+
+// properties
+var() string LocalizationSectionName;	// Name of the section in the map's int file that contains the data for this beacon. Notably, the TitleString field
+										// will be used to lookup in the int file
+
+replication
+{
+	reliable if (bNetInitial && Role == ROLE_Authority)
+		LocalizationSectionName;
+}
+
+simulated function String GetHumanReadableName()
+{
+	return Level.S_Localize(TitleString, , GetLocalizationSectionName());
+}
+
+simulated function string GetLocalizationSectionName()
+{
+	return LocalizationSectionName;
+}
+
+defaultproperties
+{
+	TitleString="BEACONNAME"
+}//=============================================================================
+// The Ball-and-Socket joint class.
+//=============================================================================
+
+class gbxRagdollJoint extends KBSJoint
+    placeable;
+
+
+
+event PostBeginPlay()
+{
+	SetTimer( 0.5, false );
+}
+
+function Timer()
+{
+	local	gbxRagDollUS	aRagdoll;
+	local	bool		fFound1, fFound2;
+
+	fFound1 = false;
+	fFound2 = false;
+
+	foreach AllActors(class'gbxRagDollUS', aRagdoll)
+	{
+		if (KConstraintActor1 != None)
+		{
+			if (aRagdoll == KConstraintActor1)
+			{
+				aRagdoll.m_aJoint = self;
+				fFound1 = true;
+				log(self$".SetRagdollJoint1 - "$aRagdoll);
+			}
+		}
+		else
+			fFound1 = true;
+
+		if (KConstraintActor2 != None)
+		{
+			if (aRagdoll == KConstraintActor2)
+			{
+				aRagdoll.m_aJoint = self;
+				fFound2 = true;
+				log(self$".SetRagdollJoint2 - "$aRagdoll);
+			}
+		}
+		else
+			fFound2 = true;
+	}
+	if (!fFound1 || !fFound2)
+		SetTimer( 0.5, false );
+}
+
+defaultproperties
+{
+    Texture=Texture'Engine.S_KBSJoint'
+}
+class GBXRagDollUS extends KActor
+	placeable;
+
+#exec OBJ LOAD FILE=..\animation\K_character_us.ukx
+
+
+//var	() array<sound>		PainSounds;
+
+var () float			TimeBetweenPainSounds;
+var () float			PainVolume;
+var () float			PainRadius;
+var () float			HitSoundThreshold;
+
+var transient float		LastSound;
+var gbxRagdollJoint		m_aJoint;
+
+var bool just_spawned;
+var bool need_to_wakeup;
+var () float m_flGoToSleepTime;
+var	float LastKAddImpulseTime;
+
+function PostNetBeginPlay()
+{
+   	KSetImpactThreshold(HitSoundThreshold);
+	SetTimer( m_flGoToSleepTime, false );
+}
+
+
+event KImpact(actor other, vector pos, vector impactVel, vector impactNorm)
+{
+//	local int numSounds;
+//	numSounds = PainSounds.Length;
+
+//	if(numSounds > 0 && Level.TimeSeconds > LastSound + TimeBetweenPainSounds)
+//	{
+//		PlaySound(PainSounds[Rand(numSounds)], SLOT_Pain, PainVolume,,PainRadius);
+//		LastSound = Level.TimeSeconds;
+//	}
+}
+
+function TakeDamage( int Damage, Pawn instigatedBy, Vector hitlocation,
+						Vector momentum, class<DamageType> damageType, optional name HitBoxName)
+{
+	local vector shotDir; // hitLocRel, deathAngVel, shotStrength
+    local Vector PushLinVel, PushAngVel;
+	local KarmaParamsSkel skelParams;
+
+	if (need_to_wakeup)
+	{
+		KMakeRagdollAvailable();
+
+		log(self$".ReinitializeKarmaRagDoll");
+
+		if( KIsRagdollAvailable() )
+		{
+			skelParams = KarmaParamsSkel(KParams);
+			skelParams.KStartEnabled=True;
+			KParams = skelParams;
+
+//			if (damageType.Name == 'gbxDamageExploded')
+			if (damageType.Default.m_bExplosiveDamage)
+			{
+				shotDir = Normal(Momentum);
+				PushLinVel = (200 * shotDir) +  vect(0, 0, 800);
+				PushAngVel = Normal(shotDir Cross vect(0, 0, 1)) * -18000;
+			}
+			else if (damageType.Name == 'DamageRunOver')
+			{
+				shotDir = Normal(Momentum);
+				PushLinVel = (200 * shotDir);
+				PushAngVel = Normal(shotDir Cross vect(0, 0, 1)) * -18000;
+			}
+			else
+			{
+				PushLinVel = 250*Normal(Momentum);
+			}
+
+			skelParams.KStartAngVel = PushAngVel;
+			skelParams.KStartLinVel = PushLinVel;
+
+			// Set physics mode to ragdoll. This doesn't actaully start it straight away, it's deferred to the first tick.
+			SetPhysics(PHYS_KarmaRagdoll);
+
+//			SetCollision(true, true, true);
+
+			if (m_aJoint != None)
+			{
+				m_aJoint.SetPhysics( PHYS_Karma );
+				// m_aJoint.KReinitializeConstraint();
+			}
+		}
+		need_to_wakeup = false;
+	}
+	else
+	{
+//		if (damageType.Name == 'gbxDamageExploded')
+			if (damageType.Default.m_bExplosiveDamage)
+		{
+			if (LastKAddImpulseTime + 3.0f < Level.TimeSeconds)
+			{
+				LastKAddImpulseTime = Level.TimeSeconds;
+				shotDir = Normal(Momentum);
+				PushLinVel = (200 * shotDir) +  vect(0, 0, 800);
+				PushAngVel = Normal(shotDir Cross vect(0, 0, 1)) * -18000;
+				KSetSkelVel( PushLinVel, PushAngVel );
+				KAddImpulse(PushLinVel, Location);
+			}
+		}
+		else if (damageType.Name == 'DamageRunOver')
+		{
+			if (LastKAddImpulseTime + 3.0f < Level.TimeSeconds)
+			{
+				LastKAddImpulseTime = Level.TimeSeconds;
+				shotDir = Normal(Momentum);
+				PushLinVel = (200 * shotDir);
+				PushAngVel = Normal(shotDir Cross vect(0, 0, 1)) * -18000;
+				KSetSkelVel( PushLinVel, PushAngVel );
+				KAddImpulse(PushLinVel, Location);
+			}
+		}
+		else
+		{
+			if (LastKAddImpulseTime + 3.0f < Level.TimeSeconds)
+			{
+				LastKAddImpulseTime = Level.TimeSeconds;
+				PushLinVel = 8000*Normal(Momentum);
+				KAddImpulse(PushLinVel, HitLocation);
+			}
+		}
+	}
+
+	SetTimer( m_flGoToSleepTime, false );
+}
+
+function Timer()
+{
+	KFreezeRagdoll();
+	SetPhysics( PHYS_None );
+	SetCollision( true, true, true );
+	need_to_wakeup = true;
+}
+
+defaultproperties
+{
+    DrawType=DT_Mesh
+	Mesh=Mesh'K_character_us.us_para_body'  //SJP: Temp fix until body groups work
+
+    Physics=PHYS_KarmaRagDoll
+
+	bCollideActors=True
+    bProjTarget=True
+	bBlockActors=False
+	bBlockNonZeroExtentTraces=True
+	bBlockZeroExtentTraces=True
+	bBlockPlayers=False
+	bWorldGeometry=False
+
+	CollisionHeight=84.0
+	CollisionRadius=28.0
+
+	TimeBetweenPainSounds=0.5
+	PainVolume=255
+	PainRadius=2000
+	HitSoundThreshold=500
+
+	bHidden=false
+	bBlockKarma=true
+	bCollideWorld=true
+	bNoDelete=true
+
+    Begin Object Class=KarmaParamsSkel Name=SquibbleRagDollUS
+		KSkeleton="temp_ragdoll"
+		KRestitution=0.2
+		KBuoyancy=1
+	    KStartEnabled=False
+		KImpactThreshold=500
+		KVelDropBelowThreshold=0.06
+		KConvulseSpacing=(Min=0.5,Max=2.2)
+        Name="SquibbleRagDollUS"
+        bDestroyOnSimError=False
+		KLinearDamping=0.1
+		KAngularDamping=8.0
+		bKDoubleTickRate=True
+		KMass=1.0
+		KActorGravScale=1.25
+		KFriction=0.6
+    End Object
+    KParams=KarmaParams'SquibbleRagDollUS'
+
+	need_to_wakeup=false
+	m_flGoToSleepTime=12.000000
+}
+// ====================================================================
+//  Class:  gbxWaypointBeacon
+//
+//  <Enter a description here>
+//
+// (c) 2001, Epic Games, Inc - All Rights Reserved
+// ====================================================================
+
+class gbxWaypointBeacon extends gbxBeacons
+	native;
+
+simulated function DrawIcon(Canvas C, gbxHud H, float Scale, float X, float Y)
+{
+	C.SetPos(X-12,Y-12);
+	C.DrawTile(Icon,24,24,0,0,32,32);
+}
+
+defaultproperties
+{
+//	Icon=texture'WG_HUD.HUD.radar_civi'
+	bDrawDistance=true
+    m_MarkerColor=(R=250,G=218,B=77,A=175)
+}
+class PushableDecoration extends Decoration
+	abstract;
+
+
+
+/* This is the superclass of non-static decorations which interact with players and
+the world.
+Static Decorations should be subclassed directly from Engine.Decoration
+*/
+
+//#exec AUDIO IMPORT FILE="..\botpack\sounds\general\bPush1.wav" NAME="ObjectPush" GROUP="General"
+//#exec AUDIO IMPORT FILE="..\botpack\sounds\general\EndPush.wav" NAME="Endpush" GROUP="General"
+
+defaultproperties
+{
+	 Health=30
+     bPushable=True
+	 bDamageable=True
+//     PushSound=Sound'ObjectPush'
+//     EndPushSound=Sound'Endpush'
+     bStatic=False
+     CollisionRadius=24.000000
+     CollisionHeight=29.000000
+     bCollideActors=True
+     Mass=50.000000
+     Buoyancy=40.000000
+     bCollideWorld=True
+     bBlockActors=True
+     bBlockPlayers=True
+}
+//=============================================================================
+// RadarLandmark.
+//
+// A landmark to indicate the SW corner of the map to be used in figuring out how to associate the radar map with
+// the world
+//
+//=============================================================================
+class RadarLandmark extends Info
+	placeable;
+
+
+
+enum TextAlign
+{
+	LandmarkNE,
+	LandmarkSE,
+	LandmarkSW,
+	LandmarkNW
+};
+
+var() float m_flRadarLandmarkX;		// Bitmap X coordinate this landmark position corresponds to on the radar map
+var() float m_flRadarLandmarkY;		// Bitmap Y coordinate this landmark position corresponds to on the radar map
+var() TextAlign m_eLandmarkLoc;		// What corner of the realestate does this landmark represent.
+
+defaultproperties
+{
+     m_flRadarLandmarkX=0.000000
+     m_flRadarLandmarkY=0.000000
+     m_eLandmarkLoc = LandmarkSW
+}
+//=============================================================================
+// StaticMeshActorDestroyable.
+// An actor that is drawn using a static mesh(a mesh that never changes, and
+// can be cached in video memory, resulting in a speed boost).  This extends the
+// standard StaticMeshActor, but sets the static flag so it can be destroyed.
+//=============================================================================
+
+class StaticMeshActorDestroyable extends StaticMeshActor
+	placeable;
+
+
+
+defaultproperties
+{
+	DrawType=DT_StaticMesh
+	bEdShouldSnap=True
+	bStatic=False
+	bStaticLighting=True
+	bShadowCast=True
+	bCollideActors=True
+	bBlockActors=True
+	bBlockPlayers=True
+	bBlockKarma=True
+	bWorldGeometry=True
+    CollisionHeight=+000001.000000
+	CollisionRadius=+000001.000000
+	bAcceptsProjectors=True
+	bExactProjectileCollision=true
+
+	bNetInitialRotation=true
+}
+class TelephoneManager extends WireManager
+    placeable;
+    
+#exec OBJ LOAD FILE=..\texture\t_effect.utx
+
+defaultproperties
+{
+    WireMaterial=GbxShaderMaterial't_effect.Wire.WireShader'
+}class TelephonePoint extends UtilityPole
+    placeable;
+
+simulated function PostNetBeginPlay()
+{
+	Super.PostNetBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("s_ext_rural.telephone_pole.telephone_pole_post", class'StaticMesh')));
+}
+
+defaultproperties
+{
+//    StaticMesh=StaticMesh's_ext_rural.telephone_pole.telephone_pole_post'
+	EditorStaticMeshName="s_ext_rural.telephone_pole.telephone_pole_post"
+
+    WireOffset[0]=(X=-2,Y=-30,Z=17)
+    NumSegments[0]=10
+    Slack[0]=50.0
+    Active[0]=1
+}class TelephonePole1Post extends UtilityPole
+    placeable;
+
+simulated function PostNetBeginPlay()
+{
+	Super.PostNetBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("s_ext_rural.telephone_pole.s_telephone_pole_wooden_1_post", class'StaticMesh')));
+}
+
+defaultproperties
+{
+//    StaticMesh=StaticMesh's_ext_rural.telephone_pole.s_telephone_pole_wooden_1_post'
+	EditorStaticMeshName="s_ext_rural.telephone_pole.s_telephone_pole_wooden_1_post"
+
+    WireOffset[0]=(X=-3,Y=-30,Z=950)
+    NumSegments[0]=10
+    Slack[0]=50.0
+    Active[0]=1
+}class TelephonePole2Post extends UtilityPole
+    placeable;
+
+simulated function PostNetBeginPlay()
+{
+	Super.PostNetBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("s_ext_rural.telephone_pole.s_telephone_pole_wooden_2_post", class'StaticMesh')));
+}
+
+defaultproperties
+{
+//    StaticMesh=StaticMesh's_ext_rural.telephone_pole.s_telephone_pole_wooden_2_post'
+	EditorStaticMeshName="s_ext_rural.telephone_pole.s_telephone_pole_wooden_2_post"
+
+    WireOffset[0]=(X=-2,Y=-31,Z=950)
+    NumSegments[0]=10
+    Slack[0]=50.0
+    Active[0]=1
+
+    WireOffset[1]=(X=-2,Y=-31,Z=890)
+    NumSegments[1]=10
+    Slack[1]=50.0
+    Active[1]=1
+}class TelephonePole2Wall extends UtilityPole
+    placeable;
+
+//#exec OBJ LOAD FILE=..\staticmesh\s_ext_rural.usx
+
+simulated function PostNetBeginPlay()
+{
+	Super.PostNetBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("s_ext_rural.telephone_pole.telephone_pole_2_post", class'StaticMesh')));
+}
+
+defaultproperties
+{
+//    StaticMesh=StaticMesh's_ext_rural.telephone_pole.telephone_pole_2_post'
+	EditorStaticMeshName="s_ext_rural.telephone_pole.telephone_pole_2_post"
+
+    WireOffset[0]=(X=5,Y=-75,Z=67)
+    WireOffset[1]=(X=5,Y=-75,Z=10)
+    NumSegments[0]=10
+    NumSegments[1]=10
+    Slack[0]=50.0
+    Slack[1]=50.0
+    Active[0]=1
+    Active[1]=1
+}class TelephonePole3Post extends UtilityPole
+    placeable;
+
+simulated function PostNetBeginPlay()
+{
+	Super.PostNetBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("s_ext_rural.telephone_pole.telephone_pole_concrete", class'StaticMesh')));
+}
+
+defaultproperties
+{
+//    StaticMesh=StaticMesh's_ext_rural.telephone_pole.telephone_pole_concrete'
+	EditorStaticMeshName="s_ext_rural.telephone_pole.telephone_pole_concrete"
+
+    WireOffset[0]=(X=-63,Y=-16,Z=933)
+    NumSegments[0]=10
+    Slack[0]=50.0
+    Active[0]=1
+
+    WireOffset[1]=(X=63,Y=-16,Z=990)
+    NumSegments[1]=10
+    Slack[1]=50.0
+    Active[1]=1
+
+    WireOffset[2]=(X=63,Y=-16,Z=874)
+    NumSegments[2]=10
+    Slack[2]=50.0
+    Active[2]=1
+}class TelephonePole4Post extends UtilityPole
+    placeable;
+
+simulated function PostNetBeginPlay()
+{
+	Super.PostNetBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("s_ext_rural.telephone_pole.s_telephone_pole_wooden_4_post", class'StaticMesh')));
+}
+
+defaultproperties
+{
+//    StaticMesh=StaticMesh's_ext_rural.telephone_pole.s_telephone_pole_wooden_4_post'
+	EditorStaticMeshName="s_ext_rural.telephone_pole.s_telephone_pole_wooden_4_post"
+
+    WireOffset[0]=(X=-120,Y=-19,Z=932)
+    NumSegments[0]=10
+    Slack[0]=50.0
+    Active[0]=1
+
+    WireOffset[1]=(X=-60,Y=-19,Z=932)
+    NumSegments[1]=10
+    Slack[1]=50.0
+    Active[1]=1
+
+    WireOffset[2]=(X=60,Y=-19,Z=932)
+    NumSegments[2]=10
+    Slack[2]=50.0
+    Active[2]=1
+
+    WireOffset[3]=(X=121,Y=-19,Z=932)
+    NumSegments[3]=10
+    Slack[3]=50.0
+    Active[3]=1
+}class TelephonePole4Wall extends UtilityPole
+    placeable;
+
+//#exec OBJ LOAD FILE=..\staticmesh\s_ext_rural.usx
+
+simulated function PostNetBeginPlay()
+{
+	Super.PostNetBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("s_ext_rural.telephone_pole.telephone_pole_4_post", class'StaticMesh')));
+}
+
+defaultproperties
+{
+//    StaticMesh=StaticMesh's_ext_rural.telephone_pole.telephone_pole_4_post'
+	EditorStaticMeshName="s_ext_rural.telephone_pole.telephone_pole_4_post"
+
+    WireOffset[0]=(X=5,Y=-75,Z=130)
+    WireOffset[1]=(X=5,Y=-75,Z=70)
+    WireOffset[2]=(X=5,Y=-75,Z=10)
+    WireOffset[3]=(X=5,Y=-75,Z=-50)
+    NumSegments[0]=10
+    NumSegments[1]=10
+    NumSegments[2]=10
+    NumSegments[3]=10
+    Slack[0]=50.0
+    Slack[1]=50.0
+    Slack[2]=50.0
+    Slack[3]=50.0
+    Active[0]=1
+    Active[1]=1
+    Active[2]=1
+    Active[3]=1
+}

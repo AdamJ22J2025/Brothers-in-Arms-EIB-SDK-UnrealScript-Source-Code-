@@ -1,0 +1,4208 @@
+class gbxDefendWaveMessage extends LocalMessage;
+
+
+
+var localized string	WaveCompletedMessage;
+
+static simulated function ClientReceive( 
+	PlayerController P,
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1, 
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject
+	)
+{
+	// Need a small tweak to the base class functionality - we want to generate the message string based on the player that will get the message.
+	// So this is a copy of that functionality, modified accordingly. 2004-06-17 JWS
+	local string msg;
+	local WargameHUD myHud;
+
+	msg = Static.GetString( Switch, RelatedPRI_1, RelatedPRI_2, OptionalObject );
+
+	if ( WargameHUD(P.myHud) != None )
+	{
+		myHUD = WargameHUD(P.MyHud);
+
+		myHUD.ClearObjectiveOverlay();
+
+		if (msg != "")
+		{
+			MyHud.ClearObjectiveOverlay();
+
+			myHud.m_ObjString = msg;
+			myHud.m_bObjComplete = OI_Inactive;
+			myHud.m_bObjPrimary = false;
+			myHud.m_bCriticalMessage = true; //DLEVY
+
+			myHud.m_flObjStringTime = 3.0;
+			myHud.m_flObjStringStartTime = P.Level.TimeSeconds;
+		}
+	}
+}
+
+static function string GetString(
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1,
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject ) {
+
+	return Default.WaveCompletedMessage$" "$Switch$".";
+}
+
+defaultproperties
+{
+	bFadeMessage=True
+	bIsSpecial=True
+	bIsUnique=True
+	Lifetime=3
+	bBeep=True
+	FontSize=1
+    DrawColor=(R=128,G=128,B=255,A=255)
+
+	bIsConsoleMessage=false
+	
+	WaveCompletedMessage="Completed Wave"
+
+    YPos=240
+}
+class gbxDefendWaveNextMessage extends LocalMessage;
+
+
+
+var localized string	WaveBeginningMessage;
+
+static simulated function ClientReceive( 
+	PlayerController P,
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1, 
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject
+	)
+{
+	// Need a small tweak to the base class functionality - we want to generate the message string based on the player that will get the message.
+	// So this is a copy of that functionality, modified accordingly. 2004-06-17 JWS
+	local string msg;
+	local WargameHUD myHud;
+
+	msg = Static.GetString( Switch, RelatedPRI_1, RelatedPRI_2, OptionalObject );
+
+	if ( WargameHUD(P.myHud) != None )
+	{
+		myHUD = WargameHUD(P.MyHud);
+
+		myHUD.ClearObjectiveOverlay();
+
+		if (msg != "")
+		{
+			MyHud.ClearObjectiveOverlay();
+
+			myHud.m_ObjString = msg;
+			myHud.m_bObjComplete = OI_Inactive;
+			myHud.m_bObjPrimary = false;
+			myHud.m_bCriticalMessage = true; //DLEVY
+
+			myHud.m_flObjStringTime = 3.0;
+			myHud.m_flObjStringStartTime = P.Level.TimeSeconds;
+		}
+	}
+}
+
+static function string GetString(
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1,
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject ) {
+
+	return Default.WaveBeginningMessage$" "$Switch$"...";
+}
+
+defaultproperties
+{
+	bFadeMessage=True
+	bIsSpecial=True
+	bIsUnique=True
+	Lifetime=3
+	bBeep=True
+	FontSize=1
+    DrawColor=(R=128,G=128,B=255,A=255)
+
+	bIsConsoleMessage=false
+	
+	WaveBeginningMessage="Beginning Wave"
+
+    YPos=240
+}
+class gbxGameMessage extends LocalMessage;
+
+var localized string	      CheckpointSaveMessage;
+var localized string          CheckpointDenyMessage;
+
+static simulated function ClientReceive( 
+	PlayerController P,
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1, 
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject
+	)
+{
+	// Need a small tweak to the base class functionality - we want to generate the message string based on the player that will get the message.
+	// So this is a copy of that functionality, modified accordingly. 2004-06-17 JWS
+	local string msg;
+	local WargameHUD myHud;
+
+	msg = Static.GetStringForPlayer( Switch, RelatedPRI_1, RelatedPRI_2, OptionalObject, P );
+
+	if ( WargameHUD(P.myHud) != None )
+	{
+		myHUD = WargameHUD(P.MyHud);
+
+		myHUD.ClearObjectiveOverlay();
+
+		if (msg != "")
+		{
+			MyHud.ClearObjectiveOverlay();
+
+			myHud.m_ObjString = msg;
+			myHud.m_bObjComplete = OI_Inactive;
+			myHud.m_bObjPrimary = false;
+			myHud.m_bCriticalMessage = true; //DLEVY
+
+			myHud.m_flObjStringTime = 3.0;
+			myHud.m_flObjStringStartTime = P.Level.TimeSeconds;
+		}
+
+		if (Switch > 0)
+		{
+			if (Switch == 1)
+			{
+				// GBX:PAD: Fade to black
+				P.Level.m_bFadeScreen = 1;
+				P.Level.m_flStartFadeTime = P.Level.TimeSeconds;
+				P.Level.m_flFadeTime = 1.0;
+				myHud.m_fFadeOverride = true;
+			}
+			else if (Switch == 2)
+			{
+				P.Level.m_bFadeScreen = 2;
+				P.Level.m_flStartFadeTime = P.Level.TimeSeconds;
+				P.Level.m_flFadeTime = 1.0;
+				myHud.m_fFadeOverride = true;
+			}
+		}
+	}
+}
+
+// PRI1 is the player that generated the message
+// OptionalObject is a gbxMcGuffin class
+static function string GetStringForPlayer(
+	int Switch,
+	PlayerReplicationInfo RelatedPRI_1, 
+	PlayerReplicationInfo RelatedPRI_2,
+	Object OptionalObject,
+	PlayerController DisplayPlayer)
+{
+	switch( Switch )
+	{
+		case 0:
+			return Default.CheckpointSaveMessage;
+			break;
+		case 1:
+			return Default.CheckpointDenyMessage;
+			break;
+		case 2:
+			return Default.CheckpointSaveMessage;
+			break;
+	}
+
+	return "";
+}
+
+defaultproperties
+{
+	CheckpointSaveMessage="Saving Progress..."
+	CheckpointDenyMessage="Adding player to the field checkpoint..."
+
+	bBeep=false
+	bFadeMessage=True
+	bIsSpecial=True
+	bIsUnique=True
+	Lifetime=3.0
+
+	bIsConsoleMessage=false
+	
+	DrawColor=(R=0,G=160,B=255,A=255)
+	FontSize=1
+
+	YPos=240
+}
+// usage: base class for localized messages for network hint messages
+class gbxHintMessage extends LocalMessage;
+
+var string MessageSectionName;
+
+var string ObjectiveHint;
+
+static simulated function ClientReceive( 
+	PlayerController P,
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1, 
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject
+	)
+{
+	// Need a small tweak to the base class functionality - we want to generate the message string based on the player that will get the message.
+	// So this is a copy of that functionality, modified accordingly. 2004-06-17 JWS
+	local string msg;
+	local WargameHUD myHud;
+
+	msg = Static.GetStringForPlayer( Switch, RelatedPRI_1, RelatedPRI_2, OptionalObject, P );
+
+	if ( gbxHUD(P.myHud) != None )
+	{
+		myHUD = WargameHUD(P.MyHud);
+
+		myHud.m_szHintMessage = msg;
+
+		myHud.ClearTrainingOverlay();
+		if (msg != "")
+			MyHud.SetTrainingText(myHud.m_szHintText$": "$msg, Default.Lifetime, false);
+	}
+}
+
+static function bool IsPRISelf(PlayerController player, PlayerReplicationInfo pri)
+{
+	local bool result;
+
+	if (player.PlayerReplicationInfo == pri)
+	{
+		result = true;
+	}
+	else
+	{
+		result = false;
+	}
+
+	return result;
+}
+
+static function bool IsPRIAlly(PlayerController player, PlayerReplicationInfo pri)
+{
+	local bool result;
+
+	if (player.PlayerReplicationInfo.Team.TeamIndex == pri.Team.TeamIndex)
+	{
+		result = true;
+	}
+	else
+	{
+		result = false;
+	}
+
+	return result;
+}
+
+static function string GetMessageSectionName(Object Switch)
+{
+	return default.MessageSectionName;
+}
+
+static function string GetLocalizedMissionString(string Key, Object Switch, LevelInfo TheLevel)
+{
+	local string text;
+
+	text = TheLevel.S_Localize(Key, , static.GetMessageSectionName(Switch));
+
+	return text;
+}
+
+// PRI1 is the player that generated the message
+// OptionalObject is a gbxMcGuffin class
+static function string GetStringForPlayer(
+	int Switch,
+	PlayerReplicationInfo RelatedPRI_1, 
+	PlayerReplicationInfo RelatedPRI_2,
+	Object OptionalObject,
+	PlayerController DisplayPlayer)
+{
+	local string msg;
+	local LevelInfo level;
+
+	msg = "";
+   	
+	level = DisplayPlayer.Level;
+
+	assert(RelatedPRI_1 != None);
+
+	if (RelatedPRI_1 != None)
+	{
+		msg = GetLocalizedMissionString(default.ObjectiveHint$""$Switch, None, level);
+	}
+	else
+	{
+		// Fall back for cases where the player is no longer around. This sucks, but there's not much else we can do except ignore the message
+		msg = "";
+	}
+
+	return msg;
+}
+
+defaultproperties
+{
+	MessageSectionName="SkirmishHintMessage"
+
+	ObjectiveHint="ObjectiveHint"
+	
+	bBeep=false
+	bFadeMessage=True
+	bIsSpecial=True
+	bIsUnique=True
+	Lifetime=4.0
+
+	bIsConsoleMessage=false
+	
+	DrawColor=(R=0,G=160,B=255,A=255)
+	FontSize=1
+
+	YPos=240
+}// usage: base class for localized messages for network objective messages
+class gbxObjectiveMessage extends LocalMessage;
+
+var string MessageSectionName;
+
+var string ObjectiveMessage;
+
+static simulated function ClientReceive( 
+	PlayerController P,
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1, 
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject
+	)
+{
+	// Need a small tweak to the base class functionality - we want to generate the message string based on the player that will get the message.
+	// So this is a copy of that functionality, modified accordingly. 2004-06-17 JWS
+	local string msg;
+	local WargameHUD myHud;
+
+	msg = Static.GetStringForPlayer( Switch, RelatedPRI_1, RelatedPRI_2, OptionalObject, P );
+
+	if ( WargameHUD(P.myHud) != None )
+	{
+		myHUD = WargameHUD(P.MyHud);
+
+		myHUD.ClearObjectiveOverlay();
+
+		if (msg != "")
+		{
+			myHUD.SetObjectiveString( msg, EObjectiveComplete.OI_Inactive, Default.Lifetime, false, false );
+		}
+	}
+}
+
+static function bool IsPRISelf(PlayerController player, PlayerReplicationInfo pri)
+{
+	local bool result;
+
+	if (player.PlayerReplicationInfo == pri)
+	{
+		result = true;
+	}
+	else
+	{
+		result = false;
+	}
+
+	return result;
+}
+
+static function bool IsPRIAlly(PlayerController player, PlayerReplicationInfo pri)
+{
+	local bool result;
+
+	if (player.PlayerReplicationInfo.Team.TeamIndex == pri.Team.TeamIndex)
+	{
+		result = true;
+	}
+	else
+	{
+		result = false;
+	}
+
+	return result;
+}
+
+static function string GetMessageSectionName(Object Switch)
+{
+	return default.MessageSectionName;
+}
+
+static function string GetLocalizedMissionString(string Key, Object Switch, LevelInfo TheLevel)
+{
+	local string text;
+
+	text = TheLevel.S_Localize(Key, , static.GetMessageSectionName(Switch));
+
+	return text;
+}
+
+// PRI1 is the player that generated the message
+// OptionalObject is a gbxMcGuffin class
+static function string GetStringForPlayer(
+	int Switch,
+	PlayerReplicationInfo RelatedPRI_1, 
+	PlayerReplicationInfo RelatedPRI_2,
+	Object OptionalObject,
+	PlayerController DisplayPlayer)
+{
+	local string msg;
+	local LevelInfo level;
+
+	msg = "";
+   	
+	level = DisplayPlayer.Level;
+
+	assert(RelatedPRI_1 != None);
+
+	if (RelatedPRI_1 != None)
+	{
+		msg = GetLocalizedMissionString(default.ObjectiveMessage$""$Switch, None, level);
+	}
+	else
+	{
+		// Fall back for cases where the player is no longer around. This sucks, but there's not much else we can do except ignore the message
+		msg = "";
+	}
+
+	return msg;
+}
+
+defaultproperties
+{
+	MessageSectionName="SkirmishObjectiveMessage"
+
+	ObjectiveMessage="ObjectiveMessage"
+	
+	bBeep=false
+	bFadeMessage=True
+	bIsSpecial=True
+	bIsUnique=True
+	Lifetime=4.0
+
+	bIsConsoleMessage=false
+	
+	DrawColor=(R=0,G=160,B=255,A=255)
+	FontSize=1
+
+	YPos=240
+}class gbxPickupMessage extends LocalMessage;
+
+
+
+var localized string	PickupWeaponMessage;
+var localized string	PickupTrophyMessage;
+
+static function string GetString(
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1,
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject ) {
+
+	switch( Switch )
+	{
+		case 0:
+			return Default.PickupWeaponMessage;
+			break;
+		case 1:
+			return Default.PickupTrophyMessage;
+			break;
+	}
+}
+
+defaultproperties
+{
+	bFadeMessage=True
+	bIsSpecial=True
+	bIsUnique=True
+	Lifetime=2
+	bBeep=True
+	FontSize=1
+    DrawColor=(R=128,G=128,B=255,A=255)
+
+	bIsConsoleMessage=false
+	
+	PickupWeaponMessage="%+action_use% %icon_use% to pick up|"
+	PickupTrophyMessage="%action_use% %use% to pick up trophy."
+
+    YPos=240
+}
+//=============================================================================
+// WargameHUD
+// Heads up display
+//=============================================================================
+class WargameHUD extends gbxHUD
+	config
+	native;
+
+#exec OBJ LOAD FILE=..\texture\t_interface_mb.utx
+#exec TEXTURE IMPORT NAME=BlackTexture FILE=..\Engine\Textures\Black.tga MIPS=OFF COMPRESS=DXT1
+
+
+var TexRotator	anObjectiveRotator;
+var bool		fDesignOverlay;
+
+// Constants
+
+const NO_FADE = 0;
+const FADE_TO_BLACK = 1;
+const FADE_FROM_BLACK = 2;
+const FADE_START_BLACK = 3;
+
+const MAP_INTRO_TEXT_SCALE = 0.85; // CEK-FONT 0.7;
+const LOAD_TIME_HINT_SCALE = 0.9f;
+
+const SIMPLE_INTRO_TEXT_SCALE = 1.5; // CEK-FONT 0.7;
+
+const WIDESCREEN_SLIDE_TIME = 1.0f;
+const WIDESCREEN_SLIDE_DIST = 65.0f;
+const NO_WIDESCREEN = 0;
+const WIDESCREEN_SLIDE_ON = 1;
+const WIDESCREEN_SLIDE_OFF = 2;
+const WIDESCREEN_ON = 4;
+
+const COMPASS_RADIUS = 50;
+
+const MAX_OBJECTIVE_ARC_DISTANCE = 6000.0f;
+
+// GBX:PAD: These are going to be used to stash off information for the HUD that will prevent us from having to calculate
+// every frame, and can instead calculate at intervals using cached values in between.
+const HUD_CALC_INTERVAL = 0.06;
+var float		m_flNextHudCalc;
+var float		m_flObjectiveXPos[MAX_OBJECTIVE_BEACONS];
+var float		m_flObjectiveYPos[MAX_OBJECTIVE_BEACONS];
+var float		m_nObjectiveDirAngle[MAX_OBJECTIVE_BEACONS];
+
+var() float ConsoleMessageSpectatingPosX, ConsoleMessageSpectatingPosY;
+
+const SUB_TITLE_FONT_SCALE = 1.4;
+
+// GBX:CEK: 4/12/2004 - Objective overlay stuff
+var string				m_ObjString;
+var float				m_flObjStringStartTime;
+var float				m_flObjStringTime;
+var localized string	strNewObj;
+var localized string	strPrimaryObj;
+var localized string	strSecondaryObj;
+var localized string	strObjComplete;
+var localized string	strObjFailed;
+var bool				m_bObjPrimary;
+var bool				m_bDoJiggle;
+var EObjectiveComplete	m_bObjComplete;
+
+var bool				m_bCriticalMessage;  //DLEVY critical messages are not cleared until their time is up
+											//needed to ensure XBOX TCR compliance with onscreen message timing
+
+const CHAT_FONT_SCALE = 0.5;
+const MESSAGE_TITLE_FONT_SCALE = 0.8;
+const CONTEXTUSE_TITLE_FONT_SCALE = 0.8;
+const OBJECTIVE_TITLE_FONT_SCALE = 0.9;
+const TRAINING_TITLE_FONT_SCALE = 0.9;
+const GRENADE_DISPLAY_SCALE = 0.7;
+
+const DRIFT_PER_SEC = 30000.0f;
+const JIGGLE_PER_SEC = 10000.0f;
+const COMPASS_START_JIGGLE = 1500;
+const COMPASS_JIGGLE_LIMIT = 1500.0f;
+const CHECKPOINT_SAVE_DELAY = 0.1f;
+var int					m_nRealCompassYaw;
+var int					m_nCompassJiggle;
+var int					m_nCompassDestJiggle;
+var int					m_nMaxCompassDiff;
+var float				m_flCurJigglePerSec;
+var	float				flDoSaveGame;
+
+// PSV: 5/18/2004 Field promotion spectator HUD
+var localized string	strFieldPromotion;
+var localized string	strAutomaticallyPromote;
+var localized string	strNextSoldier;
+var localized string	strCallInReinforcements;
+var localized string	strSpectate;
+var float				TeamIconScale;
+var int					TeamIconPosX;
+var int					TeamIconPosY;
+var int					FieldPromoteCmdPosX;
+var int					FieldPromoteCmdPosY;
+var float				FieldPromoteCmdTextScale;
+var string				strFire;
+var string				strAltFire;
+var float				FieldPromoteTextScale;
+var float				InitArcOffset;
+var float				ArcVScale;
+var localized string	strSpectating;
+var localized string	strLockCamera;
+var localized string	strUnlockCamera;
+
+// spectating scoreboard members
+var localized string	strShowSpectatingScoreboard;
+var localized string	strHideSpectatingScoreboard;
+var bool				m_bShowSpectatingScoreboard;
+var byte				m_bLastSpectatingButton;
+  	 
+// live notification icons
+var Canvas.CanvasIcon				IconFriendRequest;
+var Canvas.CanvasIcon				IconGameInvite;
+
+// Team icons for Field Promotion
+var Canvas.CanvasIcon				USForeground;
+var Canvas.CanvasIcon				DEForeground;
+var Canvas.CanvasIcon				USBackground;
+var Canvas.CanvasIcon				DEBackground;
+
+// Vars for edge effects
+var float EdgeEffectLeftTime;
+var Color EdgeEffectLeftColor;
+var eRenderStyle EdgeEffectLeftRenderStyle;
+var float EdgeEffectRightTime;
+var Color EdgeEffectRightColor;
+var eRenderStyle EdgeEffectRightRenderStyle;
+var float EdgeEffectTopTime;
+var Color EdgeEffectTopColor;
+var eRenderStyle EdgeEffectTopRenderStyle;
+var float EdgeEffectBottomTime;
+var Color EdgeEffectBottomColor;
+var eRenderStyle EdgeEffectBottomRenderStyle;
+var float EdgeEffectMaxTime;
+var float EdgeEffectDrawTime;
+
+var int EdgeEffectWidth;
+
+var float MPProgressMessageHintTime;
+const MP_HINT_CYCLE_DELAY = 10;
+
+// HUD Training dialog stuff...
+var string				m_TrainingString;
+var float				m_flTrainingStringStartTime;
+var float				m_flTrainingStringTime;
+var bool bShowTrainingInOracleCam;
+var bool bLocalizedStringsInitialized;
+
+var bool				m_fRespawnDeadPlayer;
+var bool				m_fFadeOverride;		// For the times when we do need to fade in multiplayer, override.
+var bool				m_fPersistantFadeOverride;		// For the times when we do need to fade in multiplayer, override.
+
+var bool				bHudCoordInitialized;
+var float				m_flLastClipX;
+var float				m_flLastClipY;
+
+var float TrainingText_x;
+var float TrainingText_y;
+var float TrainingText_w;
+
+var float ContextText_x;
+var float ContextText_y;
+var float ContextText_w;
+
+var float PickupText_x;
+var float PickupText_y;
+var float PickupText_w;
+
+var float LocalText_x;
+var float LocalText_y;
+var float LocalText_w;
+
+// text button escape sequence codes...
+const BUTTONIZED_ESC_TEXTLEFT		= 1;	// text left justified
+const BUTTONIZED_ESC_TEXTRIGHT		= 2;	// text right justified
+const BUTTONIZED_ESC_TEXTCENTERED	= 3;	// text centered
+const BUTTONIZED_ESC_ICON_BUTTON	= 10;	// icon button textures start here
+const BUTTONIZED_ESC_ICON_TRAINING	= 80;	// icon training art textures start here
+
+struct native TextureStruct
+{
+	var int		U,V,UL,VL;
+};
+
+var Material ButtonTexture;  // controller button art that can appear in text messages
+var array<TextureStruct> ButtonArray;
+var float ButtonArtScaleX, ButtonArtScaleY;
+
+var Material TrainingTexture;  // training art that can appear in text messages
+var array<TextureStruct> TrainingArray;
+var float TrainingArtScaleX, TrainingArtScaleY;
+
+// LCD Grenade
+var Texture				m_LCDGrenade;
+
+struct native SubstituteStruct
+{
+	var string	Text;
+	var string	Replacement;
+};
+
+var array<SubstituteStruct> SubstituteText;
+
+struct native ButtonizedStruct  // used to replace keywords in "buttonized" text with ESC sequences (or other text)
+{
+	var string	Keyword;			// the original keyword
+	var string	Replacement;		// the text that replaces the keyword
+	var bool	bIsESC;				// is the replacement an ESC sequence?
+	var int		ESC_code;			// escape sequence code
+};
+
+var array<ButtonizedStruct> ButtonizedKeywords;
+var array<ButtonizedStruct> TrainingKeywords;
+
+struct native TrainingIconStruct
+{
+	var string	Keyword;			// the original keyword
+	var int		ESC_code;			// escape sequence code
+};
+
+var array<TrainingIconStruct> TrainingIcons;
+
+struct native LocalizedActionStruct
+{
+	var string	ActionKeyword;
+	var string	LocalizedText;
+};
+
+var array<LocalizedActionStruct> PCLocalizedActions;
+var array<LocalizedActionStruct> XboxLocalizedActions;
+
+var HUDClockIcon		m_aBombClock;
+var float				m_flBombClockTime;
+var float				m_flBombClockStartTime;
+
+// hud related
+var   int   TimerPosX;
+var   int   TimerPosY;
+
+var		int		m_nCheckpointID;
+var		name	m_szPreSaveTrigger;
+var		name	m_szPostSaveTrigger;
+
+// same as Canvas::execDrawTextBounded, but replaces ESC control sequences with controller button art
+native final function DrawTextBoundedWithButtons(Canvas C, coerce string String, byte JustX, byte JustY, out float x1, out float y1, out float x2, out float y2, float ScaleX, float ScaleY, int pass);
+native function DrawCompass(Canvas Canvas, int nPass );
+
+
+simulated function PostBeginPlay()
+{
+	//local InfantryUSA		FriendlyPawn;
+	local gbxBeacons		ObjectiveBeacons;
+	local int				i;
+
+	Super.PostBeginPlay();
+
+	ForEach DynamicActors(class'gbxBeacons', ObjectiveBeacons)
+	{
+		if (ObjectiveBeacons.bEnabled)
+		{
+			for (i = 0; i < MAX_OBJECTIVE_BEACONS; i++)
+				if (m_ObjectiveBeacons[i] == None)
+				{
+					m_ObjectiveBeacons[i] = ObjectiveBeacons;
+					break;
+				}
+		}
+	}
+
+	/*ForEach DynamicActors(class'InfantryUSA', FriendlyPawn)
+	{
+		m_FriendlyPawns.Length = m_FriendlyPawns.Length + 1;
+		m_FriendlyPawns[ m_FriendlyPawns.Length - 1 ] = FriendlyPawn;
+	}*/
+
+	if (!Level.m_fStartBlack)
+	{
+		Level.m_bFadeScreen = NO_FADE;
+	}
+	
+	if (Level.m_aScreenOverlay == None)
+	{
+		Level.m_bFadeOverlay = NO_FADE;
+	}
+
+	if ( Level.m_fStartBlack || Level.m_bFadeOverlay == FADE_START_BLACK || Level.m_bFadeScreen == FADE_START_BLACK )
+	{
+		EnableSoundCategory( ESoundCategory.SC_AMBIENT,	false, 0.0 );	
+		EnableSoundCategory( ESoundCategory.SC_CINEMATIC, false, 0.0 );
+		EnableSoundCategory( ESoundCategory.SC_SOUNDFX,	false, 0.0 );
+	}
+}
+
+simulated function DrawStatus(Canvas Canvas)
+{
+}
+
+exec function AKey()
+{
+/* CEK: Mission Failed GUI screen handles this now
+	if (m_eHudMode == HudModeDead)
+	{
+		// Multiplayer is now handled by the debriefing screen 2004-06-22 JWS
+		// single player can reload the map
+		if (Level.NetMode == NM_Standalone)
+		{
+			PlayerOwner.ConsoleCommand("open "$GetURLMap());
+		}
+	}
+*/
+	if (m_nHelpOverlay > 0)
+	{
+		m_nHelpOverlay = 0;
+		PlayerOwner.SetPause(false);
+	}
+}
+
+exec function BKey()
+{
+/* CEK: Mission Failed GUI screen handles this now
+	if (m_eHudMode == HudModeDead)
+	{
+		if (Level.NetMode == NM_Standalone)
+		{
+			PlayerOwner.ConsoleCommand("open D0_0130_EAGLES_E3");
+		}
+	}
+*/
+	if (m_nHelpOverlay == 1)
+	{
+//		m_nHelpOverlay = 2;
+//		PlayerOwner.SetPause(true);
+//	}
+//	else if (m_nHelpOverlay == 2)
+//	{
+		PlayerOwner.SetPause(false);
+//		PlayerOwner.ConsoleCommand("open D0_0130_EAGLES_E3");
+		m_nHelpOverlay = 0;
+	}
+}
+
+/* UseKey()
+- The player has hit the use key
+*/
+simulated function UseKey()
+{
+	if (m_eHudMode == HudModeWaitForKey)
+	{
+		TriggerEvent(m_szWaitTag, PlayerOwner, PlayerOwner.Pawn);
+		m_eHudMode = HudModeNormal;
+		ClearTextSubTitles();
+		ClearObjectiveOverlay();
+		WargamePlayerController(PlayerOwner).bLockedMovement = false;
+//		PlayerOwner.ConsoleCommand( "cinematics 0" );
+		if (bHideWargameHUD)
+			PlayerOwner.SetHand( 0 );
+		PlayerOwner.PlaySound(Sound'UI.CLICK',SLOT_Interface,100.0,,120);
+		bHideWargameHUD = false;
+	}
+}
+
+/// SJP: Edge effect jog function
+simulated function DoEdgeEffect( ScreenEdge dir, Color color, eRenderStyle rStyle, bool bForce )
+{
+	switch( dir )
+	{
+		case Left :
+
+			if( EdgeEffectLeftTime > 0.0 && !bForce )
+			{
+				if ( color == EdgeEffectLeftColor )
+					EdgeEffectLeftTime = EdgeEffectMaxTime;
+			}
+			else
+			{
+				EdgeEffectLeftTime = EdgeEffectMaxTime;
+				EdgeEffectLeftColor = color;
+				EdgeEffectLeftRenderStyle = rStyle;
+			}
+
+			break;
+
+		case Right : 
+
+			if( EdgeEffectRightTime > 0.0 && !bForce )
+			{
+				if ( color == EdgeEffectRightColor )
+					EdgeEffectRightTime = EdgeEffectMaxTime;
+			}
+			else
+			{
+				EdgeEffectRightTime = EdgeEffectMaxTime;
+				EdgeEffectRightColor = color;
+				EdgeEffectRightRenderStyle = rStyle;
+			}
+
+			break;
+
+		case Top :
+
+			if( EdgeEffectTopTime > 0.0 && !bForce )
+			{
+				if ( color == EdgeEffectTopColor )
+					EdgeEffectTopTime = EdgeEffectMaxTime;
+			}
+			else
+			{
+				EdgeEffectTopTime = EdgeEffectMaxTime;
+				EdgeEffectTopColor = color;
+				EdgeEffectTopRenderStyle = rStyle;
+			}
+
+			break;
+
+		case Bottom :
+
+			if( EdgeEffectBottomTime > 0.0 && !bForce )
+			{
+				if ( color == EdgeEffectBottomColor )
+					EdgeEffectBottomTime = EdgeEffectMaxTime;
+			}
+			else
+			{
+				EdgeEffectBottomTime = EdgeEffectMaxTime;
+				EdgeEffectBottomColor = color;
+				EdgeEffectBottomRenderStyle = rStyle;
+			}
+
+			break;
+	}
+}
+
+function UpdatePlayerFeedbackElements( Canvas Canvas, int pass )
+{
+	local float TimeDelta, DrawAlpha, CalcEdgeEffectWidth;
+
+	TimeDelta = Level.TimeSeconds - EdgeEffectDrawTime;
+
+	// Edge effects
+	if( EdgeEffectLeftTime > 0 || EdgeEffectRightTime > 0 || EdgeEffectTopTime > 0 || EdgeEffectBottomTime > 0 )
+	{
+		// Warning shot from left
+		if( EdgeEffectLeftTime > 0 )
+		{
+			if( pass == 0 && m_eHudMode == HudModeNormal )
+			{
+				DrawAlpha = EdgeEffectLeftTime / EdgeEffectMaxTime;
+				CalcEdgeEffectWidth = Lerp( 1.0 - DrawAlpha, EdgeEffectWidth/2, EdgeEffectWidth );
+				Canvas.Style = EdgeEffectLeftRenderStyle;
+				Canvas.SetDrawColor(EdgeEffectLeftColor.R,EdgeEffectLeftColor.G,EdgeEffectLeftColor.B, Lerp(DrawAlpha, 1, EdgeEffectLeftColor.A) );
+				Canvas.SetPos( (Canvas.ClipX - Canvas.ClipY)/2, (Canvas.ClipY - Canvas.ClipX)/2 ); // Canvas.ClipX - CalcEdgeEffectWidth * ScaleX - ( (Canvas.ClipX - Canvas.ClipY) / 2 )
+				Canvas.DrawTileRotated(material't_interface_mb.hud.interface_comp', Canvas.ClipY, CalcEdgeEffectWidth * ScaleX, 436, 139, 33, 8,  Canvas.ClipX/2, Canvas.ClipY/2, Rot(0,49152,0) );
+			}
+
+			EdgeEffectLeftTime = FMax( 0.0, EdgeEffectLeftTime - TimeDelta );
+		}
+		
+		// Warning shot from right
+		if( EdgeEffectRightTime > 0 )
+		{
+			if( pass == 0 && m_eHudMode == HudModeNormal )
+			{
+				DrawAlpha = EdgeEffectRightTime / EdgeEffectMaxTime;
+				CalcEdgeEffectWidth = Lerp( 1.0 - DrawAlpha, EdgeEffectWidth/2, EdgeEffectWidth );
+				Canvas.Style = EdgeEffectRightRenderStyle;
+				Canvas.SetDrawColor(EdgeEffectRightColor.R,EdgeEffectRightColor.G,EdgeEffectRightColor.B, Lerp(DrawAlpha, 1, EdgeEffectRightColor.A) );
+				Canvas.SetPos( (Canvas.ClipX - Canvas.ClipY)/2, (Canvas.ClipY - Canvas.ClipX)/2 ); // Canvas.ClipX - CalcEdgeEffectWidth * ScaleX - ( (Canvas.ClipX - Canvas.ClipY) / 2 )
+				Canvas.DrawTileRotated(material't_interface_mb.hud.interface_comp', Canvas.ClipY, CalcEdgeEffectWidth * ScaleX, 436, 139, 33, 8, Canvas.ClipX/2, Canvas.ClipY/2, Rot(0,16384,0) );
+			}
+
+			EdgeEffectRightTime = FMax( 0.0, EdgeEffectRightTime - TimeDelta );
+		}
+
+		// Warning shot from front
+		if( EdgeEffectTopTime > 0 )
+		{
+			if( pass == 0 && m_eHudMode == HudModeNormal )
+			{
+				DrawAlpha = EdgeEffectTopTime / EdgeEffectMaxTime;
+				CalcEdgeEffectWidth = Lerp( 1.0 - DrawAlpha, EdgeEffectWidth/2, EdgeEffectWidth );
+				Canvas.Style = EdgeEffectTopRenderStyle;
+				Canvas.SetDrawColor(EdgeEffectTopColor.R,EdgeEffectTopColor.G,EdgeEffectTopColor.B, Lerp(DrawAlpha, 1, EdgeEffectTopColor.A) );
+				Canvas.SetPos( 0, 0 );
+				Canvas.DrawTile(material't_interface_mb.hud.interface_comp', Canvas.ClipX, CalcEdgeEffectWidth * ScaleY, 436, 139, 33, 8 );
+			}
+
+			EdgeEffectTopTime = FMax( 0.0, EdgeEffectTopTime - TimeDelta );
+		}
+
+		// Warning shot from back
+		if( EdgeEffectBottomTime > 0 )
+		{
+			if( pass == 0 && m_eHudMode == HudModeNormal )
+			{
+				DrawAlpha = EdgeEffectBottomTime / EdgeEffectMaxTime;
+				CalcEdgeEffectWidth = Lerp( 1.0 - DrawAlpha, EdgeEffectWidth/2, EdgeEffectWidth );
+				Canvas.Style = EdgeEffectBottomRenderStyle;
+				Canvas.SetDrawColor(EdgeEffectBottomColor.R,EdgeEffectBottomColor.G,EdgeEffectBottomColor.B, Lerp(DrawAlpha, 1, EdgeEffectBottomColor.A) );
+				Canvas.SetPos( 0, 0 );
+				Canvas.DrawTileRotated(material't_interface_mb.hud.interface_comp', Canvas.ClipX, CalcEdgeEffectWidth * ScaleY, 436, 139, 33, 8, Canvas.ClipX/2, Canvas.ClipY/2, Rot(0,32768,0) );
+			}
+
+			EdgeEffectBottomTime = FMax( 0.0, EdgeEffectBottomTime - TimeDelta );
+		}
+	}
+
+	EdgeEffectDrawTime = Level.TimeSeconds;
+}
+
+exec function HelpOverlay()
+{
+	local OracleCamera OracleCam;
+
+	OracleCam = WargamePlayerController( PlayerOwner ).OracleCam;
+
+	if (Level.Game.IsA('WargameSinglePlayer'))
+	{
+		if( OracleCam != None && OracleCam.IsActive() )
+			return;
+	}
+
+	if (m_eHudMode == HudModeNormal)
+	{
+		if (m_nHelpOverlay == 0)
+		{
+			m_nHelpOverlay = 1;
+			PlayerOwner.SetPause(true);
+		}
+		else
+		{
+			m_nHelpOverlay = 0;
+			PlayerOwner.SetPause(false);
+		}
+	}
+}
+
+/*
+simulated function DrawRadar(Canvas Canvas)
+{
+	local float xl,yl,amt;
+	local string s;
+	local int team;
+//	local gbxBeacons B;
+//	local InfantryUSA aSoldier;
+	local Vector View;
+	local float cX, cY, cX2, cY2, radarX, radarY, centerX, centerY;
+	local float flPlayerYaw;
+	local int	i;
+
+	if ((gbxPlayerStart(PawnOwner.LastStartSpot) == None) || (gbxPlayerStart(PawnOwner.LastStartSpot).m_aRadarMap == None))
+		return;
+
+	Canvas.Style = ERenderStyle.STY_Normal;
+	Canvas.SetDrawColor(255,255,255);
+
+	if ((gbxPlayerStart(PawnOwner.LastStartSpot) != None) && (gbxPlayerPawn(PawnOwner) != None))
+	{
+		cX = ((PawnOwner.Location.X - gbxPlayerPawn(PawnOwner).m_flLandmarkW) * gbxPlayerPawn(PawnOwner).m_flRadarScaleX) + gbxPlayerPawn(PawnOwner).m_flRadarW;
+		cY = ((PawnOwner.Location.Y - gbxPlayerPawn(PawnOwner).m_flLandmarkN) * gbxPlayerPawn(PawnOwner).m_flRadarScaleY) + gbxPlayerPawn(PawnOwner).m_flRadarN;
+		centerX = cX;
+		centerY = cY;
+
+		if (cX < (gbxPlayerPawn(PawnOwner).m_flRadarW + 60.000000))
+		{
+			cX2 = gbxPlayerPawn(PawnOwner).m_flRadarW;
+		}
+		else if (cX > (gbxPlayerPawn(PawnOwner).m_flRadarE - 60.000000))
+		{
+			cX2 = gbxPlayerPawn(PawnOwner).m_flRadarE - 120.000000;
+		}
+		else
+		{
+			cX2 = cX - 60.000000;
+		}
+
+		if (cY < (gbxPlayerPawn(PawnOwner).m_flRadarN + 60.000000))
+		{
+			cY2 = gbxPlayerPawn(PawnOwner).m_flRadarN;
+		}
+		else if (cY > (gbxPlayerPawn(PawnOwner).m_flRadarS - 60.000000))
+		{
+			cY2 = gbxPlayerPawn(PawnOwner).m_flRadarS - 120.000000;
+		}
+		else
+		{
+			cY2 = cY - 60.000000;
+		}
+		radarX = cX2;
+		radarY = cY2;
+
+		Canvas.SetPos((37*ScaleX),Canvas.ClipY-((195*ScaleY) - ScaleY));
+		Canvas.DrawTile(gbxPlayerStart(PawnOwner.LastStartSpot).m_aRadarMap, 158*ScaleX,158*ScaleY, cX2, cY2, 120, 120);
+
+		flPlayerYaw = PawnOwner.GetViewRotation().Yaw + 16384;
+		if (flPlayerYaw > 65535)
+			flPlayerYaw = flPlayerYaw - 65535;
+		flPlayerYaw = 65535 - flPlayerYaw;
+		Canvas.SetPos(((37 + ((cX - cX2 - 5) * gbxPlayerPawn(PawnOwner).m_flScreenScaleX)) * ScaleX),
+			Canvas.ClipY-((195 - ((cY - cY2 - 5) * gbxPlayerPawn(PawnOwner).m_flScreenScaleX)) * ScaleY));
+		Canvas.DrawTileRotated(material'WG_HUD.HUD.radar_player',10*ScaleX,10*ScaleY,0,0,texture'WG_HUD.HUD.radar_player'.USize,texture'WG_HUD.HUD.radar_player'.VSize,flPlayerYaw);
+	}
+
+	Canvas.SetPos(35*ScaleX,Canvas.ClipY-(195*ScaleY));
+	Canvas.DrawTile(RightHud[Team],161*ScaleX,160*ScaleY,0,0,texture(RightHud[Team]).USize,texture(RightHud[Team]).VSize);
+
+//	Canvas.SetPos(Canvas.ClipX-(255*ScaleX),Canvas.ClipY-(255*ScaleY));
+//	Canvas.DrawTile(RightHud[Team],256*ScaleX,256*ScaleY,0,0,256,256);
+
+	Canvas.Font = Font'Engine.DefaultFont';
+	amt = PawnOwner.Health;
+	Canvas.SetDrawColor(192 * ((100.000000 - amt) / 100.000000) ,192 * (amt / 100.000000),0);
+
+	s = ""$PawnOwner.Health;
+	Canvas.StrLen(s,xl,yl);
+	Canvas.SetPos(Canvas.ClipX - (210*ScaleX) - (xl/2), Canvas.ClipY-(100*ScaleY));
+	Canvas.DrawText(s,false);
+
+	Canvas.SetDrawColor(255,255,255);
+	for (i = 0; i < MAX_OBJECTIVE_BEACONS; i++)
+	{
+		if (m_ObjectiveBeacons[i] == None)
+			continue;
+
+		cX = ((m_ObjectiveBeacons[i].Location.X - gbxPlayerPawn(PawnOwner).m_flLandmarkW) * gbxPlayerPawn(PawnOwner).m_flRadarScaleX) + gbxPlayerPawn(PawnOwner).m_flRadarW;
+		cY = ((m_ObjectiveBeacons[i].Location.Y - gbxPlayerPawn(PawnOwner).m_flLandmarkN) * gbxPlayerPawn(PawnOwner).m_flRadarScaleY) + gbxPlayerPawn(PawnOwner).m_flRadarN;
+
+		if ((cX > radarX) && (cX < (radarX + 120.000000)) && (cY > radarY) && (cY < (radarY + 120.000000)))
+		{
+			Canvas.SetPos(((35 + ((cX - radarX - 5) * gbxPlayerPawn(PawnOwner).m_flScreenScaleX)) * ScaleX),
+				Canvas.ClipY-((195 - ((cY - radarY - 5) * gbxPlayerPawn(PawnOwner).m_flScreenScaleY)) * ScaleY));
+			Canvas.DrawTile(material'WG_HUD.HUD.radar_civi',8*ScaleX,8*ScaleY,0,0,texture'WG_HUD.HUD.radar_civi'.USize,texture'WG_HUD.HUD.radar_civi'.VSize);
+		}
+		else
+		{
+			// Draw the symbol
+			View = m_ObjectiveBeacons[i].Location - PawnOwner.Location;
+			cX = (115 * ScaleX) + (cos(atan(View.Y, View.X)) * (90 * ScaleX));
+			cY = (Canvas.ClipY - (140 * ScaleY)) + (sin(atan(View.Y, View.X)) * (90 * ScaleY));
+
+			DrawBeacon(m_ObjectiveBeacons[i],Canvas,self,cX,cY);
+		}
+	}
+
+	if (gbxPlayerPawn(PawnOwner) != None)
+	{
+		Canvas.SetDrawColor(255,255,255);
+		for (i = 0; i < m_FriendlyPawns.Length; i++)
+		{
+			if (m_FriendlyPawns[i] == None)
+				continue;
+			if (m_FriendlyPawns[i].Health <= 0)
+				continue;
+			cX = ((m_FriendlyPawns[i].Location.X - gbxPlayerPawn(PawnOwner).m_flLandmarkW) * gbxPlayerPawn(PawnOwner).m_flRadarScaleX) + gbxPlayerPawn(PawnOwner).m_flRadarW;
+			cY = ((m_FriendlyPawns[i].Location.Y - gbxPlayerPawn(PawnOwner).m_flLandmarkN) * gbxPlayerPawn(PawnOwner).m_flRadarScaleY) + gbxPlayerPawn(PawnOwner).m_flRadarN;
+
+			if ((cX > radarX) && (cX < (radarX + 120.000000)) && (cY > radarY) && (cY < (radarY + 120.000000)))
+			{
+				Canvas.SetPos(((35 + ((cX - radarX - 5) * gbxPlayerPawn(PawnOwner).m_flScreenScaleX)) * ScaleX),
+					Canvas.ClipY-((195 - ((cY - radarY - 5) * gbxPlayerPawn(PawnOwner).m_flScreenScaleY)) * ScaleY));
+				flPlayerYaw = m_FriendlyPawns[i].Rotation.Yaw + 16384;
+				if (flPlayerYaw > 65535)
+					flPlayerYaw = flPlayerYaw - 65535;
+				flPlayerYaw = 65535 - flPlayerYaw;
+				Canvas.DrawTileRotated(material'WG_HUD.HUD.radar_teamate',10*ScaleX,10*ScaleY,0,0,texture'WG_HUD.HUD.radar_teamate'.USize,texture'WG_HUD.HUD.radar_teamate'.VSize,flPlayerYaw);
+			}
+		}
+	}
+}
+*/
+
+simulated function DrawContextUseMessage(Canvas Canvas, int nPass)
+{
+	local string	szMsg, szButtonizedMessage;
+	local float x, y, w, h;
+
+	if (ContextUseMessage == None)
+		return;
+
+	if ((m_flContextUseLife > 0) && (m_flContextUseLife < Level.TimeSeconds))
+	{
+		ContextUseMessage = None;
+		return;
+	}
+	
+	Canvas.Font = WargameFont;
+	
+	szMsg = ContextUseMessage.Static.GetString( ContextUseSwitch );
+	szButtonizedMessage = ConvertToButtonizedMessage(szMsg);
+
+	if (nPass == 0)
+	{
+		if ( !bIsSplitScreen )
+		{
+			x = Canvas.SafeOffX + ((93 + (iObjectiveHeight * 2)) * flMinScaleX);
+			if (Level.NetMode == NM_StandAlone)
+			{
+				y = 303.0f * ScaleY;
+			}
+			else
+			{
+				y = 353.0f * ScaleY;
+			}
+			w = Canvas.SafeSizeX - ((93 + (iObjectiveHeight * 2) + 55) * flMinScaleX);
+		}
+		else
+		{
+			x = Canvas.SafeOffX + ((93 + (iObjectiveHeight * 2)) * flSplitScreenScale);
+			if (Canvas.SafeOffY == 0)
+			{
+				y = (353.0f * ScaleY) - (Canvas.ClipY - Canvas.SafeSizeY);
+			}
+			else
+			{
+				y = 353.0f * ScaleY;
+			}
+			w = Canvas.SafeSizeX - ((93 + (iObjectiveHeight * 2) + 55) * flSplitScreenScale);
+		}
+		h = 0.0f;
+
+		DrawTextBoundedWithButtons(Canvas, szButtonizedMessage, 1, 0, x, y, w, h, CONTEXTUSE_TITLE_FONT_SCALE, CONTEXTUSE_TITLE_FONT_SCALE * flScaleRatio, 0);
+
+		x = x - 15*ScaleX;
+		y = y - 15*ScaleY;
+		w = w + 30*ScaleX;
+		h = h + 30*ScaleY;
+	
+		Canvas.SetPos( x, y );
+		Canvas.SetDrawColor(0, 0, 0, 178);
+		Canvas.DrawTileTiledClip(	Texture't_interface_mb.hud.interface_comp', 
+								w, h, 
+								284, 128, 128, 128,
+								32, 32);
+
+		x = x + 15*ScaleX;
+		y = y + 15*ScaleY;
+		w = w - 30*ScaleX;
+		h = h - 30*ScaleY;
+	
+		Canvas.SetDrawColor(255,255,255);
+		DrawTextBoundedWithButtons(Canvas, szButtonizedMessage, 1, 0, x, y, w, h, CONTEXTUSE_TITLE_FONT_SCALE, CONTEXTUSE_TITLE_FONT_SCALE * flScaleRatio, nPass + 1);
+
+		ContextText_x = x;
+		ContextText_y = y;
+		ContextText_w = w;
+	}
+	else if (nPass == 1)
+	{
+		x = ContextText_x;
+		y = ContextText_y;
+		w = ContextText_w;
+		h = 0.0f;
+		Canvas.DrawColor = WhiteColor;
+		DrawTextBoundedWithButtons(Canvas, szButtonizedMessage, 1, 0, x, y, w, h, CONTEXTUSE_TITLE_FONT_SCALE, CONTEXTUSE_TITLE_FONT_SCALE * flScaleRatio, nPass + 1);
+	}
+}
+
+simulated function DrawPrimaryWeaponSelect(Canvas Canvas, int nPass)
+{
+	local string	szMsg, szButtonizedMessage;
+	local float x, y, w, h;
+
+	if (ContextUseMessage != None)
+	{
+		return;
+	}
+	
+	Canvas.Font = WargameFont;
+	
+	if (gbxPawn(PawnOwner).m_fPrimaryWeaponSelect)
+	{
+		szMsg = class'gbxHUD.gbxPickupMessage'.Static.GetString( 0 );
+		szMsg = szMsg$"|"$gbxPawn(PawnOwner).m_szWeaponName$".";
+	}
+	else
+		szMsg = class'gbxHUD.gbxPickupMessage'.Static.GetString( 1 );
+	szButtonizedMessage = ConvertToButtonizedMessage(szMsg);
+
+	if (nPass == 0)
+	{
+		if ( !bIsSplitScreen )
+		{
+			x = Canvas.SafeOffX + ((93 + (iObjectiveHeight * 2)) * flMinScaleX);
+			if (Level.NetMode == NM_StandAlone)
+			{
+				y = 303.0f * ScaleY;
+			}
+			else
+			{
+				y = 353.0f * ScaleY;
+			}
+			w = Canvas.SafeSizeX - ((93 + (iObjectiveHeight * 2) + 55) * flMinScaleX);
+		}
+		else
+		{
+			x = Canvas.SafeOffX + ((93 + (iObjectiveHeight * 2)) * flSplitScreenScale);
+			if (Canvas.SafeOffY == 0)
+			{
+				y = (353.0f * ScaleY) - (Canvas.ClipY - Canvas.SafeSizeY);
+			}
+			else
+			{
+				y = 353.0f * ScaleY;
+			}
+			w = Canvas.SafeSizeX - ((93 + (iObjectiveHeight * 2) + 55) * flSplitScreenScale);
+		}
+/*
+		x = Canvas.SafeOffX;
+		// GBX:PAD: This is a complete hack, but I need to know if this is the lower viewport in a splitscreen game
+		// so that I can shift this message up by the safe zone offset to be more consistent with the rest of the hud.
+		if (bIsSplitScreen && (Canvas.SafeOffY == 0))
+		{
+			y = (303.0f * ScaleY) - (Canvas.ClipY - Canvas.SafeSizeY);
+		}
+		else
+		{
+			y = 303.0f * ScaleY;
+		}
+		w = Canvas.SafeSizeX;
+*/
+		h = 0.0f;
+
+		DrawTextBoundedWithButtons(Canvas, szButtonizedMessage, 1, 0, x, y, w, h, CONTEXTUSE_TITLE_FONT_SCALE, CONTEXTUSE_TITLE_FONT_SCALE * flScaleRatio, 0);
+
+		x = x - 15*ScaleX;
+		y = y - 15*ScaleY;
+		w = w + 30*ScaleX;
+		h = h + 30*ScaleY;
+	
+		Canvas.SetPos( x, y );
+		Canvas.SetDrawColor(0, 0, 0, 178);
+		Canvas.DrawTileTiledClip(	Texture't_interface_mb.hud.interface_comp', 
+								w, h, 
+								284, 128, 128, 128,
+								32, 32);
+
+		x = x + 15*ScaleX;
+		y = y + 15*ScaleY;
+		w = w - 30*ScaleX;
+		h = h - 30*ScaleY;
+	
+		Canvas.SetDrawColor(255,255,255);
+		DrawTextBoundedWithButtons(Canvas, szButtonizedMessage, 1, 0, x, y, w, h, CONTEXTUSE_TITLE_FONT_SCALE, CONTEXTUSE_TITLE_FONT_SCALE * flScaleRatio, nPass + 1);
+
+		PickupText_x = x;
+		PickupText_y = y;
+		PickupText_w = w;
+	}
+	else if (nPass == 1)
+	{
+		x = PickupText_x;
+		y = PickupText_y;
+		w = PickupText_w;
+		h = 0.0f;
+		Canvas.DrawColor = WhiteColor;
+		DrawTextBoundedWithButtons(Canvas, szButtonizedMessage, 1, 0, x, y, w, h, CONTEXTUSE_TITLE_FONT_SCALE, CONTEXTUSE_TITLE_FONT_SCALE * flScaleRatio, nPass + 1);
+	}
+}
+
+simulated function DrawSecondaryWeaponSelect(Canvas Canvas, int nPass)
+{
+	local string s;
+	local int	 nIconW, nIconH, nNumCopies;
+	local int	lcdGX, lcdGY, lcdGNX;
+	local Font oldFont;
+	local byte	nAlpha;
+
+	if (Powerups(gbxPawn(PawnOwner).SecondaryWeapon) == None)
+	{
+		return;
+	}
+	nNumCopies = Powerups(gbxPawn(PawnOwner).SecondaryWeapon).NumCopies;
+	
+	
+	// Draw the Grenade on LCD
+	lcdGX=115; //Passing numbers directly casted weird.
+	lcdGY=5;
+	lcdGNX=145;
+	Canvas.DrawLCDIcon(0, m_LCDGrenade, lcdGX, lcdGY);
+	Canvas.DrawLCDNumber(0, nNumCopies, lcdGNX, lcdGY);
+	
+	if ( gbxPlayerController(PawnOwner.Controller).bRemoveWeaponFromHud == true)
+		return;
+	
+	if (nNumCopies <= 0)
+	{
+		return;
+	}
+			
+	// Determine alpha value to use for the grenade ammo icons
+	if ((255 * gbxPawn(PawnOwner).flSecondaryUIFadeTime) < 51)		
+		nAlpha = 51;
+	else if(gbxPawn(PawnOwner).flSecondaryUIFadeTime < 1.0)
+		nAlpha = 255 * gbxPawn(PawnOwner).flSecondaryUIFadeTime;
+	
+	if (nPass == 0)
+	{
+		if (!bIsSplitScreen)
+		{
+			iSecondaryPosX = (Canvas.SafeOffX + Canvas.SafeSizeX) - (55 * flMinScaleX);
+			iSecondaryPosY = (Canvas.SafeOffY + Canvas.SafeSizeY) - (100 * flMinScaleY);
+		}
+		else
+		{
+			iSecondaryPosX = (Canvas.SafeOffX + Canvas.SafeSizeX) - (55 * flSplitScreenScale);
+			iSecondaryPosY = (Canvas.SafeOffY + Canvas.SafeSizeY) - (100 * flSplitScreenScale);
+		}
+
+		Canvas.SetDrawColor( 26, 20, 14, nAlpha );
+		if ( !bIsSplitScreen )
+		{
+            Canvas.SetPos(iSecondaryPosX, iSecondaryPosY);
+			Canvas.DrawTile(material't_interface_mb.hud.interface_comp', 48*flMinScaleX, 48*flMinScaleY, 94, 128, 48, 48);
+		}
+		else
+		{
+			Canvas.SetPos(iSecondaryPosX, iSecondaryPosY);
+			Canvas.DrawTile(material't_interface_mb.hud.interface_comp', 48*flSplitScreenScale, 48*flSplitScreenScale, 94, 128, 48, 48);
+		}
+
+		Canvas.SetDrawColor( 228, 220, 197, nAlpha );
+		nIconW = gbxPawn(PawnOwner).SecondaryWeapon.nIconW;
+		nIconH = gbxPawn(PawnOwner).SecondaryWeapon.nIconH;
+		if ( !bIsSplitScreen )
+		{
+			Canvas.SetPos(iSecondaryPosX + (((48 - nIconW) / 2) * flMinScaleX), iSecondaryPosY + (((48 - nIconH) / 2) * flMinScaleY));
+			Canvas.DrawTile(material't_interface_mb.hud.interface_comp', nIconW * flMinScaleX, nIconH * flMinScaleY, gbxPawn(PawnOwner).SecondaryWeapon.nIconX, gbxPawn(PawnOwner).SecondaryWeapon.nIconY, nIconW, nIconH);
+		}
+		else
+		{
+			Canvas.SetPos(iSecondaryPosX + (((48 - nIconW) / 2) * flSplitScreenScale), iSecondaryPosY + (((48 - nIconH) / 2) * flSplitScreenScale));
+			Canvas.DrawTile(material't_interface_mb.hud.interface_comp', nIconW * flSplitScreenScale, nIconH * flSplitScreenScale, gbxPawn(PawnOwner).SecondaryWeapon.nIconX, gbxPawn(PawnOwner).SecondaryWeapon.nIconY, nIconW, nIconH);
+		}
+	}
+	else if (nPass == 1)
+	{
+		oldFont = Canvas.Font;
+		Canvas.Font = WargameFontNumbers;
+
+		Canvas.DrawColor = WhiteColor;
+		s = ""$nNumCopies;
+		
+		Canvas.SetDrawColor( 228, 220, 197, nAlpha );
+
+		if ( !bIsSplitScreen )
+		{
+			Canvas.SetPos(iSecondaryPosX + (34 * flMinScaleX), iSecondaryPosY + (24 * flMinScaleY));
+			Canvas.DrawText(s, false, GRENADE_DISPLAY_SCALE*flMinScaleX, GRENADE_DISPLAY_SCALE*flMinScaleY);
+		}
+		else
+		{
+			Canvas.SetPos(iSecondaryPosX + (34 * flSplitScreenScale), iSecondaryPosY + (24 * flSplitScreenScale));
+			Canvas.DrawText(s, false, GRENADE_DISPLAY_SCALE*flSplitScreenScale, GRENADE_DISPLAY_SCALE*flSplitScreenScale);
+		}
+
+		Canvas.Font = oldFont;
+	}
+
+	if (gbxPawn(PawnOwner).flSecondaryUIFadeTime > 0.0f)
+	{
+		gbxPawn(PawnOwner).flSecondaryUIFadeTime -= (Level.TimeSeconds - gbxPawn(PawnOwner).flSecondaryUILastFadeTime);
+		gbxPawn(PawnOwner).flSecondaryUILastFadeTime = Level.TimeSeconds;
+	}
+
+}
+
+simulated function DrawAmmo(Canvas Canvas)
+{
+}
+
+simulated function DrawGameSynopsis(Canvas Canvas);
+
+function DrawTalkFace(Canvas Canvas, int i, float YPos)
+{
+}
+
+simulated function DrawBombClock( canvas Canvas )
+{
+	if ((m_aBombClock != None) && (m_aBombClock.ClockPercentage > 0))
+	{
+		m_aBombClock.DrawGBXHud(Canvas, self, None, 0);
+		m_aBombClock.ClockPercentage = ((m_flBombClockTime - (Level.TimeSeconds - m_flBombClockStartTime)) / m_flBombClockTime);
+	}
+}
+
+//========================================
+// Master HUD render function.
+
+simulated function DrawHUD( canvas Canvas )
+{
+	local float YPos,XL, YL;
+	local int i, j, p;
+	local bool	fCalcAxes;
+	local string BuildLabelString;
+	local OracleCamera OracleCam;
+	local IAIDebugCamera AIDebugCam;
+	local IGbxPawnList PawnList;
+	local gbxPawn		aPawn;
+
+	fCalcAxes = false;
+	Canvas.Style = ERenderStyle.STY_Alpha;
+
+	OracleCam = WargamePlayerController( PlayerOwner ).OracleCam;
+
+	if( OracleCam != None )
+	{
+		if( OracleCam.IsActive() )
+		{
+			for( i = 0; i < 2; i++ )
+			{
+				if ( !OracleCam.IsSimplified() )
+				{
+					if (i==0)
+					{
+						for( j = 0; j < InWorldIcons.Length; ++j )
+						{
+							if( InWorldIcons[ j ] != None && !InWorldIcons[ j ].bDeleteMe )
+							{
+								InWorldIcons[ j ].DrawGBXHUD( Canvas, Self, MyFont, i );
+							}
+							else
+							{
+								InWorldIcons.Remove( j, 1 );
+								--j;
+							}
+						}
+					}
+				}
+
+				if (!bShowTrainingInOracleCam || m_flTrainingStringTime < 0)
+				{
+					OracleCam.bIsTrainingTextDisplayed = false;
+
+					// Update inspector manager
+					UpdateInspectors( Canvas );
+				}
+				else
+				{
+					OracleCam.bIsTrainingTextDisplayed = true;
+
+					// draw any HUD Training text messages...
+					DisplayTrainingOverlay( Canvas, i );
+				}
+
+				OracleCam.DrawGBXHUD( Canvas, Self, MyFont, i );
+
+			}
+
+			return;
+		}
+	}
+
+	// Update inspector manager.
+	UpdateInspectors( Canvas );
+
+	// AI Debug camera HUD.
+	AIDebugCam = WargamePlayerController( PlayerOwner ).AIDebugCam;
+	if ( AIDebugCam != None && AIDebugCam.IsActive() )
+	{
+		AIDebugCam.DrawGBXHUD( Canvas, Self, MyFont, i );
+		return;
+	}
+
+	if ( bHideHUD || bHideWargameHUD || (ViewedInfo == None) || ( PlayerOwner.ProgressTimeOut > Level.TimeSeconds ) || ( Level.LevelAction == LEVACT_Loading ))
+	{
+		return;
+	}
+
+	// GBX:PAD: Pretty much do a 2 pass rendering process so that each accessed function has the chance to either draw text, or
+	// draw icons in hopes of sticking with the same material for as long as possible.  0 is the graphic pass, 1 is the
+	// text pass.
+
+	//	Canvas.Style = ERenderStyle.STY_Normal;
+	Canvas.SetDrawColor(255,255,255);
+
+	for( i = 0; i < 2; i++ )
+	{
+		if( i == 1 && Level.bShowBuildLabel )
+		{
+			BuildLabelString = "Build "$Level.BuildLabel;
+			YPos = Canvas.ClipY - 96;
+			Canvas.SetDrawColor(125,125,125);
+			Canvas.StrLen( BuildLabelString, XL, YL );
+			Canvas.SetPos(0.50 * (Canvas.ClipX - XL), YPos);
+			Canvas.DrawText(BuildLabelString, False);
+		}
+
+		if ( !ViewedInfo.bIsSpectator )
+		{
+			if (!bLimitedPlayerHUD)
+			{
+				if( i == 0 )
+				{
+					for( j = 0; j < InWorldIcons.Length; ++j )
+					{
+						if( InWorldIcons[ j ] != None && !InWorldIcons[ j ].bDeleteMe )
+						{
+							InWorldIcons[ j ].DrawGBXHUD( Canvas, Self, MyFont, i );
+						}
+						else
+						{
+							InWorldIcons.Remove( j, 1 );
+							--j;
+						}
+					}
+				}
+
+
+				// Let the Weapon draw it's info
+				if ( PawnOwner != None)
+				{
+					if (PawnOwner.Weapon!=None)
+					{
+						gbxWeapon(PawnOwner.Weapon).DrawHud(Canvas,Self,MyFont, i);
+					}
+
+					if ( PawnOwner.IsA('gbxPawn'))
+					{
+						if ( gbxPawn(PawnOwner).SecondaryWeapon != None)
+						{
+							// SJP: This was spamming 'Accessed None' when you picked up a grenade, so I added this check
+							if( gbxWeapon(gbxPawn(PawnOwner).SecondaryWeapon) != None )
+								gbxWeapon(gbxPawn(PawnOwner).SecondaryWeapon).DrawHud(Canvas,Self,MyFont, i);
+
+							if ((m_eHudMode == HudModeNormal) || (m_eHudMode == HudModeWaitForKey))
+								DrawSecondaryWeaponSelect(Canvas, i);
+						}
+
+						if (gbxPawn(PawnOwner).m_fPrimaryWeaponSelect && (m_eHudMode == HudModeNormal))
+							DrawPrimaryWeaponSelect(Canvas, i);
+						if (ContextUseMessage != None)
+							DrawContextUseMessage(Canvas, i);
+					}
+				}
+
+				if (PawnOwner.Controller.IsA('gbxPlayerController'))
+				{
+					PawnList = Level.GetPawnList();
+					if (PawnList != None)
+					{
+						p = gbxPawnList( PawnList ).GetGbxPawn( None, 0, aPawn );
+						while( p != -1 )
+						{
+							if (gbxPlayerController(PawnOwner.Controller).bFriendlyFireIDDisable == true)
+								aPawn.bPawnInfoIconOnly = true;
+							aPawn.DrawSelfForGBXHudC( Canvas, self, MyFont, i );
+							p = gbxPawnList( PawnList ).GetGbxPawn( None, p, aPawn );
+						}
+					}
+					
+					if (gbxPlayerController(PawnOwner.Controller).bFriendlyFireIDDisable == false)
+					{
+						for( p = 0; p < m_ScriptedPawns.Length; p++ )
+						{
+							if (m_ScriptedPawns[ p ] != None)
+							{
+								m_ScriptedPawns[ p ].DrawSelfForGBXHudC( Canvas, self, MyFont, i );
+							}
+						}
+					}
+				}
+			}
+
+			// Draw the compass with it's associated objective markers and fire team markers.
+			DrawCompass( Canvas, i );
+			DrawBombClock( Canvas );
+
+			if (gbxPlayerPawn(PawnOwner)!=None)
+				gbxPlayerPawn(PawnOwner).DrawGBXHud(Canvas,self,MyFont,i);
+
+			// Update display of feedback elements, such as warning shot and damage directional indicators
+			UpdatePlayerFeedbackElements( Canvas, i );
+		}
+
+		// GBX:PAD: Moved these down a bit so that they draw after (on top of) the hud elements since it looks odd for them to
+		// to draw on top of the subtitles and training overlay.
+		DisplaySubTitles( Canvas, i );
+		// draw any HUD Training text messages...
+		DisplayTrainingOverlay( Canvas, i );
+		
+		if ( Level.NetMode == NM_CLIENT || Level.NetMode == NM_LISTENSERVER )
+		{
+			for( j = 0; j < VictoryConditions.Length; ++j )
+			{
+				if( VictoryConditions[ j ] != None && !VictoryConditions[ j ].bDeleteMe )
+				{
+					VictoryConditions[ j ].DrawGBXHUD( Canvas, self, MyFont, i );
+				}
+				else
+				{
+					VictoryConditions.Remove( j, 1 );
+					--j;
+				}
+			}
+		}
+
+		DisplayLocalMessages(Canvas, i);
+	}
+
+	Canvas.Style = ERenderStyle.STY_Normal;
+	
+	if ( (PlayerOwner.GameReplicationInfo != None) && (PlayerOwner.GameReplicationInfo.RemainingTime > 0) )
+	{
+		if ( (PlayerOwner.GameReplicationInfo.RemainingTime <= 300)
+		&& (PlayerOwner.GameReplicationInfo.RemainingTime != LastReportedTime) )
+		{
+			LastReportedTime = PlayerOwner.GameReplicationInfo.RemainingTime;
+			if ( PlayerOwner.GameReplicationInfo.RemainingTime <= 30 )
+			{
+				bTimeValid = ( bTimeValid || (PlayerOwner.GameReplicationInfo.RemainingTime > 0) );
+				if ( PlayerOwner.GameReplicationInfo.RemainingTime == 30 )
+					TellTime(30);
+				else if ( bTimeValid && PlayerOwner.GameReplicationInfo.RemainingTime <= 10 )
+					TellTime(PlayerOwner.GameReplicationInfo.RemainingTime);
+			}
+			else if ( PlayerOwner.GameReplicationInfo.RemainingTime % 60 == 0 )
+				TellTime(PlayerOwner.GameReplicationInfo.RemainingTime);
+		}
+	}
+
+	if ( bStartUpMessage && (Level.TimeSeconds < 5) )
+	{
+		bStartUpMessage = false;
+	}
+
+	if ( StartupMessageEnd > Level.TimeSeconds )
+		DisplayStartupMessage(Canvas, 0);
+
+	if ( PawnOwner != None )
+	{
+		if (PawnOwner.Weapon!=None)
+		{
+			gbxWeapon(PawnOwner.Weapon).DrawCrossHair(Canvas);
+		}
+	}
+}
+
+/*  Print a centered level action message with a drop shadow.
+*/
+function PrintActionMessage( Canvas Canvas, string BigMessage )
+{
+	local float YL, MaxXL;
+    local int XPos, YPos;
+
+	if (Canvas.Viewport.Actor.MenuIsActive())
+		return;
+
+	Canvas.Font = WargameFont;
+
+	MaxXL = 0;
+
+	Canvas.StrLen( BigMessage, MaxXL, YL, OBJECTIVE_TITLE_FONT_SCALE, OBJECTIVE_TITLE_FONT_SCALE );
+
+	MaxXL += 30;
+
+	XPos = Canvas.SafeOffX + ((Canvas.SafeSizeX - (MaxXL * ScaleX)) / 2.0f);
+	YPos = Canvas.SafeOffY + ((Canvas.SafeSizeY - ((YL + 30) * ScaleY)) / 2);
+	Canvas.SetDrawColor(26, 20, 14, 102);
+	Canvas.SetPos( XPos, YPos );
+	Canvas.DrawTile(material't_interface_mb.hud.interface_comp', MaxXL * ScaleX, (YL + 30) * ScaleY, 284, 128, 128, 128);
+	
+	Canvas.DrawColor = WhiteColor;
+	XPos += (15 * ScaleX);
+	YPos += (15 * ScaleY);
+	Canvas.SetPos( XPos, YPos );
+	Canvas.DrawText( BigMessage, false, ScaleX * OBJECTIVE_TITLE_FONT_SCALE, ScaleY * OBJECTIVE_TITLE_FONT_SCALE );
+}
+
+simulated function DisplayLocalMessages(Canvas C, int nPass)
+{
+	local int i, j, MessageCount;
+	local float x, y, w, h;
+	local string szStr, szButtonizedMessage;
+
+	if (C.Viewport.Actor.MenuIsActive())
+		return;
+
+	C.Font = WargameFont;
+	C.Style = ERenderStyle.STY_Alpha;
+	
+	MessageCount = 0;
+    for( i = 0; i < 10; i++ )
+    {
+        if ( LocalMessages[i].StringMessage == "" )
+        {
+            continue;
+        }
+        if( (LocalMessages[i].Lifetime != -1) && (LocalMessages[i].EndOfLife < Level.TimeSeconds) )
+        {
+            LocalMessages[i].StringMessage = "";
+
+            if( i < 9 )
+            {
+                for( j=i; j<9; j++ )
+                    LocalMessages[j] = LocalMessages[j+1];
+            }
+            LocalMessages[j].StringMessage = "";
+            continue;
+        }
+        
+		if (szStr != "")
+			szStr = szStr$"|"$LocalMessages[i].StringMessage;
+		else
+			szStr = LocalMessages[i].StringMessage;
+		MessageCount++;
+    }
+
+	szButtonizedMessage = ConvertToButtonizedMessage(szStr);
+	
+	if ((nPass == 0) || (nPass == -1))
+	{
+		if (MessageCount > 0)
+		{
+			if ( !bIsSplitScreen )
+			{
+				x = C.SafeOffX + ((93 + (iObjectiveHeight * 2)) * flMinScaleX);
+				if (PlayerOwner.GameReplicationInfo.GameType == GT_Multiplayer)
+				{
+					y = 80.0f * ScaleY;
+				}
+				else
+				{
+					y = 258.0f * ScaleY;
+				}
+				w = C.SafeSizeX - ((93 + (iObjectiveHeight * 2) + 55) * flMinScaleX);
+			}
+			else
+			{
+				x = C.SafeOffX + ((93 + (iObjectiveHeight * 2)) * flSplitScreenScale);
+				if (PlayerOwner.GameReplicationInfo.GameType == GT_Multiplayer)
+				{
+					if (C.SafeOffY == 0)
+					{
+						y = (100.0f * ScaleY) - (C.ClipY - C.SafeSizeY);
+
+					}
+					else
+					{
+						y = 60.0f * ScaleY;
+					}
+				}
+				else
+				{
+					if (C.SafeOffY == 0)
+					{
+						y = (258.0f * ScaleY) - (C.ClipY - C.SafeSizeY);
+
+					}
+					else
+					{
+						y = 258.0f * ScaleY;
+					}
+				}
+				w = C.SafeSizeX - ((93 + (iObjectiveHeight * 2) + 55) * flSplitScreenScale);
+			}
+			h = 0;
+
+			// space for the objective text
+			DrawTextBoundedWithButtons(C, szButtonizedMessage, 1, 0, x, y, w, h, CONTEXTUSE_TITLE_FONT_SCALE, CONTEXTUSE_TITLE_FONT_SCALE * flScaleRatio, 0);
+
+			x = x - 15*ScaleX;
+			y = y - 15*ScaleY;
+			w = w + 30*ScaleX;
+			h = h + 30*ScaleY;
+			
+			C.SetPos( x, y );
+			C.SetDrawColor(0, 0, 0, 178);
+			C.DrawTileTiledClip( Texture't_interface_mb.hud.interface_comp', w, h, 284, 128, 128, 128, 32, 32);
+
+			LocalText_x = x + 15*ScaleX;
+			LocalText_y = y + 15*ScaleY;
+			LocalText_w = w - 30*ScaleX;
+		}
+	}
+
+	if ((nPass == 1) || (nPass == -1))
+	{
+		if (MessageCount > 0)
+		{
+			C.DrawColor = WhiteColor;
+
+			x = LocalText_x;
+			y = LocalText_y;
+			w = LocalText_w;
+			h = 0;
+
+			DrawTextBoundedWithButtons(C, szStr, 1, 0, x, y, w, h, CONTEXTUSE_TITLE_FONT_SCALE, CONTEXTUSE_TITLE_FONT_SCALE * flScaleRatio, 2);
+		}
+	}
+}
+
+// Override these functions to provide better support for text chat 2005-02-23 JWS
+function DisplayMessages(Canvas C)
+{
+    local int i, j, XPos, YPos;
+    local float XL, YL, StartPosX, StartPosY;
+	local gbxPlayerController gbxPC;
+
+	// Variables used to wrap the text properly
+	local array<string> Buffer;
+	local array<Color> MessageColors;
+	local array<string> WrappedMessages;
+	local int WrapCursor; // where we are in these arrays currently
+
+	if (IsDisplayingMultiplayerTitleCard())
+		return;
+
+	gbxPC = gbxPlayerController(PlayerOwner);
+	if (gbxPC.IsSpectating() || gbxPC.IsInOracleCamMode() || gbxPC.IsViewingDeadBody())
+	{
+		StartPosX = ConsoleMessageSpectatingPosX;
+		StartPosY = ConsoleMessageSpectatingPosY;
+	}
+	else
+	{
+		StartPosX = ConsoleMessagePosX;
+		StartPosY = ConsoleMessagePosY;
+	}
+
+	// Set this up here since we are going to need these properties in order to wrap correctly
+	C.Style = ERenderStyle.STY_Normal;
+    C.Font = WargameFont;
+
+	// Since messages may end up on more than one line, we need to pre-wrap all of them
+	WrapCursor = 0;
+	WrappedMessages.Length = ConsoleMessageCount;
+	MessageColors.Length = ConsoleMessageCount;
+	
+	// Traverse the messages in reverse order to allow the newest message into the list first
+    for( i = ConsoleMessageCount; i >= 0; i-- )
+    {
+		if (WrapCursor == ConsoleMessageCount)
+			break;
+        if ( TextMessages[i].Text != "" && ( TextMessages[i].MessageLife >= Level.TimeSeconds ) )
+		{
+			Buffer.Length = 0;
+			C.WrapStringToArray(TextMessages[i].Text, Buffer, (1.0 - StartPosX) * 640 * (1/CHAT_FONT_SCALE), "|");
+
+			// If this message blows us past the limit, don't do it
+			if ( (WrapCursor + Buffer.Length) > ConsoleMessageCount)
+			{
+				break;
+			}
+
+			// Otherwise we use it. Put it in backwards since the newest message will be on the bottom of the screen (which means that a multi-line message
+			// breaks the temporal continuum)
+			for (j = Buffer.Length-1; j >= 0; j--)
+			{
+				WrappedMessages[WrapCursor] = Buffer[j];
+				MessageColors[WrapCursor] = TextMessages[i].TextColor;
+				WrapCursor++;
+			}
+		}
+    }
+
+	XPos = (StartPosX * 640 * ScaleX);
+	YPos = (StartPosY * 480 * ScaleY);
+
+    C.StrLen("A", XL, YL, CHAT_FONT_SCALE * ScaleX, CHAT_FONT_SCALE * ScaleY);
+
+    for( i=0; i<WrapCursor; i++ )
+    {
+		C.SetDrawColor(32, 32, 32, 192);
+
+		C.SetPos( XPos + ScaleX, YPos + ScaleY );
+		C.DrawTextClipped( WrappedMessages[i], false, CHAT_FONT_SCALE * ScaleX, CHAT_FONT_SCALE * ScaleY );
+
+		C.DrawColor = MessageColors[i];
+		C.SetPos( XPos, YPos );
+		C.DrawTextClipped( WrappedMessages[i], false, CHAT_FONT_SCALE * ScaleX, CHAT_FONT_SCALE * ScaleY );
+
+		YPos -= YL;
+    }
+}
+
+simulated function DrawLiveNotificationIcons(Canvas C)
+{
+	local float xPos, y0, x0, yPos, XL, YL, spacer;
+
+	spacer = 3.0 * flMinScaleX;
+
+	x0 = 592*ScaleX;
+
+	y0 = C.SafeOffY;
+
+	if (( Level.TimeSeconds >= PlayerOwner.FriendRequestTimeout ) && ( Level.TimeSeconds >= PlayerOwner.GameInviteTimeout ))
+	{
+		return;
+	}
+	else if ((Level.TimeSeconds < PlayerOwner.FriendRequestTimeout) && (Level.TimeSeconds < PlayerOwner.GameInviteTimeout))
+	{
+		C.CanvasIconSize(IconFriendRequest, XL, YL, flMinScaleX, flMinScaleY);
+		xPos = X0 - 2.25*XL - spacer;
+	}
+	else
+	{
+		C.CanvasIconSize(IconFriendRequest, XL, YL, flMinScaleX, flMinScaleY);
+		xPos = X0 - XL - spacer;
+	}
+
+	// draw the background
+	yPos = y0;
+	YL += 6*flMinScaleY;
+	XL = x0 - XPos + spacer;
+
+	C.Style = ERenderStyle.STY_Alpha;
+	C.SetDrawColor(26,20,14,96);
+	C.SetPos(xPos, yPos);
+	C.DrawTileTiledClip(Texture't_interface_mb.hud.interface_comp', XL, YL,
+							284, 128, 128, 128, 32, 32);
+
+	// draw the icons
+	C.CanvasIconSize(IconFriendRequest, XL, YL, flMinScaleX, flMinScaleY);
+	if( Level.TimeSeconds < PlayerOwner.FriendRequestTimeout )
+	{
+		xPos = x0;
+		yPos = y0 + 3*flMinScaleY;
+		C.DrawCanvasIcon(xPos, yPos, flMinScaleX, flMinScaleY, IconFriendRequest);
+
+		x0 -= XL*1.15;
+	}
+    
+	if( Level.TimeSeconds < PlayerOwner.GameInviteTimeout )
+	{
+		xPos = x0;
+		yPos = y0 + 3*flMinScaleY;
+		C.DrawCanvasIcon(xPos, yPos, flMinScaleX, flMinScaleY, IconGameInvite);
+	}
+}
+
+function DisplayObjectiveOverlay( Canvas C, int nPass )
+{
+	local float x, y, w, h, XL, YL;
+	local float x0, y0, w0;
+	local gbxPlayerController	PC;
+
+	if (m_flObjStringTime < 0)
+		return;
+
+	if (C.Viewport.Actor.MenuIsActive())
+		return;
+
+	if ((m_flObjStringTime > 0) && ((Level.TimeSeconds - m_flObjStringStartTime) > m_flObjStringTime))
+	{
+		ClearObjectiveOverlay();
+		return;
+	}
+	
+	if ((PawnOwner != None) && PawnOwner.Controller.IsA('gbxPlayerController') && (gbxPlayerController(PawnOwner.Controller).bObjectiveMessageDisable == true))
+	{
+		return;
+	}
+	
+	x0 = 148*ScaleX;
+	y0 = 420*ScaleY;
+	if ( ViewedInfo.bIsSpectator )
+	{
+		PC = gbxPlayerController(C.Viewport.Actor);
+		y0 = y0 + PC.nSpectateObjectiveOffset;
+	}
+	w0 = 344*ScaleX;
+
+    C.Font = WargameFont;
+
+	C.StrLen("W", XL, YL, ScaleX*OBJECTIVE_TITLE_FONT_SCALE, ScaleY*OBJECTIVE_TITLE_FONT_SCALE);
+	C.Style = ERenderStyle.STY_Alpha;
+
+	if ((nPass == 0) || (nPass == -1))
+	{
+		x = x0;
+		y = y0;
+		w = w0;
+		h = 0;
+
+		// allow room for the wait key
+		if (m_eHudMode == HudModeWaitForKey)
+		{
+			y -= 48*ScaleY;
+		}
+
+		// space for the objective text
+		C.DrawTextBounded(m_ObjString, 1, 2, x, y, w, h, ScaleX*OBJECTIVE_TITLE_FONT_SCALE, ScaleY*OBJECTIVE_TITLE_FONT_SCALE, true);
+
+		/*
+		// space for the title line
+		if (m_bObjPrimary)
+		{
+			y -= YL*1.25;
+			h += YL*1.25;
+		}
+		*/
+
+		// space for the completion/failed line
+		if ( (m_bObjComplete == OI_Active) || (m_bObjComplete == OI_Complete) || (m_bObjComplete == OI_Failed) )
+		{
+			y -= YL;
+			h += YL;
+		}
+
+		// leave room for the "X" button thingy
+		if (m_eHudMode == HudModeWaitForKey)
+		{
+			h += 48*ScaleY;
+		}
+
+		// draw the background
+		y -= 15*ScaleY;
+		h += 30*ScaleY;
+		C.SetPos( x-15*ScaleX, y );
+		C.SetDrawColor(0, 0, 0, 92);
+		C.DrawTileTiledClip(	Texture't_interface_mb.hud.interface_comp', 
+								w+30*ScaleX, h, 
+								284, 128, 128, 128,
+								32, 32);
+
+		// draw the X thingy
+		if (m_eHudMode == HudModeWaitForKey)
+		{
+			h -= 40*ScaleY;
+
+			C.SetDrawColor(255,255,255);
+			C.SetPos(x0 + 0.5*(w0-32*ScaleX), y + h);
+			C.DrawTile(material't_interface_mb.hud.interface_comp', 34*ScaleX, 34*ScaleY, 129, 176, 34, 34);
+		}
+	}
+
+	if ((nPass == 1) || (nPass == -1))
+	{
+		C.DrawColor = WhiteColor;
+
+		x = x0;
+		y = y0;
+		w = w0;
+		h = 0;
+
+		if (m_eHudMode == HudModeWaitForKey)
+		{
+			y -= 48*ScaleY;
+		}
+
+		C.DrawTextBounded(m_ObjString, 1, 2, x, y, w, h, ScaleX*OBJECTIVE_TITLE_FONT_SCALE, ScaleY*OBJECTIVE_TITLE_FONT_SCALE);
+
+		y -= 1.25*YL;
+
+		// completion/failed line
+		if (m_bObjComplete == OI_Active)
+		{
+			C.DrawTextJustified(strNewObj, 1, x0, y, x0+w0, y+YL, ScaleX*OBJECTIVE_TITLE_FONT_SCALE, ScaleY*OBJECTIVE_TITLE_FONT_SCALE);
+			y -= YL;
+		}
+		else if (m_bObjComplete == OI_Complete)
+		{
+			C.DrawTextJustified(strObjComplete, 1, x0, y, x0+w0, y+YL, ScaleX*OBJECTIVE_TITLE_FONT_SCALE, ScaleY*OBJECTIVE_TITLE_FONT_SCALE);
+			y -= YL;
+		}
+		else if (m_bObjComplete == OI_Failed)
+		{
+			C.DrawTextJustified(strObjFailed, 1, x0, y, x0+w0, y+YL, ScaleX*OBJECTIVE_TITLE_FONT_SCALE, ScaleY*OBJECTIVE_TITLE_FONT_SCALE);
+			y -= YL;
+		}
+
+		// primary/secondary
+/*
+		if (m_bObjPrimary)
+		{
+			C.DrawTextJustified(strPrimaryObj, 1, x0, y, x0+w0, y+YL, ScaleX*OBJECTIVE_TITLE_FONT_SCALE, ScaleY*OBJECTIVE_TITLE_FONT_SCALE);
+		}
+		else
+		{
+			C.DrawTextJustified(strSecondaryObj, 1, x0, y, x0+w0, y+YL, ScaleX*OBJECTIVE_TITLE_FONT_SCALE, ScaleY*OBJECTIVE_TITLE_FONT_SCALE);
+		}
+*/
+	}
+}
+
+function ClearObjectiveOverlay()
+{
+	//if ((m_flObjStringTime > 0) && ((Level.TimeSeconds - m_flObjStringStartTime) < m_flObjStringTime) && m_bCriticalMessage)
+	//{
+	//	log("DLEVY*** Clearing Objective when Crit string displayed",'dlevy');
+	//	return;
+	//}
+	m_ObjString = "";
+	m_flObjStringStartTime = -1;
+	m_flObjStringTime = -1;
+	m_bObjComplete = OI_Inactive;
+	m_bObjPrimary = false;
+	m_bCriticalMessage = false;
+}
+
+function DisplayTrainingOverlay( Canvas C, int nPass )
+{
+	local float x, y, w, h;
+	local float x0, y0, w0;
+	local bool bHasIconTraining;
+	local string temp;
+
+	if (m_flTrainingStringTime < 0)
+		return;
+
+	if (C.Viewport.Actor.MenuIsActive())
+		return;
+
+	if ((m_flTrainingStringTime > 0) && ((Level.TimeSeconds - m_flTrainingStringStartTime) > m_flTrainingStringTime))
+	{
+		ClearTrainingOverlay();
+		return;
+	}
+
+	temp = Chr(27) $ Chr(80);  // buttonized %image_training% ESC sequence;
+
+	if (Left(m_TrainingString, 2) == temp)
+		bHasIconTraining = true;
+	else
+		bHasIconTraining = false;
+
+	if (bHasIconTraining)
+	{
+		x0 = 140.0f*ScaleX + TrainingArray[0].UL*ScaleX;
+		y0 = 70.0f*ScaleY;
+		w0 = (520.0f*ScaleX) - TrainingArray[0].UL*ScaleX;
+	}
+	else
+	{
+		x0 = 140.0f*ScaleX;
+		y0 = 70.0f*ScaleY;
+		w0 = 520.0f*ScaleX;
+	}
+
+    C.Font = WargameFont;
+	C.Style = ERenderStyle.STY_Alpha;
+
+	if ((nPass == 0) || (nPass == -1))
+	{
+		x = x0;
+		y = y0;
+		w = w0;
+		h = 0.0f;
+
+		// determine the size of the training text and background...
+		DrawTextBoundedWithButtons(C, m_TrainingString, 1, 0, x, y, w, h, TRAINING_TITLE_FONT_SCALE, TRAINING_TITLE_FONT_SCALE, 0);
+
+		if (bHasIconTraining)
+			x = (320*ScaleX - w/2) + (TrainingArray[0].UL*ScaleX * 0.5);  // adjust the x position to center the box and text on the screen
+		else
+			x = 320*ScaleX - w/2;  // adjust the x position to center the box and text on the screen
+
+		// save the x and y position and width (used during 2nd pass)
+		TrainingText_x = x;
+		TrainingText_y = y;
+		TrainingText_w = w;
+
+		// draw the background...
+		if (bHasIconTraining)
+		{
+			x = x - 15*ScaleX - TrainingArray[0].UL*ScaleX;
+			y = y - 15*ScaleY;
+			w = w + 30*ScaleX + TrainingArray[0].UL*ScaleX;
+			h = h + 30*ScaleY;
+		}
+		else
+		{
+			x = x - 15*ScaleX;
+			y = y - 15*ScaleY;
+			w = w + 30*ScaleX;
+			h = h + 30*ScaleY;
+		}
+		C.SetPos( x, y );
+		C.SetDrawColor(0, 0, 0, 178);
+		C.DrawTileTiledClip(	Texture't_interface_mb.hud.interface_comp', 
+								w, h,
+								284, 128, 128, 128,
+								32, 32);
+
+		if (bHasIconTraining)
+		{
+			C.SetPos( x, y );
+			C.SetDrawColor(255,255,255,255);
+			C.DrawTile(	Texture't_interface_mb.hud.training_art', TrainingArray[0].UL, TrainingArray[0].VL,
+								TrainingArray[0].U, TrainingArray[0].V, TrainingArray[0].UL, TrainingArray[0].VL );
+		}
+
+		// now draw the art button textures...
+		C.SetDrawColor(255,255,255,255);
+		x = TrainingText_x;  // copy these to temp variables since DrawTextBoundedWithButtons() can change values passed in
+		y = TrainingText_y;
+		w = TrainingText_w;
+		h = 0.0f;
+		DrawTextBoundedWithButtons(C, m_TrainingString, 1, 0, x, y, w, h, TRAINING_TITLE_FONT_SCALE, TRAINING_TITLE_FONT_SCALE, 1);
+	}
+
+	if ((nPass == 1) || (nPass == -1))
+	{
+		// on the second pass, draw the text using the font...
+		C.DrawColor = WhiteColor;
+		x = TrainingText_x;  // copy these to temp variables since DrawTextBoundedWithButtons() can change values passed in
+		y = TrainingText_y;
+		w = TrainingText_w;
+		h = 0.0f;
+		DrawTextBoundedWithButtons(C, m_TrainingString, 1, 0, x, y, w, h, TRAINING_TITLE_FONT_SCALE, TRAINING_TITLE_FONT_SCALE, 2);
+	}
+}
+
+function ClearTrainingOverlay()
+{
+	m_TrainingString = "";
+	m_flTrainingStringStartTime = -1;
+	m_flTrainingStringTime = -1;
+}
+
+function SetTrainingText(string Text, float lifetime, bool bShowInOracleCam)
+{
+	m_TrainingString = Text;
+	bShowTrainingInOracleCam = bShowInOracleCam;
+
+	m_flTrainingStringTime = lifetime;
+	if (m_flTrainingStringTime > 0)
+	{
+		m_flTrainingStringStartTime = Level.TimeSeconds;
+	}
+}
+
+function DrawSpectatingHudText (Canvas C, coerce string String, float x, float y, float w, float h)
+{
+	local string convertedButtonString;
+	local float buttonStrX, buttonStrY, buttonStrW, buttonStrH;
+	local bool	bSplitHorz, bSplitVert;
+
+	convertedButtonString = ConvertToButtonizedMessage(String);
+
+	if ((C.SafeOffX == 0) && (((C.SafeOffX * 2) + C.SafeSizeX) < C.ClipX))
+		bSplitVert = true;
+	else
+		bSplitVert = false;
+	if ((C.SafeOffY > 0) && ((C.SafeOffY + C.SafeSizeY) == C.ClipY))
+		bSplitHorz = true;
+	else
+		bSplitHorz = false;
+	// now draw the art button textures...
+	C.SetDrawColor(255,255,255,255);
+	if (bSplitVert)
+	{
+		buttonStrX = 0;
+	}
+	else
+	{
+		buttonStrX = max( C.SafeOffX, x*ScaleX );
+	}
+	if (bSplitHorz)
+	{
+		buttonStrY = C.ClipY - 15;
+
+		// way to hard code in values + ignore the params, I can do it too.
+		if (y - 330.17 < 0.16)
+			buttonStrY -= 23;
+	}
+	else
+	{
+		buttonStrY = min( (C.SafeOffY + C.SafeSizeY) - 15, y*ScaleY );
+	}
+	buttonStrW = min( C.SafeSizeX, w*ScaleX );
+	buttonStrH = h;
+	DrawTextBoundedWithButtons(C, convertedButtonString, 0, 0, buttonStrX, buttonStrY, buttonStrW, buttonStrH, FieldPromoteCmdTextScale, (FieldPromoteCmdTextScale / ScaleY), 1);
+	
+	// on the second pass, draw the text using the font...
+	C.DrawColor = WhiteColor;
+	if (bSplitVert)
+	{
+		buttonStrX = 0;
+	}
+	else
+	{
+		buttonStrX = max( C.SafeOffX, x*ScaleX );
+	}
+	if (bSplitHorz)
+	{
+		buttonStrY = C.ClipY - 15;
+
+		// way to hard code in values + ignore the params, I can do it too.
+		if (y - 330.17 < 0.16)
+			buttonStrY -= 23;
+	}
+	else
+	{
+		buttonStrY = min( (C.SafeOffY + C.SafeSizeY) - 15, y*ScaleY );
+	}
+	buttonStrW = min( C.SafeSizeX, w*ScaleX );
+	buttonStrH = h;
+	DrawTextBoundedWithButtons(C, convertedButtonString, 0, 0, buttonStrX, buttonStrY, buttonStrW, buttonStrH, FieldPromoteCmdTextScale, FieldPromoteCmdTextScale / ScaleY, 2);
+}
+
+function DrawSpectatingHud (Canvas C)
+{
+	local PlayerReplicationInfo replicationInfo;
+	local gbxPlayerController PC;
+	local ETeamIdentifier myTeam;
+	local float XL, YL;
+	local Canvas.CanvasIcon bgicon, fgicon;
+	local int i, j;
+	
+ 	// Only draw spectating HUD in multiplayer
+	if( Level.NetMode == NM_ListenServer || Level.NetMode == NM_Client )
+	{
+		Super.DrawSpectatingHud( C );
+		
+		PC = gbxPlayerController(C.Viewport.Actor);
+		if ( PC != None && ( PC.IsSpectating() || PC.IsViewingDeadBody() ))
+		{
+			replicationInfo = PC.PlayerReplicationInfo;
+
+			if ( replicationInfo != None )
+			{
+				C.Style = ERenderStyle.STY_Alpha;
+
+				// Draw grime bars
+				C.SetDrawColor( 0, 0, 0, 127 );
+				C.SetPos(C.ClipX - (64 * ScaleX),0);
+				C.DrawTile(material't_interface_mb.hud.pause_grime', 64 * ScaleX, C.ClipY, 0, 0, 64, 256);
+
+				C.SetPos(0,0);
+				C.DrawTile(material't_interface_mb.hud.pause_grime', 64 * ScaleX, C.ClipY, 64, 0, -64, 256);
+
+				C.SetDrawColor(0,0,0,204);
+
+				if (C.SafeOffY > 0)
+				{				
+					C.SetPos(0, 0);
+					C.DrawTile(material't_interface_mb.hud.pause_arc', C.ClipX, C.SafeOffY, 1, 64, 512, -32);
+				}
+				
+				C.SetPos(0, C.SafeOffY);
+				C.DrawTile(material't_interface_mb.hud.pause_arc', C.ClipX, 64 * ScaleY * ArcVScale, 1, 64, 512, -64);
+
+				// GBX:PAD: This is a bit weird, but here's the deal.  In a horizontal split screen, the safe zone offset
+				// of the top of the screen will be 0, thus making SafeOffY zero, but the safe zone on the bottom is figured
+				// by the fact that the safesize is less than the window clip area.  This should work out nicely.				
+				C.SetPos(0, C.SafeOffY + C.SafeSizeY );
+				C.DrawTile(material't_interface_mb.hud.pause_arc', C.ClipX, C.ClipY - (C.SafeOffY + C.SafeSizeY), 1, 33, 512, 64);
+				C.SetPos(0, (C.SafeOffY + C.SafeSizeY) - (64 * ScaleY * ArcVScale) );
+				C.DrawTile(material't_interface_mb.hud.pause_arc', C.ClipX, 64 * ScaleY * ArcVScale, 1, 1, 512, 64);
+
+				// Draw team icons
+				if ( !PC.IsSpectating() )
+				{
+					myTeam = ETeamIdentifier(replicationInfo.Team.TeamIndex);
+				}
+				else
+				{
+					// In spectator view, draw icons matching the target's team
+					if (PC.ViewTarget != None && Pawn(PC.ViewTarget) != None)
+					{
+						myTeam = Pawn(PC.ViewTarget).PawnTeam;
+					}
+					else
+					{
+						myTeam = ETeamIdentifier(PC.PlayerReplicationInfo.Team.TeamIndex);
+					}
+				}
+
+				if ( myTeam == TEAM_US )
+				{
+					bgicon = USBackground;
+					fgicon = USForeground;
+				}
+				else
+				{
+					bgicon = DEBackground;
+					fgicon = DEForeground;
+				}
+
+
+				//if ( !bIsSplitScreen )
+				//{
+				//	C.CanvasIconSize(bgicon, XL, YL, TeamIconScale * flMinScaleX, TeamIconScale * flMinScaleY);
+				//	C.DrawCanvasIconComposite( C.SafeOffX + (TeamIconPosX * ScaleX) + XL/2, max(C.SafeOffY + YL/2, (TeamIconPosY * ScaleY) + YL/2),
+				//			TeamIconScale * flMinScaleX,
+				//			TeamIconScale * flMinScaleY,
+				//			fgicon, bgicon );
+				//	C.DrawCanvasIconComposite( (C.SafeOffX + C.SafeSizeX) - (((TeamIconScale)+TeamIconPosX)*ScaleX) - XL/2, max(C.SafeOffY + YL/2, (TeamIconPosY * ScaleY) + YL/2),
+				//			TeamIconScale * flMinScaleX,
+				//			TeamIconScale * flMinScaleY,
+				//			fgicon, bgicon );
+				//}
+				//else
+				//{
+				//	C.CanvasIconSize(bgicon, XL, YL, TeamIconScale * flSplitscreenScale, TeamIconScale * flSplitscreenScale);
+				//	C.DrawCanvasIconComposite( C.SafeOffX + (TeamIconPosX * ScaleX) + XL/2, max(C.SafeOffY + YL/2, (TeamIconPosY * ScaleY) + YL/2),
+				//			TeamIconScale * flSplitscreenScale,
+				//			TeamIconScale * flSplitscreenScale,
+				//			fgicon, bgicon );
+				//	C.DrawCanvasIconComposite( (C.SafeOffX + C.SafeSizeX) - (((TeamIconScale)+TeamIconPosX)*ScaleX) - XL/2, max(C.SafeOffY + YL/2, (TeamIconPosY * ScaleY) + YL/2),
+				//			TeamIconScale * flSplitscreenScale,
+				//			TeamIconScale * flSplitscreenScale,
+				//			fgicon, bgicon );
+				//}
+
+				C.Style = ERenderStyle.STY_Alpha;
+				C.DrawColor = WhiteColor;
+				C.Font = WargameFont;
+				
+				if (ScoreBoard.IsA('WargameMultiplayerScoreboard'))
+				{
+					if ((m_bLastSpectatingButton != 0) && (PC.bUnitSelect == 0))
+					{
+						m_bShowSpectatingScoreboard = !m_bShowSpectatingScoreboard;
+					}
+					m_bLastSpectatingButton = PC.bUnitSelect;
+
+					if (m_bShowSpectatingScoreboard)
+					{
+						// draw the timer victory condition.
+						for( j = 0; j < VictoryConditions.Length; ++j )
+						{
+							if( VictoryConditions[ j ] != None && VictoryConditions[ j ].IsA('gbxTimerVictoryCondition') && !VictoryConditions[ j ].bDeleteMe )
+							{
+								for ( i = 0 ; i < 2 ; i++)
+								{
+									VictoryConditions[ j ].DrawGBXHUD( C, self, MyFont, i );
+								}
+							}
+						}
+
+						if (bIsSplitScreen)
+						{
+							// wonder why m_bWideScreen doesn't work...
+							//log (flSplitScreenScale);
+							// 0.75 for horizontal splitscreen.
+							if ( C.ClipX < C.ClipY) 
+							{ // vertical split screen case:
+								DrawSpectatingHudText(C, strHideSpectatingScoreboard, 64.0f, 385.0f, 512.0f, 0.0f);
+								ScoreBoard.DrawMPTeam( C, 2*ScaleX, ScaleY, myTeam, 3);
+							}
+							else
+							{ // horizontal split screen case:
+								DrawSpectatingHudText(C, strHideSpectatingScoreboard, 64.0f, 330.17f, 512.0f, 0.0f);
+								ScoreBoard.DrawMPTeam( C, ScaleX, 2*ScaleY, myTeam, 2);
+							}
+						}
+						else
+						{
+							DrawSpectatingHudText(C, strHideSpectatingScoreboard, 64.0f, 385.0f, 512.0f, 0.0f);
+							ScoreBoard.DrawMPTeam( C, ScaleX, ScaleY, myTeam, 1);
+						}
+					}
+					else
+					{
+						if (bIsSplitScreen)
+						{
+							if ( C.ClipX < C.ClipY)
+							{
+								DrawSpectatingHudText(C, strShowSpectatingScoreboard, 64.0f, 385.0f, 512.0f, 0.0f);
+							}
+							else
+							{
+								DrawSpectatingHudText(C, strShowSpectatingScoreboard, 64.0f, 330.17f, 512.0f, 0.0f);
+							}
+						}
+						else
+						{
+							DrawSpectatingHudText(C, strShowSpectatingScoreboard, 64.0f, 385.0f, 512.0f, 0.0f);
+						}
+					}
+				}
+
+ 				if ( !PC.IsSpectating() )
+				{
+					// Draw "Field Promotion" title in the top bar
+					C.Font = WargameFont2;
+					if ( !bIsSplitScreen )
+					{
+						C.StrLen( strFieldPromotion, XL, YL, flMinScaleX*1.1, flMinScaleY*1.1 );
+						C.SetPos( C.SafeOffX + ((C.SafeSizeX - XL)/2), max((YL/2)+((TeamIconPosY-10)*flMinScaleY), C.SafeOffY) );
+						C.DrawText( strFieldPromotion, false, flMinScaleX*1.1, flMinScaleY*1.1 );// CEK-FONT
+					}
+					else
+					{
+						C.StrLen( strFieldPromotion, XL, YL, flSplitscreenScale*1.1, flSplitscreenScale*1.1 );
+						C.SetPos( C.SafeOffX + ((C.SafeSizeX - XL)/2), max((YL/2)+((TeamIconPosY-10)*flSplitscreenScale), C.SafeOffY) );
+						C.DrawText( strFieldPromotion, false, flSplitscreenScale*1.1, flSplitscreenScale*1.1 );// CEK-FONT
+					}
+
+					C.Font = WargameFont;
+
+					// Draw commands in bottom bar
+					if ( PC.GameReplicationInfo.GameType != GT_SKIRMISH )
+					{
+						if (( PC.LastPlayerUnit != None ) && ( PC.LastPlayerUnit.NumSubUnits > 0 ))
+						{
+							DrawSpectatingHudText(C, strAutomaticallyPromote, 64.0f, 408.0f, 512.0f, 0.0f);
+							DrawSpectatingHudText(C, strNextSoldier, 64.0f, 408.0f, 512.0f, 0.0f);
+						}
+						else
+						{
+							if ( replicationInfo.bOutofLives == false )
+							{
+								DrawSpectatingHudText(C, strCallInReinforcements, 64.0f, 408.0f, 512.0f, 0.0f);
+							}
+							else
+							{
+								DrawSpectatingHudText(C, strSpectate, 64.0f, 408.0f, 512.0f, 0.0f);
+							}
+						}
+					}
+					else
+					{
+						if ( replicationInfo.bOutofLives == true && ( PlayerOwner.GameReplicationInfo.MaxPlayers > 1 ) )
+						{
+							DrawSpectatingHudText(C, strSpectate, 64.0f, 408.0f, 512.0f, 0.0f);
+						}
+					}			
+				}
+				else
+				{
+					// Draw "Spectating" title in the top bar
+					C.Font = WargameFont2;
+					if ( !bIsSplitScreen )
+					{
+						C.StrLen( strSpectating, XL, YL, flMinScaleX*1.1, flMinScaleY*1.1 );
+						C.SetPos( C.SafeOffX + ((C.SafeSizeX - XL)/2), max((YL/2)+((TeamIconPosY-10)*flMinScaleY), C.SafeOffY) );
+						C.DrawText( strSpectating, false, flMinScaleX*1.1, flMinScaleY*1.1 );// CEK-FONT
+					}
+					else
+					{
+						C.StrLen( strSpectating, XL, YL, flSplitscreenScale*1.1, flSplitscreenScale*1.1 );
+						C.SetPos( C.SafeOffX + ((C.SafeSizeX - XL)/2), max((YL/2)+((TeamIconPosY-10)*flSplitscreenScale), C.SafeOffY) );
+						C.DrawText( strSpectating, false, flSplitscreenScale*1.1, flSplitscreenScale*1.1 );// CEK-FONT
+					}
+
+					// Draw commands
+					C.Font = WargameFont;
+					DrawSpectatingHudText(C, strNextSoldier, 64.0f, 408.0f, 512.0f, 0.0f);
+
+					if ( PC.bCameraRotationLocked )
+					{
+						DrawSpectatingHudText(C, strUnlockCamera, 64.0f, 408.0f, 512.0f, 0.0f);
+					}
+					else
+					{
+						DrawSpectatingHudText(C, strLockCamera, 64.0f, 408.0f, 512.0f, 0.0f);
+					}
+				}
+			}
+		}
+	}
+}
+
+function DisplaySubTitles(Canvas C, int nPass)
+{
+	DisplayObjectiveOverlay( C, nPass );
+}
+
+simulated function DisplayProgressMessage(Canvas C)
+{
+	local float XL, YL, FadeValue;
+	local string title;
+	local string server;
+	local string processState;
+	local int Separator;
+	local float bx1, bw, by1, bh;
+	local bool bIsSkirmishMapLoading;
+	
+	if (PlayerOwner.ProgressMessage[0] == "")
+	{
+		return;
+	}
+	
+	C.Style = ERenderStyle.STY_Alpha;
+	C.SetDrawColor(255,255,255,255);
+	C.SetPos(0, 0);
+	C.DrawTile(Texture'BlackTexture',C.ClipX, C.ClipY, 0, 0, C.ClipX, C.ClipY);
+	
+	if (C.Viewport.Actor.MenuIsActive())
+		return;
+
+	FadeValue = 1.0;
+
+    C.Font = WargameFont2;
+	C.SetDrawColor(255, 255, 255, Lerp(FadeValue, 1, 254) );
+	C.Style = ERenderStyle.STY_Alpha;
+	
+	Separator = InStr( PlayerOwner.ProgressMessage[0], "#" );
+	title = Left(PlayerOwner.ProgressMessage[0], Separator - 1);
+	server = Mid( PlayerOwner.ProgressMessage[0], Separator + 1 );
+	processState = PlayerOwner.ProgressMessage[1];
+
+	if ( InStr( title, "skr_" ) >= 0 )
+		bIsSkirmishMapLoading = true;
+
+	//Log( " WargameHUD::DisplayProgressMessage() title: "$title$ " bIsSkirmishMapLoading: "$bIsSkirmishMapLoading, 'MP' );
+
+	title = class'Gameplay.gbxMPMissionList'.Static.FindMissionName(title, true);
+	
+	C.StrLen( title, XL, YL, 1.25 * MAP_INTRO_TEXT_SCALE * flMinScaleX, 1.25 * MAP_INTRO_TEXT_SCALE * flMinScaleY );
+	C.SetPos( 0.5*(C.ClipX - XL), 0.5*C.ClipY - YL*1.5 );
+	C.DrawText( title, false, 1.25 * flMinScaleX * MAP_INTRO_TEXT_SCALE, 1.25 * flMinScaleY * MAP_INTRO_TEXT_SCALE );
+	
+	DrawHUDThinRedLine(	C,
+						0.5*(C.ClipX - XL*0.925),
+						0.5*C.ClipY - YL*0.64, 
+						XL * 0.95, 
+						Lerp(FadeValue, 1, 254));
+	C.SetDrawColor(255, 255, 255, Lerp(FadeValue, 1, 254) );
+	
+	C.StrLen( server, XL, YL, MAP_INTRO_TEXT_SCALE * flMinScaleX, MAP_INTRO_TEXT_SCALE * flMinScaleY );
+	C.SetPos( 0.5*(C.ClipX - XL), 0.5*C.ClipY + YL*0.5 );
+	C.DrawText( server, false, flMinScaleX * MAP_INTRO_TEXT_SCALE, flMinScaleY * MAP_INTRO_TEXT_SCALE );
+
+	C.StrLen( processState, XL, YL, MAP_INTRO_TEXT_SCALE * flMinScaleX, MAP_INTRO_TEXT_SCALE * flMinScaleY );
+	C.SetPos( 0.5*(C.ClipX - XL), 0.5*C.ClipY + YL*1.5 );
+	C.DrawText( processState, false, flMinScaleX * MAP_INTRO_TEXT_SCALE, flMinScaleY * MAP_INTRO_TEXT_SCALE );
+
+	// find a hint if one hasn't been selected yet
+	if ((PlayerOwner.ProgressMessage[2] == "") || (Level.TimeSeconds > (MPProgressMessageHintTime + MP_HINT_CYCLE_DELAY)) )
+	{
+		if ( bIsSkirmishMapLoading )
+			PlayerOwner.ReceiveLocalizedMessage( class'gbxMPTrainingMessage', 2 );
+		else
+		PlayerOwner.ReceiveLocalizedMessage( class'gbxMPTrainingMessage', 0 );
+		MPProgressMessageHintTime = Level.TimeSeconds;
+	}
+
+	// draw the hint
+	bx1 = 640.0f * 0.075f * ScaleX;
+	bw  = 640.0f * 0.85f * ScaleX;
+
+	by1 = 480.0f * 0.625f * ScaleY;
+	bh  = 480.0f * 0.3f * ScaleY;
+
+	C.Font = WargameFont;
+	C.DrawColor = WhiteColor;
+
+	// Figure out how big
+	DrawTextBoundedWithButtons(C, PlayerOwner.ProgressMessage[2], 1, 2, bx1, by1, bw, bh, LOAD_TIME_HINT_SCALE, LOAD_TIME_HINT_SCALE, 0);
+
+	// Now do 2-pass rendering
+	DrawTextBoundedWithButtons(C, PlayerOwner.ProgressMessage[2], 1, 0, bx1, by1, bw, bh, LOAD_TIME_HINT_SCALE, LOAD_TIME_HINT_SCALE, 1);
+	DrawTextBoundedWithButtons(C, PlayerOwner.ProgressMessage[2], 1, 0, bx1, by1, bw, bh, LOAD_TIME_HINT_SCALE, LOAD_TIME_HINT_SCALE, 2);
+}
+
+// three line display:
+// map name line	(Title)
+// location line	(TitleLocation)
+// date, time line	(TitleDate)
+function DisplayMapIntro( Canvas C )
+{
+	local float XL, YL, FadeValue, flFontScale;
+//	local float PosX, PosY;
+
+	if (C.Viewport.Actor.MenuIsActive())
+		return;
+
+	FadeValue = 0.0;
+	if ( Level.m_bFadeMapIntro == FADE_START_BLACK )
+	{
+		FadeValue = 1.0;
+	}
+	else if( Level.m_bFadeMapIntro == FADE_TO_BLACK )
+	{
+		FadeValue = (Level.TimeSeconds - Level.m_flMapIntroStartTime) / Level.m_flMapIntroTime;
+		if (FadeValue >= 1.0)
+		{
+			Level.m_bFadeMapIntro = FADE_START_BLACK;
+			FadeValue = 1.0;
+		}
+	}
+	else if ( Level.m_bFadeMapIntro == FADE_FROM_BLACK )
+	{
+		FadeValue = 1 - ((Level.TimeSeconds - Level.m_flMapIntroStartTime) / Level.m_flMapIntroTime);
+		if (FadeValue <= 0.0)
+		{
+			FadeValue = 0.0;
+			Level.m_bFadeMapIntro = NO_FADE;
+		}
+	}
+
+	if (FadeValue <= 0.0)
+	{
+		return;
+	}
+
+    C.Font = WargameFont2;
+	C.DrawColor = WhiteColor;
+	C.DrawColor.A = Lerp(FadeValue, 1, 254);
+//	C.SetDrawColor(255, 255, 255, Lerp(FadeValue, 1, 254) );
+	C.Style = ERenderStyle.STY_Alpha;
+/*
+	C.StrLen( "W", XL, YL, MAP_INTRO_TEXT_SCALE, MAP_INTRO_TEXT_SCALE );
+
+	C.SetPos( Level.m_nMapIntroX*ScaleX, ScaleY*(Level.m_nMapIntroY - 3*YL) );
+	C.DrawText( Level.Title, false, ScaleX * MAP_INTRO_TEXT_SCALE, ScaleY * MAP_INTRO_TEXT_SCALE );
+
+	C.SetPos( Level.m_nMapIntroX*ScaleX, ScaleY*(Level.m_nMapIntroY - 2*YL) );
+	C.DrawText( Level.TitleLocation, false, ScaleX * MAP_INTRO_TEXT_SCALE, ScaleY * MAP_INTRO_TEXT_SCALE );
+
+	C.SetPos( Level.m_nMapIntroX*ScaleX, ScaleY*(Level.m_nMapIntroY - YL) );
+	C.DrawText( Level.TitleDate, false, ScaleX * MAP_INTRO_TEXT_SCALE, ScaleY * MAP_INTRO_TEXT_SCALE );
+*/
+
+	if (Level.m_bSimpleIntro)
+	{
+		C.StrLen( Level.Title, XL, YL, flMinScaleX, flMinScaleY );
+		flFontScale = (C.SafeSizeX - (20.0 * ScaleX)) / XL;
+		C.SetPos( 0.5*(C.ClipX - (XL * flFontScale)), 0.5*(C.ClipY - (YL * flFontScale)) );
+		C.DrawText( Level.Title, false, flMinScaleX * flFontScale, flMinScaleY * flFontScale );
+	}
+	else
+	{
+		C.StrLen( Level.Title, XL, YL, 1.25 * MAP_INTRO_TEXT_SCALE * flMinScaleX, 1.25 * MAP_INTRO_TEXT_SCALE * flMinScaleY );
+		C.SetPos( 0.5*(C.ClipX - XL), 0.5*C.ClipY - YL*1.5 );
+/*
+		if (Level.m_nMapIntroX != -1)
+		{
+			PosX = 0.5*(C.ClipX - XL);
+		}
+		else
+		{
+			PosX = ((C.SafeOffX + C.SafeSizeX) - XL) + (Level.m_nMapIntroX * ScaleX);
+		}
+		if (Level.m_nMapIntroY != -1)
+		{
+			PosY = 0.5*C.ClipY - YL*1.5;
+		}
+		else
+		{
+			PosY = Level.m_nMapIntroY * ScaleX;
+		}
+		C.SetPos( PosX, PosY );
+*/
+		C.DrawText( Level.Title, false, 1.25 * flMinScaleX * MAP_INTRO_TEXT_SCALE, 1.25 * flMinScaleY * MAP_INTRO_TEXT_SCALE );
+
+		DrawHUDThinRedLine(	C,
+							0.5*(C.ClipX - XL*0.925),
+							0.5*C.ClipY - YL*0.64, 
+							XL * 0.95, 
+							Lerp(FadeValue, 1, 254));
+
+		C.DrawColor = WhiteColor;
+		C.DrawColor.A = Lerp(FadeValue, 1, 254);
+//		C.SetDrawColor(255, 255, 255, Lerp(FadeValue, 1, 254) );
+		C.StrLen( Level.TitleLocation, XL, YL, MAP_INTRO_TEXT_SCALE * flMinScaleX, MAP_INTRO_TEXT_SCALE * flMinScaleY );
+		C.SetPos( 0.5*(C.ClipX - XL), 0.5*C.ClipY - YL*0.5 );
+/*
+		if (Level.m_nMapIntroX != -1)
+		{
+			PosX = 0.5*(C.ClipX - XL);
+		}
+		else
+		{
+			PosX = ((C.SafeOffX + C.SafeSizeX) - XL) + (Level.m_nMapIntroX * ScaleX);
+		}
+		if (Level.m_nMapIntroY != -1)
+		{
+			PosY = PosY + YL;
+		}
+		else
+		{
+			PosY = 0.5*C.ClipY - YL*0.5;
+		}
+		C.SetPos( PosX, PosY );
+*/
+		C.DrawText( Level.TitleLocation, false, flMinScaleX * MAP_INTRO_TEXT_SCALE, flMinScaleY * MAP_INTRO_TEXT_SCALE );
+
+		C.StrLen( Level.TitleDate, XL, YL, MAP_INTRO_TEXT_SCALE * flMinScaleX, MAP_INTRO_TEXT_SCALE * flMinScaleY );
+		C.SetPos( 0.5*(C.ClipX - XL), 0.5*C.ClipY + YL*0.5 );
+/*
+		if (Level.m_nMapIntroX != -1)
+		{
+			PosX = 0.5*(C.ClipX - XL);
+		}
+		else
+		{
+			PosX = ((C.SafeOffX + C.SafeSizeX) - XL) + (Level.m_nMapIntroX * ScaleX);
+		}
+		if (Level.m_nMapIntroY != -1)
+		{
+			PosY = PosY + YL;
+		}
+		else
+		{
+			PosY = 0.5*C.ClipY + YL*0.5;
+		}
+		C.SetPos( PosX, PosY );
+*/
+		C.DrawText( Level.TitleDate, false, flMinScaleX * MAP_INTRO_TEXT_SCALE, flMinScaleY * MAP_INTRO_TEXT_SCALE );
+	}
+}
+
+function DrawHUDThinRedLine(Canvas C, int X, int Y, int XL, byte alpha)
+{
+/*
+	C.SetDrawColor(13, 5, 8, 255);
+
+	C.SetPos(X+1, Y - (2*flMinScaleY)+1);
+	C.DrawTileTiledClip(	Texture't_interface_mb.hud.interface_comp', 
+							XL, 4 * flMinScaleY, 
+							284, 128, 128, 128,
+							32, 32,
+							3.0, 2.0);
+*/
+	C.SetDrawColor(220, 40, 40, alpha);
+	C.SetPos(X, Y - (2*flMinScaleY));
+	C.DrawTileTiledClip(	Texture't_interface_mb.hud.interface_comp', 
+							XL, 6 * flMinScaleY, 
+							284, 128, 128, 128,
+							32, 32,
+							2.0, 1.0);
+}
+
+
+function DisplayHelpOverlay( Canvas Canvas )
+{
+	local string	szMsg;
+	local float		XL, YL;
+	local int		xPos;
+	local int		yPos;
+
+	szMsg = "Paused";
+	Canvas.StrLen(szMsg, XL, YL, flMinScaleX, flMinScaleY);
+	xPos = (Canvas.ClipX - XL) / 2;
+	yPos = (Canvas.ClipY - YL) / 2;
+
+	Canvas.SetDrawColor(26, 20, 14, 102);
+	Canvas.SetPos( (xPos - (10 * ScaleX)), (yPos - (10 * ScaleY)) );
+	Canvas.DrawTile(material't_interface_mb.hud.interface_comp', (XL + 20) * flMinScaleX, (YL + 20) * flMinScaleY, 292, 175, 219, 80);
+
+	Canvas.SetDrawColor(228,220,197);
+	Canvas.SetPos(xPos, yPos);
+	Canvas.DrawText(szMsg, false, flMinScaleX, flMinScaleY);
+}
+
+function DisplayDeathOverlay( Canvas Canvas )
+{
+	Canvas.Style = ERenderStyle.STY_Alpha;
+
+	if( Level.m_aKIAOverlay != None )
+	{
+		Canvas.SetDrawColor(255, 255, 255);
+		Canvas.SetPos( (Canvas.ClipX - (512 * ScaleX)) / 2, (Canvas.ClipY - (128 * ScaleY)) / 2 );
+		Canvas.DrawTile(Level.m_aKIAOverlay, 512*ScaleX, 128*ScaleY, 0, 0, 512, 128);
+	}
+
+	Canvas.SetPos( (Canvas.ClipX - (128 * ScaleX)) / 2, 360 * ScaleY);
+	Canvas.DrawTile( material't_interface_mb.hud.a_continue', 128*ScaleX, 32*ScaleY, 0, 0, 128, 32 );
+}
+
+simulated event PostRender( canvas Canvas )
+{
+	local float	FadeValue, flDiff;
+	local bool bDisplayObjectiveOverlay;
+	local gbxPlayerController gbxController;
+	local int i;
+	local string medalResult;
+
+	Super.PostRender( Canvas );
+
+	gbxController = gbxPlayerController( Canvas.Viewport.Actor );
+
+	if( !bIsSplitScreen && !IsDisplayingMultiplayerTitleCard() ) // No dirt, rain, or blood in split screen, or when the MP title card is displaying
+	{
+		if( gbxController != None )
+		{
+			for( i = 0; i < gbxController.MAX_HUD_EFFECTS; i++ )
+			{
+				if( gbxController.myHudEffects[ i ] != None )
+				{
+					gbxController.myHudEffects[ i ].DrawHudEffect( Canvas );
+				}
+			}
+		}
+	}
+
+	if (bForceDrawLocalMessages)
+	{
+		DisplayLocalMessages(Canvas, -1);
+	}
+
+	if ( Level.m_bWideScreen != NO_WIDESCREEN )
+	{
+		if ( Level.m_bWideScreen == WIDESCREEN_SLIDE_ON )
+		{
+			FadeValue = (Level.TimeSeconds - Level.m_flStartWideScreenTime) / WIDESCREEN_SLIDE_TIME;
+			if (FadeValue >= 1.0f)
+			{
+				Level.m_bWideScreen = WIDESCREEN_ON;
+			}
+		}
+		else if ( Level.m_bWideScreen == WIDESCREEN_SLIDE_OFF )
+		{
+			FadeValue = 1 - ((Level.TimeSeconds - Level.m_flStartWideScreenTime) / WIDESCREEN_SLIDE_TIME);
+			if (FadeValue <= 0.0f)
+			{
+				Level.m_bWideScreen = NO_WIDESCREEN;
+			}
+		}
+		else
+		{
+			FadeValue = 1.0;
+		}
+
+		Canvas.Style = ERenderStyle.STY_Alpha;
+		Canvas.SetPos(-3, -3);
+		Canvas.SetDrawColor(0, 0, 0, 255);
+		Canvas.DrawTileTiledClip(	Texture't_interface_mb.hud.interface_comp', 
+								Canvas.ClipX + 6, ((WIDESCREEN_SLIDE_DIST * FadeValue)* ScaleY) + 2, 
+								284, 128, 128, 128,
+								32, 32);
+
+		Canvas.Style = ERenderStyle.STY_Alpha;
+		Canvas.SetPos(-3, Canvas.ClipY - (((WIDESCREEN_SLIDE_DIST * FadeValue) * ScaleY) - 3));
+		Canvas.SetDrawColor(0, 0, 0, 255);
+		Canvas.DrawTileTiledClip(	Texture't_interface_mb.hud.interface_comp', 
+								Canvas.ClipX + 6, ((WIDESCREEN_SLIDE_DIST * FadeValue)* ScaleY) + 2, 
+								284, 128, 128, 128,
+								32, 32);
+	}
+
+	//sdr: we don't want to do any screen fading in/out in multiplayer
+	if ((Level.NetMode != NM_Standalone) && !m_fFadeOverride && !m_fPersistantFadeOverride)
+	{
+		Level.m_bFadeScreen = NO_FADE;
+		Canvas.Viewport.Actor.EnableSoundCategory( ESoundCategory.SC_AMBIENT, true, 0.0 );	
+		Canvas.Viewport.Actor.EnableSoundCategory( ESoundCategory.SC_CINEMATIC, true, 0.0 );
+		Canvas.Viewport.Actor.EnableSoundCategory( ESoundCategory.SC_SOUNDFX, true, 0.0 );
+		Canvas.Viewport.Actor.EnableSoundCategory( ESoundCategory.SC_MUSIC, true, 0.0 );
+	}
+
+	if ( Level.m_bFadeScreen != NO_FADE)
+	{
+		if ( Level.m_bFadeScreen == FADE_START_BLACK )
+		{
+			Canvas.Style = ERenderStyle.STY_Alpha;
+			Canvas.SetDrawColor(255,255,255,255);
+			Canvas.SetPos(0, 0);
+			Canvas.DrawTile(Texture'BlackTexture',Canvas.ClipX, Canvas.ClipY, 0, 0, Canvas.ClipX, Canvas.ClipY);
+		}
+		else if( Level.m_bFadeScreen == FADE_TO_BLACK )
+		{
+			FadeValue = (Level.TimeSeconds - Level.m_flStartFadeTime) / Level.m_flFadeTime;
+			if (FadeValue >= 1.0)
+			{
+				Level.m_bFadeScreen = FADE_START_BLACK;
+				m_fFadeOverride = false;
+				Canvas.Style = ERenderStyle.STY_Alpha;
+				Canvas.SetDrawColor(255,255,255,255);
+				Canvas.SetPos(0, 0);
+				Canvas.DrawTile(Texture'BlackTexture',Canvas.ClipX, Canvas.ClipY, 0, 0, Canvas.ClipX, Canvas.ClipY);
+
+				if (Level.m_bStatsAfterFade)
+				{
+					Level.m_bWideScreen = NO_WIDESCREEN;
+					medalResult = Level.MissionManager.MissionCompleted();
+					
+					gbxController.DisplayMissionFinished(true, "MEDALS=" $medalResult);
+				}
+
+				if (m_fRespawnDeadPlayer)
+				{
+					Level.Game.LoadCheckpointInLevel( m_nCheckpointID, m_szPreSaveTrigger, m_szPostSaveTrigger );
+	
+					BroadcastLocalizedMessage(class'gbxGameMessage', 2, gbxController.PlayerReplicationInfo, None);
+					flDoSaveGame = Level.TimeSeconds;
+					m_fRespawnDeadPlayer = false;
+				}
+			}
+			else
+			{
+				Canvas.Style = ERenderStyle.STY_Alpha;
+				Canvas.SetDrawColor(255,255,255,Lerp( FadeValue, 1, 254 ));
+				Canvas.SetPos(0, 0);
+				Canvas.DrawTile(Texture'BlackTexture',Canvas.ClipX, Canvas.ClipY, 0, 0, Canvas.ClipX, Canvas.ClipY);
+			}
+		}
+		else if ( Level.m_bFadeScreen == FADE_FROM_BLACK )
+		{
+			FadeValue = 1 - ((Level.TimeSeconds - Level.m_flStartFadeTime) / Level.m_flFadeTime);
+			if (FadeValue <= 0.0)
+			{
+				Level.m_bFadeScreen = NO_FADE;
+				m_fFadeOverride = false;
+			}
+			else
+			{
+				Canvas.Style = ERenderStyle.STY_Alpha;
+				Canvas.SetDrawColor(255,255,255,Lerp( FadeValue, 1, 254 ));
+				Canvas.SetPos(0, 0);
+				Canvas.DrawTile(Texture'BlackTexture',Canvas.ClipX, Canvas.ClipY, 0, 0, Canvas.ClipX, Canvas.ClipY);
+			}
+		}
+	}
+
+	if ((Level.m_bFadeOverlay != NO_FADE) && (Level.m_aScreenOverlay != None))
+	{
+		if (Level.m_nJustifyOverlayHorz != 0)
+		{
+			if (Level.m_nJustifyOverlayHorz < 0)
+			{
+				Level.m_flScreenOverlayX = Canvas.SafeOffX / ScaleX;
+			}
+			else
+			{
+				Level.m_flScreenOverlayX = (Canvas.SafeOffX + Canvas.SafeSizeX - Level.m_flScreenOverlayU) / ScaleX;
+			}
+			Level.m_nJustifyOverlayHorz = 0;
+		}
+		if (Level.m_nJustifyOverlayVert != 0)
+		{
+			if (Level.m_nJustifyOverlayVert < 0)
+			{
+				Level.m_flScreenOverlayY = Canvas.SafeOffY / ScaleY;
+			}
+			else
+			{
+				Level.m_flScreenOverlayY = (Canvas.SafeOffY + Canvas.SafeSizeY - Level.m_flScreenOverlayV) / ScaleY;
+			}
+			Level.m_nJustifyOverlayVert = 0;
+		}
+		if ( Level.m_bFadeOverlay == FADE_START_BLACK )
+		{
+			Canvas.Style = ERenderStyle.STY_Alpha;
+			Canvas.SetDrawColor(255,255,255,255);
+			Canvas.SetPos(Level.m_flScreenOverlayX * ScaleX, Level.m_flScreenOverlayY * ScaleY);
+			Canvas.DrawTile(Level.m_aScreenOverlay, Level.m_flScreenOverlayU * ScaleX, Level.m_flScreenOverlayV * ScaleY, 0, 0, Texture(Level.m_aScreenOverlay).USize, Texture(Level.m_aScreenOverlay).VSize);
+		}
+		else if( Level.m_bFadeOverlay == FADE_TO_BLACK )
+		{
+			FadeValue = 1 - ((Level.TimeSeconds - Level.m_flStartFadeOverlayTime) / Level.m_flFadeOverlayTime);
+			if (FadeValue <= 0.0)
+			{
+				Level.m_bFadeOverlay = NO_FADE;
+				Level.m_aScreenOverlay = None;
+			}
+			else
+			{
+				Canvas.Style = ERenderStyle.STY_Alpha;
+				Canvas.SetDrawColor(255,255,255,Lerp( FadeValue, 1, 254 ));
+				Canvas.SetPos(Level.m_flScreenOverlayX * ScaleX, Level.m_flScreenOverlayY * ScaleY);
+				Canvas.DrawTile(Level.m_aScreenOverlay, Level.m_flScreenOverlayU * ScaleX, Level.m_flScreenOverlayV * ScaleY, 0, 0, Texture(Level.m_aScreenOverlay).USize, Texture(Level.m_aScreenOverlay).VSize);
+			}
+		}
+		else if ( Level.m_bFadeOverlay == FADE_FROM_BLACK )
+		{
+			FadeValue = (Level.TimeSeconds - Level.m_flStartFadeOverlayTime) / Level.m_flFadeOverlayTime;
+			if (FadeValue >= 1.0)
+			{
+				Level.m_bFadeOverlay = FADE_START_BLACK;
+				Canvas.Style = ERenderStyle.STY_Alpha;
+				Canvas.SetDrawColor(255,255,255,255);
+				Canvas.SetPos(Level.m_flScreenOverlayX * ScaleX, Level.m_flScreenOverlayY * ScaleY);
+				Canvas.DrawTile(Level.m_aScreenOverlay, Level.m_flScreenOverlayU * ScaleX, Level.m_flScreenOverlayV * ScaleY, 0, 0, Texture(Level.m_aScreenOverlay).USize, Texture(Level.m_aScreenOverlay).VSize);
+			}
+			else
+			{
+				Canvas.Style = ERenderStyle.STY_Alpha;
+				Canvas.SetDrawColor(255,255,255,Lerp( FadeValue, 1, 254 ));
+				Canvas.SetPos(Level.m_flScreenOverlayX * ScaleX, Level.m_flScreenOverlayY * ScaleY);
+				Canvas.DrawTile(Level.m_aScreenOverlay, Level.m_flScreenOverlayU * ScaleX, Level.m_flScreenOverlayV * ScaleY, 0, 0, Texture(Level.m_aScreenOverlay).USize, Texture(Level.m_aScreenOverlay).VSize);
+			}
+		}
+	}
+
+	bDisplayObjectiveOverlay = !bHideWargameHUD;
+
+	if( (gbxController != None) && (gbxController.OracleCam != None) && gbxController.OracleCam.IsActive() )
+		bDisplayObjectiveOverlay = false;
+		
+	if (bDisplayObjectiveOverlay)
+		DisplayObjectiveOverlay(Canvas, -1);
+
+	if (Level.m_bFadeMapIntro != NO_FADE)
+		DisplayMapIntro(Canvas);
+
+	if (bHideHUD)
+		DisplaySubTitles( Canvas, -1 );
+
+	if (m_nHelpOverlay > 0)
+		DisplayHelpOverlay( Canvas );
+
+	if (flDoSaveGame > 0)
+	{
+		flDiff = Level.TimeSeconds - flDoSaveGame;
+		
+		if (flDiff >= CHECKPOINT_SAVE_DELAY)
+		{
+			flDoSaveGame = -1.0f;
+			
+			if (gbxController.Pawn.Health > 0)
+			{
+				if (m_szPreSaveTrigger != '')
+				{
+					gbxController.TriggerEvent( m_szPreSaveTrigger, gbxController, gbxController.Pawn );
+				}
+					
+				Level.Game.SaveCheckpointID( m_nCheckpointID );
+				Level.m_flStartFadeTime = Level.TimeSeconds;
+				
+				if (m_szPostSaveTrigger != '')
+				{
+					gbxController.TriggerEvent( m_szPostSaveTrigger, gbxController, gbxController.Pawn );
+				}
+			}
+			else
+			{
+				if (Level.NetMode == NM_StandAlone)
+				{
+					ClearObjectiveOverlay();
+				}
+				else
+				{
+				}
+			}
+		}
+	}
+	
+	DrawLiveNotificationIcons(Canvas);
+	
+    if ( !DrawLevelAction(Canvas) )
+    {
+        if ((PlayerOwner != None) && (PlayerOwner.ProgressTimeOut > Level.TimeSeconds))
+            DisplayProgressMessage(Canvas);
+    }
+}
+
+function InitLocalizedStrings()
+{
+	local int i;
+
+	if (Level.IsXbox())
+	{
+		for (i=0; i < XboxLocalizedActions.Length; i++)
+		{
+			XboxLocalizedActions[i].LocalizedText = Localize("Training_Xbox",XboxLocalizedActions[i].ActionKeyword,"TrainingButtons");
+		}
+	}
+	else
+	{
+		for (i=0; i < PCLocalizedActions.Length; i++)
+		{
+			PCLocalizedActions[i].LocalizedText = Localize("Training_PC",PCLocalizedActions[i].ActionKeyword,"TrainingButtons");
+		}
+	}
+}
+
+function TranslateActionKeywordsToLocalized(out string Message, string ActionKeywordString, string ActionLocPrefix, string ActionLocSuffix)
+{
+	local int i, j, loop;
+	local bool done, found;
+	local string replacement, temp, temp2;
+
+	i = 0;
+	done = false;
+	while (!done)
+	{
+		found = false;
+		for (loop=0; (loop < PlayerOwner.ActionKeyBindings.Length) && !found; loop++)
+		{
+			if (PlayerOwner.ActionKeyBindings[loop].Keyword != "")
+			{
+				temp = ActionKeywordString $ PlayerOwner.ActionKeyBindings[loop].Keyword;
+
+				// see if this %action keyword exists in the input string...
+				i = InStr(Message, temp, true);
+				if (i >= 0)
+				{
+					if (Level.IsXbox())
+					{
+						temp2 = ActionLocPrefix $ "_" $ PlayerOwner.ActionKeyBindings[loop].KeyName $ ActionLocSuffix;  // ACTION_Joy1, ACTION_Joy1_HOLD, etc.
+
+						// find the localized version of this %action string...
+						for (j=0; j < XboxLocalizedActions.Length; j++)
+						{
+							if (XboxLocalizedActions[j].ActionKeyword == temp2)
+							{
+								replacement = XboxLocalizedActions[j].LocalizedText;
+								Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(temp));
+								found = true;
+								break;  // break out of 'for' loop
+							}
+						}
+					}
+					else
+					{
+						temp2 = ActionLocPrefix $ ActionLocSuffix;  // ACTION, ACTION _HOLD, ACTION _RELEASE, etc.
+
+						// find the localized version of this %action string...
+						for (j=0; j < PCLocalizedActions.Length; j++)
+						{
+							if (PCLocalizedActions[j].ActionKeyword == temp2)
+							{
+								replacement = PCLocalizedActions[j].LocalizedText;
+								Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(temp));
+								found = true;
+								break;  // break out of 'for' loop
+							}
+						}
+					}
+				}
+			}
+		}
+		if (!found)  // no keyword matches?
+			done = true;
+	}
+
+	// now do the same thing for the thumbsticks on the Xbox and/or the W,A,S,D keys on the PC...
+	i = 0;
+	done = false;
+	while (!done)
+	{
+		found = false;
+		if (Level.IsXbox())
+		{
+			for (loop=0; (loop < PlayerOwner.ActionThumbstickBindings.Length) && !found; loop++)
+			{
+				if (PlayerOwner.ActionThumbstickBindings[loop].Keyword != "")
+				{
+					temp = ActionKeywordString $ PlayerOwner.ActionThumbstickBindings[loop].Keyword;
+
+					// see if this %action keyword exists in the input string...
+					i = InStr(Message, temp, true);
+					if (i >= 0)
+					{
+						temp2 = ActionLocPrefix $ "_" $ PlayerOwner.ActionThumbstickBindings[loop].KeyName $ ActionLocSuffix;  // ACTION_Joy1, ACTION_Joy1_HOLD, etc.
+
+						// find the localized version of this %action string...
+						for (j=0; j < XboxLocalizedActions.Length; j++)
+						{
+							if (XboxLocalizedActions[j].ActionKeyword == temp2)
+							{
+								replacement = XboxLocalizedActions[j].LocalizedText;
+								Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(temp));
+								found = true;
+								break;  // break out of 'for' loop
+							}
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			// movement (W,A,S,D) and look (mouse) keys on PC...
+			for (loop=0; (loop < PlayerOwner.ActionPCMoveLookBindings.Length); loop++)
+			{
+				if (PlayerOwner.ActionPCMoveLookBindings[loop].Keyword != "")
+				{
+					temp = ActionKeywordString $ PlayerOwner.ActionPCMoveLookBindings[loop].Keyword;
+
+					// see if this %action keyword exists in the input string...
+					i = InStr(Message, temp, true);
+					if (i >= 0)
+					{
+						if ((PlayerOwner.ActionPCMoveLookBindings[loop].KeyName == "MouseX") ||
+							(PlayerOwner.ActionPCMoveLookBindings[loop].KeyName == "MouseY"))
+						{
+							temp2 = "ACTION_MOUSE";
+						}
+						else
+						{
+							temp2 = ActionLocPrefix $ ActionLocSuffix;  // ACTION, ACTION _HOLD, ACTION _RELEASE, etc.
+						}
+
+						// find the localized version of this %action string...
+						for (j=0; j < PCLocalizedActions.Length; j++)
+						{
+							if (PCLocalizedActions[j].ActionKeyword == temp2)
+							{
+								replacement = PCLocalizedActions[j].LocalizedText;
+								Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(temp));
+								found = true;
+								break;  // break out of 'for' loop
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if (!found)  // no keyword matches?
+			done = true;
+	}
+}
+
+function TranslateIconKeywords(out string Message, string IconKeywordString)
+{
+	local int i, j, loop, loop2;
+	local bool done, found;
+	local string replacement, temp;
+	local string LocalizedText;
+
+	i = 0;
+	done = false;
+	while (!done)
+	{
+		found = false;
+		for (loop=0; (loop < PlayerOwner.ActionKeyBindings.Length) && !found; loop++)
+		{
+			if (PlayerOwner.ActionKeyBindings[loop].Keyword != "")
+			{
+				temp = IconKeywordString $ PlayerOwner.ActionKeyBindings[loop].Keyword;
+
+				// see if this %icon keyword exists in the input string...
+				i = InStr(Message, temp, true);
+				if (i >= 0)
+				{
+					if (Level.IsXbox())
+					{
+						// find the button texture string for this %icon string...
+						for (j=0; j < PlayerOwner.XboxKeyBindings.Length; j++)
+						{
+							if (PlayerOwner.XboxKeyBindings[j].KeyName == PlayerOwner.ActionKeyBindings[loop].KeyName)
+							{
+								replacement = PlayerOwner.XboxKeyBindings[j].IconText;
+								Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(temp));
+								found = true;
+								break;  // break out of 'for' loop
+							}
+						}
+					}
+					else
+					{
+						// on the PC, just replace the %icon string with the key bound to that action...
+						if (PlayerOwner.ActionKeyBindings[loop].KeyName == "LeftMouse")
+							replacement = "%icon_mouse_L%";
+						else if (PlayerOwner.ActionKeyBindings[loop].KeyName == "RightMouse")
+							replacement = "%icon_mouse_R%";
+						else
+						{
+							LocalizedText = Localize("KeyNames",PlayerOwner.ActionKeyBindings[loop].KeyName,"Keys");
+							if (Left(LocalizedText, 2) != "<?")
+								replacement = "'" $ LocalizedText $ "'";
+							else
+								replacement = "'" $ PlayerOwner.ActionKeyBindings[loop].KeyName $ "'";
+						}
+						
+						Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(temp));
+						found = true;
+					}
+				}
+			}
+		}
+		if (!found)  // no keyword matches?
+			done = true;
+	}
+
+	// now do the same thing for the thumbsticks on the Xbox and/or the W,A,S,D keys on the PC...
+	i = 0;
+	done = false;
+	while (!done)
+	{
+		found = false;
+		if (Level.IsXbox())
+		{
+			for (loop=0; (loop < PlayerOwner.ActionThumbstickBindings.Length) && !found; loop++)
+			{
+				if (PlayerOwner.ActionThumbstickBindings[loop].Keyword != "")
+				{
+					temp = IconKeywordString $ PlayerOwner.ActionThumbstickBindings[loop].Keyword;
+
+					// see if this %icon keyword exists in the input string...
+					i = InStr(Message, temp, true);
+					if (i >= 0)
+					{
+						// find the button texture string for this %icon string...
+						for (j=0; j < PlayerOwner.XboxThumbstickBindings.Length; j++)
+						{
+							if (PlayerOwner.XboxThumbstickBindings[j].KeyName == PlayerOwner.ActionThumbstickBindings[loop].KeyName)
+							{
+								replacement = PlayerOwner.XboxThumbstickBindings[j].IconText;
+								Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(temp));
+								found = true;
+								break;  // break out of 'for' loop
+							}
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			// movement (W,A,S,D) and look (mouse) keys on PC...
+			for (loop=0; (loop < PlayerOwner.ActionPCMoveLookBindings.Length) && !found; loop++)
+			{
+				replacement = "";
+
+				if (PlayerOwner.ActionPCMoveLookBindings[loop].Keyword != "")
+				{
+					temp = IconKeywordString $ PlayerOwner.ActionPCMoveLookBindings[loop].Keyword;
+
+					// see if this %icon keyword exists in the input string...
+					i = InStr(Message, temp, true);
+					if (i >= 0)
+					{
+						for (loop2=0; loop2 < PlayerOwner.ActionPCMoveLookBindings.Length; loop2++)
+						{
+							if (PlayerOwner.ActionPCMoveLookBindings[loop].Keyword == PlayerOwner.ActionPCMoveLookBindings[loop2].Keyword)
+							{
+								if (PlayerOwner.ActionPCMoveLookBindings[loop2].KeyName == "MouseY")  // is this "key" the mouse?
+								{
+									replacement = "%icon_mouse%";
+									found = true;
+									break;  // break out of inner while loop
+								}
+								else
+								{
+									if (replacement == "")
+										replacement = replacement $ PlayerOwner.ActionPCMoveLookBindings[loop2].KeyName;
+									else
+										replacement = replacement $ ", " $ PlayerOwner.ActionPCMoveLookBindings[loop2].KeyName;
+									found = true;  // DON'T break out of inner while loop!!!
+								}
+							}
+						}
+
+						Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(temp));
+					}
+				}
+			}
+		}
+
+		if (!found)  // no keyword matches?
+			done = true;
+	}
+
+}
+
+function ConvertSentenceToProperCase( out string Message )
+{
+	local int pos;
+	local int StrLen;
+	local bool bStartOfSentence;
+	local string ch;
+	local int Skip;
+
+	// scan through the string and look for start of sentences and uppercase the first letter...
+	bStartOfSentence = true;
+	StrLen = Len(Message);
+	Skip = 0;
+
+	for (pos=0; pos < StrLen; pos++)
+	{
+		if (Skip > 0)
+		{
+			Skip--;
+			continue;
+		}
+
+		ch = Mid(Message, pos, 1);
+
+		if ((ch == " ") || (ch == "|"))
+			continue;  // skip spaces
+
+		if (Asc(ch) == 27)  // ESCape sequence?
+		{
+			bStartOfSentence = false;
+			Skip = 1;
+			continue;  // skip escape sequences
+		}
+
+		if (((ch == ".") || (ch == "?") || (ch == "!")) &&
+			(pos < StrLen-1) && ((Mid(Message, pos+1, 1) == " ") || (Mid(Message, pos+1, 1) == "|")))
+		{
+			bStartOfSentence = true;
+			continue;
+		}
+
+		if (bStartOfSentence)
+		{
+			bStartOfSentence = false;
+			Message = Left(Message, pos) $ Caps(ch) $ Mid(Message, pos + 1);
+		}
+	}
+}
+
+function string ConvertToButtonizedMessage(string Message)
+{
+	local int i, loop, pos;
+	local bool done;
+	local string replacement, temp;
+	local string Lang;
+
+	if (Message == "")
+		return Message;
+
+	PlayerOwner.InitKeyBindings();
+
+	if (!bLocalizedStringsInitialized)
+	{
+		InitLocalizedStrings();
+		bLocalizedStringsInitialized = true;
+	}
+
+	Lang = GetLanguage();
+
+	// check if Language is a supported Language...
+	if (!(Lang ~= "int") && !(Lang ~= "frt") && !(Lang ~= "itt") && !(Lang ~= "est") && !(Lang ~= "det"))
+		Lang = "int";  // convert Unknown language to English
+
+	// substitute some text for other text...
+	done = false;
+	while (!done)
+	{
+		for (loop=0; loop < SubstituteText.Length; loop++)
+		{
+			// see if this text exists in the input string...
+			i = InStr(Message, SubstituteText[loop].Text, true);
+			if (i >= 0)
+			{
+				replacement = SubstituteText[loop].Replacement;
+
+				Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(SubstituteText[loop].Text));
+				break;  // break out of 'for' loop
+			}
+		}
+		if (i == -1)  // no keyword matches?
+			done = true;
+	}
+
+
+	// translate the "%action_whatever%" keywords to Localized text strings that correspond to the button bound to that "action"...
+	TranslateActionKeywordsToLocalized(Message, "%action", "ACTION", "");
+	TranslateActionKeywordsToLocalized(Message, "%+action", "ACTION", "_HOLD");
+	TranslateActionKeywordsToLocalized(Message, "%-action", "ACTION", "_RELEASE");
+
+	TranslateIconKeywords(Message, "%icon");
+
+
+	// replace "%action_continue%" with localized text...
+	i = InStr(Message, "%action_continue%", true);
+	while (i != -1)
+	{
+		if (Level.IsXbox())
+			replacement = Localize("Training_Xbox","ACTION_continue","TrainingButtons");
+		else
+			replacement = Localize("Training_PC","ACTION_continue","TrainingButtons");
+
+		Message = Left(Message, i) $ replacement $ Mid(Message, i + 17);
+		i = InStr(Message, "%action_continue%", true);
+	}
+
+	// replace "%icon_continue%" with "%button_a%" on Xbox and "<SPACE>" on PC...
+	i = InStr(Message, "%icon_continue%", true);
+	while (i != -1)
+	{
+		if (Level.IsXbox())
+			Message = Left(Message, i) $ "%button_a%" $ Mid(Message, i + 15);
+		else
+		{
+			replacement = Localize("Training_PC","KEY_Space","TrainingButtons");
+			Message = Left(Message, i) $ replacement $ Mid(Message, i + 15);
+		}
+
+		i = InStr(Message, "%icon_continue%", true);
+	}
+
+	// replace "%action_cancel%" with localized text...
+	i = InStr(Message, "%action_cancel%", true);
+	while (i != -1)
+	{
+		if (Level.IsXbox())
+			replacement = Localize("Training_Xbox","ACTION_cancel","TrainingButtons");
+		else
+			replacement = Localize("Training_PC","ACTION_cancel","TrainingButtons");
+
+		Message = Left(Message, i) $ replacement $ Mid(Message, i + 17);
+		i = InStr(Message, "%action_cancel%", true);
+	}
+
+	// replace "%icon_cancel%" with "%button_b%" on Xbox and "SPACE" on PC...
+	i = InStr(Message, "%icon_cancel%", true);
+	while (i != -1)
+	{
+		if (Level.IsXbox())
+			Message = Left(Message, i) $ "%button_b%" $ Mid(Message, i + 15);
+		else
+			Message = Left(Message, i) $ "<BACKSPACE>" $ Mid(Message, i + 15);
+		i = InStr(Message, "%icon_cancel%", true);
+	}
+
+	if (Level.IsXbox())
+	{
+		// replace "%button_L_trigger%" with Internationalized version on Xbox...
+		i = InStr(Message, "%button_L_trigger%", true);
+		while (i != -1)
+		{
+			Message = Left(Message, i) $ "%button_L_trigger_" $ Lang $ "%" $ Mid(Message, i + 18);
+			i = InStr(Message, "%button_L_trigger%", true);
+		}
+		// replace "%button_R_trigger%" with Internationalized version on Xbox...
+		i = InStr(Message, "%button_R_trigger%", true);
+		while (i != -1)
+		{
+			Message = Left(Message, i) $ "%button_R_trigger_" $ Lang $ "%" $ Mid(Message, i + 18);
+			i = InStr(Message, "%button_R_trigger%", true);
+		}
+		// replace "%button_L_thumbstick%" with Internationalized version on Xbox...
+		i = InStr(Message, "%button_L_thumbstick%", true);
+		while (i != -1)
+		{
+			Message = Left(Message, i) $ "%button_L_thumbstick_" $ Lang $ "%" $ Mid(Message, i + 21);
+			i = InStr(Message, "%button_L_thumbstick%", true);
+		}
+		// replace "%button_R_thumbstick%" with Internationalized version on Xbox...
+		i = InStr(Message, "%button_R_thumbstick%", true);
+		while (i != -1)
+		{
+			Message = Left(Message, i) $ "%button_R_thumbstick_" $ Lang $ "%" $ Mid(Message, i + 21);
+			i = InStr(Message, "%button_R_thumbstick%", true);
+		}
+	}
+
+	// replace "%button_" keywords with ESC sequences for button texture art...
+	done = false;
+	while (!done)
+	{
+		for (loop=0; loop < ButtonizedKeywords.Length; loop++)
+		{
+			// see if this buttonized keyword exists in the input string...
+			i = InStr(Message, ButtonizedKeywords[loop].Keyword, true);
+			if (i >= 0)
+			{
+				if (ButtonizedKeywords[loop].bIsESC)  // is this replacement an escape sequence?
+					replacement = Chr(27) $ Chr(ButtonizedKeywords[loop].ESC_code);
+				else
+					replacement = ButtonizedKeywords[loop].Replacement;
+
+				Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(ButtonizedKeywords[loop].Keyword));
+				break;  // break out of 'for' loop
+			}
+		}
+		if (i == -1)  // no keyword matches?
+			done = true;
+	}
+
+	// replace training "%icon_" keywords with ESC sequences for training texture art...
+	done = false;
+	while (!done)
+	{
+		for (loop=0; loop < TrainingKeywords.Length; loop++)
+		{
+			// see if this training icon keyword exists in the input string...
+			i = InStr(Message, TrainingKeywords[loop].Keyword, true);
+			if (i >= 0)
+			{
+				replacement = Chr(27) $ Chr(TrainingKeywords[loop].ESC_code);
+
+				Message = Left(Message, i) $ replacement $ Mid(Message, i + Len(TrainingKeywords[loop].Keyword));
+				break;  // break out of 'for' loop
+			}
+		}
+		if (i == -1)  // no keyword matches?
+			done = true;
+	}
+
+	// replace "%newline%" with "|"...
+	i = InStr(Message, "%newline%", true);
+	while (i != -1)
+	{
+		temp = Left(Message, i) $ "|";
+		pos = i + 9;
+		while (Mid(Message, pos, 1) == " ")  // skip spaces after %newline%
+		{
+			pos++;
+		}
+		Message = temp $ Mid(Message, pos);
+		i = InStr(Message, "%newline%", true);
+	}
+
+	ConvertSentenceToProperCase( Message );
+
+	return Message;
+}
+
+
+simulated function HUDSetup(canvas canvas)
+{
+	Super.HudSetup( canvas );
+
+	if (!bHudCoordInitialized || (m_flLastClipX != Canvas.ClipX) || (m_flLastClipY != Canvas.ClipY))
+	{
+		if ( !bIsSplitScreen )
+		{
+			iCompassPosX = Canvas.SafeOffX + (iObjectiveHeight * flMinScaleX);
+			iCompassPosY = (Canvas.SafeOffY + Canvas.SafeSizeY) - ((93 + iObjectiveHeight) * flMinScaleY);
+		}
+		else
+		{
+			iSplitscreenCompassPosX = Canvas.SafeOffX + (iObjectiveHeight * flSplitScreenScale);
+			iSplitscreenCompassPosY = (Canvas.SafeOffY + Canvas.SafeSizeY) - ((93 + iObjectiveHeight) * flSplitScreenScale);
+		}
+		
+		bHudCoordInitialized = true;
+		m_flLastClipX = Canvas.ClipX;
+		m_flLastClipY = Canvas.ClipY;
+		flScaleRatio = ScaleX / ScaleY;
+		ButtonArtScaleY=Default.ButtonArtScaleY * flScaleRatio;
+		TrainingArtScaleY=Default.TrainingArtScaleY * flScaleRatio;
+	}
+}
+
+
+simulated function SetHUDClock( float flBombClockTime )
+{
+	local Vector	vecBombLoc;
+	
+	if (m_aBombClock == None)
+	{
+		m_aBombClock = Spawn( class'gbxBase.HUDClockIcon' );
+	}
+	if (m_aBombClock != None)
+	{
+		m_aBombClock.ClockPercentage = 1.0f;
+		m_flBombClockTime = flBombClockTime;
+		m_flBombClockStartTime = Level.TimeSeconds;
+
+		m_aBombClock.IconClock.ScaleX = 1.05;
+		m_aBombClock.IconClock.ScaleY = 1.05;
+		m_aBombClock.IconBack.ScaleX = 1.28;
+		m_aBombClock.IconBack.ScaleY = 1.28;
+
+		vecBombLoc.X = TimerPosX;
+		vecBombLoc.Y = TimerPosY;
+		m_aBombClock.SetLocation( vecBombLoc );
+	}
+}
+
+function SetObjectiveString( string szObjString, EObjectiveComplete bObjComplete, float flObjStringTime, bool bObjPrimary, bool bCriticalMessage )
+{
+	m_ObjString = szObjString;
+	m_bObjComplete = bObjComplete;
+	m_flObjStringTime = flObjStringTime;
+	m_bObjPrimary = bObjPrimary;
+	m_bCriticalMessage = bCriticalMessage;
+	if (flObjStringTime > 0)
+	{
+		m_flObjStringStartTime = Level.TimeSeconds;
+	}
+}
+
+simulated function SetFadeOverride( bool bFadeOverride )
+{
+	m_fFadeOverride = bFadeOverride;
+}
+
+simulated function SetPersistantFadeOverride( bool bFadeOverride )
+{
+	m_fPersistantFadeOverride = bFadeOverride;
+}
+
+defaultproperties
+{
+	StartMessage=""
+    TourneyMessage="Waiting for other players."
+    WaitingMessage1="Waiting for ready signals."
+	WaitingMessage2="(Use your fire button to toggle ready!)"
+	SingleWaitingMessage="Press Fire to start."
+	gamegoal="frags wins the match."
+    ReadyMessage="You are READY!"
+    NotReadyMessage="You are NOT READY!"
+	EdgeOffsetX=16
+	EdgeOffsetY=16
+	Style=3
+	IdentifyName="Name:"
+	IdentifyHealth="Health:"
+	bStartUpMessage=True
+	WhiteColor=(R=181,G=181,B=153,A=255)	// CEK-FONT : Draw "white" text off-white so its contrast is better
+	LiveFeed="Live Feed from "
+	TimeMessageClass=class'TimeMessage'
+	TutDir=+1.0
+	FontInfoClass="Engine.FontInfo"
+	StartupHeight=3
+	LoadOutMessage="Loadout:"
+	LoadOutCycle=" (F7 cycles)."
+
+    SubTitleCount=4
+
+	m_nSubTitleX=100
+	m_nSubTitleY=250
+	m_fShowSubTitleBackground=true
+
+	m_fMenuChoicesVisible=true
+
+	m_ObjString=""
+	m_bCriticalMessage=false
+	m_flObjStringStartTime=-1.0
+	m_flObjStringTime=-1.0
+	m_bObjComplete=0
+	m_bObjPrimary=false
+	m_TrainingString=""
+	m_flTrainingStringStartTime=-1.0
+	m_flTrainingStringTime=-1.0
+
+	strNewObj="New Objective"
+	strPrimaryObj="Primary Objective"
+	strSecondaryObj="Secondary Objective"
+	strObjComplete="Completed!"
+	strObjFailed="Failed"
+
+	ConsoleMessagePosX=0.28
+    ConsoleMessagePosY=0.1175
+	ConsoleMessageSpectatingPosX=0.025
+	ConsoleMessageSpectatingPosY=0.78
+
+	// PSV: 5/18/2004 Field promotion spectator HUD
+	strFieldPromotion="You've Been Killed!"
+	strAutomaticallyPromote="%text_right%%action_fire%%icon_fire% Instant Promotion"
+	strNextSoldier="%text_left%%action_order%%icon_order% Select Soldier"
+	strCallInReinforcements="%text_right%%action_fire%%icon_fire% Call In Reinforcements"
+	strSpectate="%text_right%%action_fire%%icon_fire% Spectate"
+	strShowSpectatingScoreboard="%text_right%%icon_team_select% Show Scores"
+	strHideSpectatingScoreboard="%text_right%%icon_team_select% Hide Scores"
+	TeamIconScale = 0.75
+	TeamIconPosX = 40
+	TeamIconPosY = 10 
+	FieldPromoteCmdPosX = 25
+	FieldPromoteCmdPosY = 15 
+	FieldPromoteCmdTextScale = 0.8// CEK-FONT: 0.5
+	strFire="(RightTrigger)"
+	strAltFire="(LeftTrigger)"
+	FieldPromoteTextScale=0.75
+	InitArcOffset=48.0
+	ArcVScale=1.5
+	strSpectating="Spectating"
+	strLockCamera="%text_right%%action_fire%%icon_fire% Lock Camera"
+	strUnlockCamera="%text_right%%action_fire%%icon_fire% Unlock Camera"
+
+	MPProgressMessageHintTime=0
+
+	iCompassPosX=52
+	iCompassPosY=345
+	iSplitscreenCompassPosX=42
+	iSplitscreenCompassPosY=300
+	iCompassCenterOffsetX=38
+	iCompassCenterOffsetY=40
+	iObjectiveWidth=21
+	iObjectiveHeight=15
+	iSecondaryPosX=553
+	iSecondaryPosY=357
+
+	IconFriendRequest=(Icon=Texture't_interface_mb.hud.interface_comp',U=412,V=122,UL=23,VL=23,DrawColor=(R=200,G=200,B=200,A=255),ScaleX=1.5,ScaleY=1.5,PivotU=1.0,PivotV=0.0)
+	IconGameInvite=(Icon=Texture't_interface_mb.hud.interface_comp',U=335,V=104,UL=23,VL=23,DrawColor=(R=200,G=200,B=200,A=255),ScaleX=1.5,ScaleY=1.5,PivotU=1.0,PivotV=0.0)
+
+	USForeground=(Icon=Texture't_interface_mb.hud.interface_comp',U=276,V=99,UL=29,VL=29,DrawColor=(R=255,G=255,B=255,A=255),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+	DEForeground=(Icon=Texture't_interface_mb.hud.interface_comp',U=305,V=99,UL=29,VL=29,DrawColor=(R=0,G=0,B=0,A=255),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+
+	USBackground=(Icon=Texture't_interface_mb.hud.interface_comp',U=192,V=131,UL=46,VL=46,DrawColor=(R=88,G=108,B=47,A=255),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+	DEBackground=(Icon=Texture't_interface_mb.hud.interface_comp',U=192,V=131,UL=46,VL=46,DrawColor=(R=181,G=56,B=41,A=255),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+
+	matCurHudComposite=material't_interface_mb.hud.interface_comp'
+	matCurHudNoShoot=material't_interface_mb.hud.no_shoot'
+
+	// Init left, right, front and back to 0; max time is adjustable
+	EdgeEffectLeftTime = 0.0
+	EdgeEffectRightTime = 0.0
+	EdgeEffectTopTime = 0.0
+	EdgeEffectBottomTime = 0.0
+	EdgeEffectMaxTime = 1.0
+
+	EdgeEffectWidth = 150
+
+	bLocalizedStringsInitialized=false
+
+	ButtonTexture=Texture't_interface_mb.hud.xbox_button_art'
+	ButtonArtScaleX=0.5
+	ButtonArtScaleY=0.5
+	ButtonArray(0)=(U=101,V=0,UL=39,VL=39)		// Button_X
+	ButtonArray(1)=(U=140,V=0,UL=39,VL=39)		// Button_Y
+	ButtonArray(2)=(U=179,V=0,UL=39,VL=39)		// Button_A
+	ButtonArray(3)=(U=218,V=0,UL=39,VL=39)		// Button_B
+	ButtonArray(4)=(U=192,V=40,UL=32,VL=32)		// Button_white
+	ButtonArray(5)=(U=224,V=40,UL=32,VL=32)		// Button_black
+	ButtonArray(6)=(U=192,V=73,UL=32,VL=32)		// Button_START
+	ButtonArray(7)=(U=224,V=73,UL=32,VL=32)		// Button_BACK
+	ButtonArray(8)=(U=192,V=139,UL=44,VL=44)	// D_Pad
+	ButtonArray(9)=(U=51,V=187,UL=23,VL=23)		// L_Arrow
+	ButtonArray(10)=(U=23,V=233,UL=23,VL=23)	// LU_Arrow
+	ButtonArray(11)=(U=74,V=210,UL=23,VL=23)	// U_Arrow
+	ButtonArray(12)=(U=46,V=233,UL=23,VL=23)	// RU_Arrow
+	ButtonArray(13)=(U=51,V=210,UL=23,VL=23)	// R_Arrow
+	ButtonArray(14)=(U=69,V=233,UL=23,VL=23)	// RD_Arrow
+	ButtonArray(15)=(U=74,V=187,UL=23,VL=23)	// D_Arrow
+	ButtonArray(16)=(U=0,V=233,UL=23,VL=23)		// LD_Arrow
+
+	ButtonArray(17)=(U=0,V=0,UL=51,VL=37)		// English_L_Trigger
+	ButtonArray(18)=(U=51,V=0,UL=51,VL=37)		// English_R_Trigger
+	ButtonArray(19)=(U=0,V=37,UL=51,VL=37)		// French_L_Trigger
+	ButtonArray(20)=(U=51,V=37,UL=51,VL=37)		// French_R_Trigger
+	ButtonArray(21)=(U=0,V=74,UL=51,VL=37)		// Blank_L_Trigger
+	ButtonArray(22)=(U=51,V=74,UL=51,VL=37)		// Blank_R_Trigger
+	ButtonArray(23)=(U=0,V=111,UL=51,VL=37)		// Italian_L_Trigger
+	ButtonArray(24)=(U=51,V=111,UL=51,VL=37)	// Italian_R_Trigger
+	ButtonArray(25)=(U=0,V=148,UL=51,VL=37)		// Korean_L_Trigger
+	ButtonArray(26)=(U=51,V=148,UL=51,VL=37)	// Korean_R_Trigger
+	ButtonArray(27)=(U=0,V=185,UL=51,VL=37)		// Spanish_L_Trigger
+	ButtonArray(28)=(U=51,V=37,UL=51,VL=37)		// Spanish_R_Trigger (uses same as French right trigger)
+
+	ButtonArray(29)=(U=102,V=40,UL=45,VL=43)	// English_L_Thumbstick
+	ButtonArray(30)=(U=147,V=40,UL=45,VL=43)	// English_R_Thumbstick
+	ButtonArray(31)=(U=102,V=83,UL=45,VL=43)	// French_L_Thumbstick
+	ButtonArray(32)=(U=147,V=83,UL=45,VL=43)	// French_R_Thumbstick
+	ButtonArray(33)=(U=147,V=126,UL=45,VL=43)	// Blank_L_Thumbstick
+	ButtonArray(34)=(U=147,V=126,UL=45,VL=43)	// Blank_R_Thumbstick
+	ButtonArray(35)=(U=102,V=169,UL=45,VL=43)	// Italian_L_Thumbstick
+	ButtonArray(36)=(U=147,V=169,UL=45,VL=43)	// Italian_R_Thumbstick
+	ButtonArray(37)=(U=102,V=212,UL=45,VL=43)	// Korean_L_Thumbstick
+	ButtonArray(38)=(U=147,V=212,UL=45,VL=43)	// Korean_R_Thumbstick
+	ButtonArray(39)=(U=102,V=126,UL=45,VL=43)	// Spanish_L_Thumbstick
+	ButtonArray(40)=(U=147,V=83,UL=45,VL=43)	// Spanish_R_Thumbstick (uses same as French right thumbstick)
+
+	SubstituteText(0)=(Text="%action_sa_zoom%",Replacement="%action_zoom%")
+	SubstituteText(1)=(Text="%icon_sa_zoom%",Replacement="%icon_zoom%")
+	SubstituteText(2)=(Text="%action_sa_look%",Replacement="%action_look%")
+	SubstituteText(3)=(Text="%icon_sa_look%",Replacement="%icon_look%")
+	SubstituteText(4)=(Text="%action_sa_move%",Replacement="%action_move%")
+	SubstituteText(5)=(Text="%icon_sa_move%",Replacement="%icon_move%")
+
+	ButtonizedKeywords(0)=(Keyword="%text_left%",Replacement="",bIsEsc=true,ESC_code=1)
+	ButtonizedKeywords(1)=(Keyword="%text_right%",Replacement="",bIsEsc=true,ESC_code=2)
+	ButtonizedKeywords(2)=(Keyword="%text_centered%",Replacement="",bIsEsc=true,ESC_code=3)
+	ButtonizedKeywords(3)=(Keyword="%button_x%",Replacement="",bIsEsc=true,ESC_code=10)  // ButtonArray(0)
+	ButtonizedKeywords(4)=(Keyword="%button_y%",Replacement="",bIsEsc=true,ESC_code=11)  // ButtonArray(1)
+	ButtonizedKeywords(5)=(Keyword="%button_a%",Replacement="",bIsEsc=true,ESC_code=12)  // ButtonArray(2)
+	ButtonizedKeywords(6)=(Keyword="%button_b%",Replacement="",bIsEsc=true,ESC_code=13)  // ButtonArray(3)
+	ButtonizedKeywords(7)=(Keyword="%button_white%",Replacement="",bIsEsc=true,ESC_code=14)  // ButtonArray(4)
+	ButtonizedKeywords(8)=(Keyword="%button_black%",Replacement="",bIsEsc=true,ESC_code=15)  // ButtonArray(5)
+	ButtonizedKeywords(9)=(Keyword="%button_START%",Replacement="",bIsEsc=true,ESC_code=16)  // ButtonArray(6)
+	ButtonizedKeywords(10)=(Keyword="%button_BACK%",Replacement="",bIsEsc=true,ESC_code=17)  // ButtonArray(7)
+	ButtonizedKeywords(11)=(Keyword="%button_dpad%",Replacement="",bIsEsc=true,ESC_code=18)  // ButtonArray(8)
+	ButtonizedKeywords(12)=(Keyword="%button_L_arrow%",Replacement="",bIsEsc=true,ESC_code=19)  // ButtonArray(9)
+	ButtonizedKeywords(13)=(Keyword="%button_LU_arrow%",Replacement="",bIsEsc=true,ESC_code=20)  // ButtonArray(10)
+	ButtonizedKeywords(14)=(Keyword="%button_U_arrow%",Replacement="",bIsEsc=true,ESC_code=21)  // ButtonArray(11)
+	ButtonizedKeywords(15)=(Keyword="%button_RU_arrow%",Replacement="",bIsEsc=true,ESC_code=22)  // ButtonArray(12)
+	ButtonizedKeywords(16)=(Keyword="%button_R_arrow%",Replacement="",bIsEsc=true,ESC_code=23)  // ButtonArray(13)
+	ButtonizedKeywords(17)=(Keyword="%button_RD_arrow%",Replacement="",bIsEsc=true,ESC_code=24)  // ButtonArray(14)
+	ButtonizedKeywords(18)=(Keyword="%button_D_arrow%",Replacement="",bIsEsc=true,ESC_code=25)  // ButtonArray(15)
+	ButtonizedKeywords(19)=(Keyword="%button_LD_arrow%",Replacement="",bIsEsc=true,ESC_code=26)  // ButtonArray(16)
+	// internationalized triggers...
+	ButtonizedKeywords(20)=(Keyword="%button_L_trigger%",Replacement="",bIsEsc=true,ESC_code=31)  // Generic left trigger
+	ButtonizedKeywords(21)=(Keyword="%button_R_trigger%",Replacement="",bIsEsc=true,ESC_code=32)  // Generic right trigger
+	ButtonizedKeywords(22)=(Keyword="%button_L_trigger_int%",Replacement="",bIsEsc=true,ESC_code=27)  // English left trigger
+	ButtonizedKeywords(23)=(Keyword="%button_R_trigger_int%",Replacement="",bIsEsc=true,ESC_code=28)  // English right trigger
+	ButtonizedKeywords(24)=(Keyword="%button_L_trigger_frt%",Replacement="",bIsEsc=true,ESC_code=29)  // French left trigger
+	ButtonizedKeywords(25)=(Keyword="%button_R_trigger_frt%",Replacement="",bIsEsc=true,ESC_code=30)  // French right trigger
+	ButtonizedKeywords(26)=(Keyword="%button_L_trigger_itt%",Replacement="",bIsEsc=true,ESC_code=33)  // Italian left trigger
+	ButtonizedKeywords(27)=(Keyword="%button_R_trigger_itt%",Replacement="",bIsEsc=true,ESC_code=34)  // Italian right trigger
+	ButtonizedKeywords(28)=(Keyword="%button_L_trigger_est%",Replacement="",bIsEsc=true,ESC_code=37)  // Spanish left trigger
+	ButtonizedKeywords(29)=(Keyword="%button_R_trigger_est%",Replacement="",bIsEsc=true,ESC_code=38)  // Spanish right trigger
+	ButtonizedKeywords(30)=(Keyword="%button_L_trigger_det%",Replacement="",bIsEsc=true,ESC_code=27)  // German left trigger (same as English)
+	ButtonizedKeywords(31)=(Keyword="%button_R_trigger_det%",Replacement="",bIsEsc=true,ESC_code=28)  // German right trigger (same as English)
+	// internationalized thumbsticks...
+	ButtonizedKeywords(32)=(Keyword="%button_L_thumbstick%",Replacement="",bIsEsc=true,ESC_code=43)  // Generic left thumbstick
+	ButtonizedKeywords(33)=(Keyword="%button_R_thumbstick%",Replacement="",bIsEsc=true,ESC_code=44)  // Generic right thumbstick
+	ButtonizedKeywords(34)=(Keyword="%button_L_thumbstick_int%",Replacement="",bIsEsc=true,ESC_code=39)  // English left thumbstick
+	ButtonizedKeywords(35)=(Keyword="%button_R_thumbstick_int%",Replacement="",bIsEsc=true,ESC_code=40)  // English right thumbstick
+	ButtonizedKeywords(36)=(Keyword="%button_L_thumbstick_frt%",Replacement="",bIsEsc=true,ESC_code=41)  // French left thumbstick
+	ButtonizedKeywords(37)=(Keyword="%button_R_thumbstick_frt%",Replacement="",bIsEsc=true,ESC_code=42)  // French right thumbstick
+	ButtonizedKeywords(38)=(Keyword="%button_L_thumbstick_itt%",Replacement="",bIsEsc=true,ESC_code=45)  // Italian left thumbstick
+	ButtonizedKeywords(39)=(Keyword="%button_R_thumbstick_itt%",Replacement="",bIsEsc=true,ESC_code=46)  // Italian right thumbstick
+	ButtonizedKeywords(40)=(Keyword="%button_L_thumbstick_est%",Replacement="",bIsEsc=true,ESC_code=49)  // Spanish left thumbstick
+	ButtonizedKeywords(41)=(Keyword="%button_R_thumbstick_est%",Replacement="",bIsEsc=true,ESC_code=50)  // Spanish right thumbstick
+	ButtonizedKeywords(42)=(Keyword="%button_L_thumbstick_det%",Replacement="",bIsEsc=true,ESC_code=39)  // German left thumbstick (same as English)
+	ButtonizedKeywords(43)=(Keyword="%button_R_thumbstick_det%",Replacement="",bIsEsc=true,ESC_code=40)  // German right thumbstick (same as English)
+
+	TrainingTexture=Texture't_interface_mb.hud.training_art'
+	TrainingArtScaleX=0.5
+	TrainingArtScaleY=0.5
+	TrainingArray(0)=(U=0,V=0,UL=126,VL=128)	// image_training
+	TrainingArray(1)=(U=127,V=0,UL=43,VL=44)	// icon_tank
+	TrainingArray(2)=(U=170,V=0,UL=43,VL=44)	// icon_team_assault
+	TrainingArray(3)=(U=127,V=44,UL=43,VL=44)	// icon_team_fire
+	TrainingArray(4)=(U=213,V=0,UL=43,VL=44)	// icon_compass_arrow
+	TrainingArray(5)=(U=170,V=44,UL=43,VL=44)	// icon_suppression_red
+	TrainingArray(6)=(U=213,V=44,UL=43,VL=44)	// icon_suppression_gray
+	TrainingArray(7)=(U=127,V=88,UL=43,VL=42)	// icon_mouse
+	TrainingArray(8)=(U=170,V=88,UL=43,VL=42)	// icon_mouse_L
+	TrainingArray(9)=(U=213,V=88,UL=43,VL=42)	// icon_mouse_R
+	TrainingArray(10)=(U=97,V=0,UL=29,VL=44)	// icon_mouse_R
+	TrainingArray(11)=(U=84,V=44,UL=42,VL=43)	// icon_compass_arrow_grey
+	TrainingArray(12)=(U=84,V=88,UL=42,VL=40)	// icon_compass_arrow_orange
+	TrainingArray(13)=(U=41,V=0,UL=25,VL=46)	// icon_reinforcements
+
+	TrainingKeywords(0)=(Keyword="%image_training%",ESC_code=80)
+	TrainingKeywords(1)=(Keyword="%icon_tank%",ESC_code=81)
+	TrainingKeywords(2)=(Keyword="%icon_team_assault%",ESC_code=82)
+	TrainingKeywords(3)=(Keyword="%icon_team_fire%",ESC_code=83)
+	TrainingKeywords(4)=(Keyword="%icon_compass_arrow%",ESC_code=84)
+	TrainingKeywords(5)=(Keyword="%icon_suppression_red%",ESC_code=85)
+	TrainingKeywords(6)=(Keyword="%icon_suppression_gray%",ESC_code=86)
+	TrainingKeywords(7)=(Keyword="%icon_mouse%",ESC_code=87)
+	TrainingKeywords(8)=(Keyword="%icon_mouse_L%",ESC_code=88)
+	TrainingKeywords(9)=(Keyword="%icon_mouse_R%",ESC_code=89)
+	TrainingKeywords(10)=(Keyword="%icon_assault_team_flag%",ESC_code=90)
+	TrainingKeywords(11)=(Keyword="%icon_compass_arrow_grey%",ESC_code=91)
+	TrainingKeywords(12)=(Keyword="%icon_compass_arrow_orange%",ESC_code=92)
+	TrainingKeywords(13)=(Keyword="%icon_reinforcements%",ESC_code=93)
+
+	PCLocalizedActions(0)=(ActionKeyword="ACTION",LocalizedText="")
+	PCLocalizedActions(1)=(ActionKeyword="ACTION_HOLD",LocalizedText="")
+	PCLocalizedActions(2)=(ActionKeyword="ACTION_RELEASE",LocalizedText="")
+	PCLocalizedActions(3)=(ActionKeyword="ACTION_MOUSE",LocalizedText="")
+
+	XboxLocalizedActions(0)=(ActionKeyword="ACTION_Joy1",LocalizedText="")
+	XboxLocalizedActions(1)=(ActionKeyword="ACTION_Joy1_HOLD",LocalizedText="")
+	XboxLocalizedActions(2)=(ActionKeyword="ACTION_Joy1_RELEASE",LocalizedText="")
+	XboxLocalizedActions(3)=(ActionKeyword="ACTION_Joy2",LocalizedText="")
+	XboxLocalizedActions(4)=(ActionKeyword="ACTION_Joy2_HOLD",LocalizedText="")
+	XboxLocalizedActions(5)=(ActionKeyword="ACTION_Joy2_RELEASE",LocalizedText="")
+	XboxLocalizedActions(6)=(ActionKeyword="ACTION_Joy3",LocalizedText="")
+	XboxLocalizedActions(7)=(ActionKeyword="ACTION_Joy3_HOLD",LocalizedText="")
+	XboxLocalizedActions(8)=(ActionKeyword="ACTION_Joy3_RELEASE",LocalizedText="")
+	XboxLocalizedActions(9)=(ActionKeyword="ACTION_Joy4",LocalizedText="")
+	XboxLocalizedActions(10)=(ActionKeyword="ACTION_Joy4_HOLD",LocalizedText="")
+	XboxLocalizedActions(11)=(ActionKeyword="ACTION_Joy4_RELEASE",LocalizedText="")
+	XboxLocalizedActions(12)=(ActionKeyword="ACTION_Joy5",LocalizedText="")
+	XboxLocalizedActions(13)=(ActionKeyword="ACTION_Joy5_HOLD",LocalizedText="")
+	XboxLocalizedActions(14)=(ActionKeyword="ACTION_Joy5_RELEASE",LocalizedText="")
+	XboxLocalizedActions(15)=(ActionKeyword="ACTION_Joy6",LocalizedText="")
+	XboxLocalizedActions(16)=(ActionKeyword="ACTION_Joy6_HOLD",LocalizedText="")
+	XboxLocalizedActions(17)=(ActionKeyword="ACTION_Joy6_RELEASE",LocalizedText="")
+	XboxLocalizedActions(18)=(ActionKeyword="ACTION_Joy7",LocalizedText="")
+	XboxLocalizedActions(19)=(ActionKeyword="ACTION_Joy7_HOLD",LocalizedText="")
+	XboxLocalizedActions(20)=(ActionKeyword="ACTION_Joy7_RELEASE",LocalizedText="")
+	XboxLocalizedActions(21)=(ActionKeyword="ACTION_Joy8",LocalizedText="")
+	XboxLocalizedActions(22)=(ActionKeyword="ACTION_Joy8_HOLD",LocalizedText="")
+	XboxLocalizedActions(23)=(ActionKeyword="ACTION_Joy8_RELEASE",LocalizedText="")
+	XboxLocalizedActions(24)=(ActionKeyword="ACTION_Joy9",LocalizedText="")
+	XboxLocalizedActions(25)=(ActionKeyword="ACTION_Joy9_HOLD",LocalizedText="")
+	XboxLocalizedActions(26)=(ActionKeyword="ACTION_Joy9_RELEASE",LocalizedText="")
+	XboxLocalizedActions(27)=(ActionKeyword="ACTION_Joy10",LocalizedText="")
+	XboxLocalizedActions(28)=(ActionKeyword="ACTION_Joy10_HOLD",LocalizedText="")
+	XboxLocalizedActions(29)=(ActionKeyword="ACTION_Joy10_RELEASE",LocalizedText="")
+	XboxLocalizedActions(30)=(ActionKeyword="ACTION_Joy11",LocalizedText="")
+	XboxLocalizedActions(31)=(ActionKeyword="ACTION_Joy11_HOLD",LocalizedText="")
+	XboxLocalizedActions(32)=(ActionKeyword="ACTION_Joy11_RELEASE",LocalizedText="")
+	XboxLocalizedActions(33)=(ActionKeyword="ACTION_Joy12",LocalizedText="")
+	XboxLocalizedActions(34)=(ActionKeyword="ACTION_Joy12_HOLD",LocalizedText="")
+	XboxLocalizedActions(35)=(ActionKeyword="ACTION_Joy12_RELEASE",LocalizedText="")
+	XboxLocalizedActions(36)=(ActionKeyword="ACTION_Joy13",LocalizedText="")
+	XboxLocalizedActions(37)=(ActionKeyword="ACTION_Joy13_HOLD",LocalizedText="")
+	XboxLocalizedActions(38)=(ActionKeyword="ACTION_Joy13_RELEASE",LocalizedText="")
+	XboxLocalizedActions(39)=(ActionKeyword="ACTION_Joy14",LocalizedText="")
+	XboxLocalizedActions(40)=(ActionKeyword="ACTION_Joy14_HOLD",LocalizedText="")
+	XboxLocalizedActions(41)=(ActionKeyword="ACTION_Joy14_RELEASE",LocalizedText="")
+	XboxLocalizedActions(42)=(ActionKeyword="ACTION_Joy15",LocalizedText="")
+	XboxLocalizedActions(43)=(ActionKeyword="ACTION_Joy15_HOLD",LocalizedText="")
+	XboxLocalizedActions(44)=(ActionKeyword="ACTION_Joy15_RELEASE",LocalizedText="")
+	XboxLocalizedActions(45)=(ActionKeyword="ACTION_Joy16",LocalizedText="")
+	XboxLocalizedActions(46)=(ActionKeyword="ACTION_Joy16_HOLD",LocalizedText="")
+	XboxLocalizedActions(47)=(ActionKeyword="ACTION_Joy16_RELEASE",LocalizedText="")
+	XboxLocalizedActions(48)=(ActionKeyword="ACTION_JoyX",LocalizedText="")
+	XboxLocalizedActions(49)=(ActionKeyword="ACTION_JoyX_HOLD",LocalizedText="")
+	XboxLocalizedActions(50)=(ActionKeyword="ACTION_JoyX_RELEASE",LocalizedText="")
+	XboxLocalizedActions(51)=(ActionKeyword="ACTION_JoyY",LocalizedText="")
+	XboxLocalizedActions(52)=(ActionKeyword="ACTION_JoyY_HOLD",LocalizedText="")
+	XboxLocalizedActions(53)=(ActionKeyword="ACTION_JoyY_RELEASE",LocalizedText="")
+	XboxLocalizedActions(54)=(ActionKeyword="ACTION_JoyU",LocalizedText="")
+	XboxLocalizedActions(55)=(ActionKeyword="ACTION_JoyU_HOLD",LocalizedText="")
+	XboxLocalizedActions(56)=(ActionKeyword="ACTION_JoyU_RELEASE",LocalizedText="")
+	XboxLocalizedActions(57)=(ActionKeyword="ACTION_JoyV",LocalizedText="")
+	XboxLocalizedActions(58)=(ActionKeyword="ACTION_JoyV_HOLD",LocalizedText="")
+	XboxLocalizedActions(59)=(ActionKeyword="ACTION_JoyV_RELEASE",LocalizedText="")
+
+	TimerPosX = 30
+	TimerPosY = 30
+	
+	m_szHintText="Hint"
+	bShowTrainingInOracleCam=false
+
+	// LCD Grenade texture
+	m_LCDGrenade=texture'Engine.LCD_Grenade'
+}
+

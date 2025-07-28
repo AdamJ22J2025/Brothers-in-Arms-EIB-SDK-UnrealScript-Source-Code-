@@ -1,0 +1,4587 @@
+class ACTION_InitAnimating extends ScriptedAction;
+
+enum ERootTeleportMode
+{
+	TELEPORT_None,
+	TELEPORT_AtEndRotate,
+	TELEPORT_AtEndNoRotate,
+	TELEPORT_AtBeginRotate,
+	TELEPORT_AtBeginNoRotate,
+};
+
+var(Action) ERootTeleportMode bTeleportAtAnimEnd;
+var(Action) bool bNoTurnBody;
+var(Action) bool bDispositionAnimPlaying;
+var(Action) bool bUpdate;
+var(Action) bool bStart;
+
+function bool InitActionFor(ScriptedController C)
+{
+	local AnimPawn P;
+
+	P = AnimPawn(C.GetInstigator());
+	
+	if (P != None)
+	{
+		P.m_bTeleportAtAnimEnd = bTeleportAtAnimEnd;
+		P.bNoTurnBody = bNoTurnBody;
+		P.m_fDispositionAnimPlaying = bDispositionAnimPlaying;
+	}
+	
+	if (bUpdate)
+	{
+		return false;
+	}
+	
+	if (bStart)
+	{
+		AnimPawn(C.Pawn).FlushAnimQueueChannel( 0,,true );
+		AnimPawn(C.Pawn).m_bDisableAnimQueue = true;
+	}
+	else
+	{
+		AnimPawn(C.Pawn).m_bDisableAnimQueue = false;
+		C.Pawn.PlayWaiting();
+	}
+	return false;
+}
+class ACTION_PlayAnim extends ScriptedAction;
+
+
+
+var(Action) name BaseAnim;
+var(Action) float BlendInTime;
+var(Action) float BlendOutTime;
+var(Action) float AnimRate;
+var(Action) byte AnimIterations;
+var(Action) bool bLoopAnim;
+var(Action) bool bRootMotionBlend;
+var(Action) float StartFrame;
+var(Action) string MeshAnimName;
+var			MeshAnimation MeshAnim;
+
+function bool InitActionFor(ScriptedController C)
+{
+	// play appropriate animation
+	C.AnimsRemaining = AnimIterations;
+	if ( PawnPlayBaseAnim(C,true) )
+		C.CurrentAnimation = self;
+	return false;
+}
+
+function SetCurrentAnimationFor(ScriptedController C)
+{
+	if ( C.Pawn.IsAnimating(0) )
+		C.CurrentAnimation = self;
+	else
+		C.CurrentAnimation = None;
+}
+
+function bool PawnPlayBaseAnim(ScriptedController C, bool bFirstPlay)
+{
+	if ( BaseAnim == '' )
+		return false;
+
+	if ((MeshAnimName != "") && (AnimPawn(C.Pawn) != None))
+	{
+
+		AnimPawn(C.Pawn).MeshAnim = MeshAnimation(DynamicLoadObject(MeshAnimName,class'MeshAnimation'));
+		if (AnimPawn(C.Pawn).MeshAnim != None)
+		{
+			AnimPawn(C.Pawn).MeshAnimName = MeshAnimName;
+			AnimPawn(C.Pawn).CurMeshAnimName = AnimPawn(C.Pawn).MeshAnimName;
+			C.Pawn.LinkSkelAnim(AnimPawn(C.Pawn).MeshAnim);
+		}
+	}
+
+	C.bControlAnimations = true;
+	if (C.Pawn.m_bTeleportAtAnimEnd > 0)
+	{
+		if ( bFirstPlay )
+			C.Pawn.PlayAnim(BaseAnim,AnimRate,0.0f,,,C.Pawn.m_bTeleportAtAnimEnd);
+		else if ( bLoopAnim || (C.AnimsRemaining > 0) )
+			C.Pawn.LoopAnim(BaseAnim,AnimRate,,,,C.Pawn.m_bTeleportAtAnimEnd);
+		else
+			return false;
+	}
+	else
+	{
+		if ( bFirstPlay )
+			C.Pawn.PlayAnim(BaseAnim,AnimRate,BlendInTime,,bRootMotionBlend);
+		else if ( bLoopAnim || (C.AnimsRemaining > 0) )
+			C.Pawn.LoopAnim(BaseAnim,AnimRate,,,bRootMotionBlend);
+		else
+			return false;
+	}
+
+	if( StartFrame > 0.0 )
+		C.Pawn.SetAnimFrame( StartFrame, 0, 1);
+
+	return true;
+}
+
+function string GetActionString()
+{
+	return ActionString@BaseAnim;
+}
+
+defaultproperties
+{
+    BlendInTime=0.200000
+    BlendOutTime=0.200000
+	AnimRate=1.000000
+	StartFrame=0.000000
+	ActionString="play animation"
+	bValidForTrigger=false
+	MeshAnimName=""
+}
+class ACTION_PlayAnimWait extends LatentPlayAnim;
+
+
+
+var(Action) name BaseAnim;
+var(Action) float BlendInTime;
+var(Action) float BlendOutTime;
+var(Action) float AnimRate;
+var(Action) byte AnimIterations;
+var(Action) bool bLoopAnim;
+var(Action) bool bRootMotionBlend;
+var(Action) float StartFrame;
+var(Action)	int Channel;
+
+function bool InitActionFor(ScriptedController C)
+{
+	Super.InitActionFor( C );
+	// play appropriate animation
+	C.AnimsRemaining = AnimIterations;
+	if ( PawnPlayBaseAnim(C,true) )
+		C.CurrentAnimationWait = self;
+	return true;
+}
+
+function SetCurrentAnimationFor(ScriptedController C)
+{
+	if ( C.Pawn.IsAnimating(0) )
+		C.CurrentAnimationWait = self;
+	else
+		C.CurrentAnimationWait = None;
+}
+
+function bool PawnPlayBaseAnim(ScriptedController C, bool bFirstPlay)
+{
+	if ( BaseAnim == '' )
+		return false;
+
+	C.bControlAnimations = true;
+	if (C.Pawn.m_bTeleportAtAnimEnd > 0)
+	{
+		if ( bFirstPlay )
+			C.Pawn.PlayAnim(BaseAnim,AnimRate,0.0f,,,C.Pawn.m_bTeleportAtAnimEnd);
+		else if ( bLoopAnim || (C.AnimsRemaining > 0) )
+			C.Pawn.LoopAnim(BaseAnim,AnimRate,,,,C.Pawn.m_bTeleportAtAnimEnd);
+		else
+			return false;
+	}
+	else
+	{
+		if ( bFirstPlay )
+			C.Pawn.PlayAnim(BaseAnim,AnimRate,BlendInTime,,bRootMotionBlend);
+		else if ( bLoopAnim || (C.AnimsRemaining > 0) )
+			C.Pawn.LoopAnim(BaseAnim,AnimRate,,,bRootMotionBlend);
+		else
+			return false;
+	}
+
+	if( StartFrame > 0.0 )
+		C.Pawn.SetAnimFrame( StartFrame, 0, 1);
+
+	return true;
+}
+
+function string GetActionString()
+{
+	return ActionString@BaseAnim;
+}
+
+function bool CompleteOnAnim(ScriptedController C, int Num)
+{
+	return (Channel == Num);
+}
+
+defaultproperties
+{
+    BlendInTime=0.200000
+    BlendOutTime=0.200000
+	AnimRate=1.000000
+	StartFrame=0.000000
+	ActionString="play animation"
+	bValidForTrigger=false
+}
+class ACTION_PlayLoopWait extends LatentPlayAnim;
+
+struct AnimData
+{
+	var() name BaseAnim;
+	var() float BlendInTime;
+	var() float BlendOutTime;
+	var() float AnimRate;
+	var() byte AnimIterations;
+	var() bool bLoopAnim;
+	var() bool bRootMotionBlend;
+	var() float StartFrame;
+	var() int Channel;
+	var() int nMaxPlayCount;
+	var   int nPlayCount;		// How many times since this array was cleared has this animation played?
+};
+
+var(Action) export editinline Array<AnimData> m_AnimList;
+var(Action) name ExternalEvent;	//tag to give controller (to affect triggering)
+var(Action) bool	bRandom;
+var			int		nCurAnimIdx;
+
+function bool InitActionFor(ScriptedController C)
+{
+	Super.InitActionFor( C );
+	
+	ResetList();
+	if ( PawnPlayBaseAnim(C,true) )
+		C.CurrentAnimationWait = self;
+	C.Tag = ExternalEvent;
+	
+	return true;
+}
+
+function SetCurrentAnimationFor(ScriptedController C)
+{
+	if ( C.Pawn.IsAnimating(0) )
+		C.CurrentAnimationWait = self;
+	else
+		C.CurrentAnimationWait = None;
+}
+
+function bool PawnPlayBaseAnim(ScriptedController C, bool bFirstPlay)
+{
+	nCurAnimIdx = GetNextAnimIdx();
+	
+	if (m_AnimList[nCurAnimIdx].AnimRate == 0.0)
+	{
+		m_AnimList[nCurAnimIdx].AnimRate = 1.0;
+	}
+		
+	if ( m_AnimList[nCurAnimIdx].BaseAnim == '' )
+		return false;
+
+	C.bControlAnimations = true;
+	if (C.Pawn.m_bTeleportAtAnimEnd > 0)
+	{
+		if ( bFirstPlay )
+		{
+			C.Pawn.PlayAnim(m_AnimList[nCurAnimIdx].BaseAnim,m_AnimList[nCurAnimIdx].AnimRate,0.0f,,,C.Pawn.m_bTeleportAtAnimEnd);
+		}
+		else if ( m_AnimList[nCurAnimIdx].bLoopAnim || (C.AnimsRemaining > 0) )
+		{
+			C.Pawn.LoopAnim(m_AnimList[nCurAnimIdx].BaseAnim,m_AnimList[nCurAnimIdx].AnimRate,,,,C.Pawn.m_bTeleportAtAnimEnd);
+		}
+		else
+			return false;
+	}
+	else
+	{
+		if ( bFirstPlay )
+		{
+			C.Pawn.PlayAnim(m_AnimList[nCurAnimIdx].BaseAnim,m_AnimList[nCurAnimIdx].AnimRate,m_AnimList[nCurAnimIdx].BlendInTime,,m_AnimList[nCurAnimIdx].bRootMotionBlend);
+		}
+		else if ( m_AnimList[nCurAnimIdx].bLoopAnim || (C.AnimsRemaining > 0) )
+		{
+			C.Pawn.LoopAnim(m_AnimList[nCurAnimIdx].BaseAnim,m_AnimList[nCurAnimIdx].AnimRate,,,m_AnimList[nCurAnimIdx].bRootMotionBlend);
+		}
+		else
+			return false;
+	}
+
+	if( m_AnimList[nCurAnimIdx].StartFrame > 0.0 )
+	{
+		C.Pawn.SetAnimFrame( m_AnimList[nCurAnimIdx].StartFrame, 0, 1);
+	}
+	
+	m_AnimList[nCurAnimIdx].nPlayCount = m_AnimList[nCurAnimIdx].nPlayCount + 1;
+
+	return true;
+}
+
+function ResetList()
+{
+	local	int	i;
+	
+	for( i = 0; i < m_AnimList.Length; i++ )
+	{
+		m_AnimList[i].nPlayCount = 0;
+	}
+	nCurAnimIdx = -1;
+}
+
+function string GetActionString()
+{
+	return ActionString@m_AnimList[nCurAnimIdx].BaseAnim;
+}
+
+function bool CompleteOnAnim(ScriptedController C, int Num)
+{
+	if (m_AnimList[nCurAnimIdx].Channel == Num)
+	{
+		PawnPlayBaseAnim(C,true);
+
+		return false;
+	}
+//	return (m_AnimList[nCurAnimIdx].Channel == Num);
+}
+
+function int GetNextAnimIdx()
+{
+	local int	nRand, i;
+	
+	if (bRandom)
+	{
+		nRand = Rand( m_AnimList.Length - 1 );
+	}
+	else
+	{
+		nRand = ++nCurAnimIdx;
+		if (nRand >= m_AnimList.Length)
+		{
+			nRand = 0;
+		}
+	}
+	if ((m_AnimList[nRand].nMaxPlayCount == 0) || (m_AnimList[nRand].nPlayCount < m_AnimList[nRand].nMaxPlayCount))
+	{
+		return (nRand);
+	}
+	else
+	{
+		for( i = nRand; i < m_AnimList.Length; i++ )
+		{
+			if ((m_AnimList[nRand].nMaxPlayCount == 0) || (m_AnimList[i].nPlayCount < m_AnimList[i].nMaxPlayCount))
+			{
+				return (i);
+			}
+		}
+		for( i = 0; i < nRand; i++ )
+		{
+			if ((m_AnimList[nRand].nMaxPlayCount == 0) || (m_AnimList[i].nPlayCount < m_AnimList[i].nMaxPlayCount))
+			{
+				return (i);
+			}
+		}
+	}
+
+	ResetList();
+	if (bRandom)
+	{
+		nRand = Rand( m_AnimList.Length - 1 );
+	}
+	else
+	{
+		nRand = 0;
+	}
+	
+	return nRand;
+}
+
+function bool CompleteWhenTriggered()
+{
+	return true;
+}
+
+defaultproperties
+{
+	ActionString="play animation"
+	bValidForTrigger=false
+}
+class ACTION_SetAnimSet extends ScriptedAction;
+
+var(Action) string MeshAnimName;
+
+function bool InitActionFor(ScriptedController C)
+{
+	Super.InitActionFor( C );
+
+	if ((MeshAnimName != "") && (AnimPawn(C.Pawn) != None))
+	{
+
+		AnimPawn(C.Pawn).MeshAnim = MeshAnimation(DynamicLoadObject(MeshAnimName,class'MeshAnimation'));
+		if (AnimPawn(C.Pawn).MeshAnim != None)
+		{
+			AnimPawn(C.Pawn).MeshAnimName = MeshAnimName;
+			AnimPawn(C.Pawn).CurMeshAnimName = AnimPawn(C.Pawn).MeshAnimName;
+			C.Pawn.LinkSkelAnim(AnimPawn(C.Pawn).MeshAnim);
+		}
+	}
+
+	return false;
+}
+
+function string GetActionString()
+{
+	return ActionString@MeshAnimName;
+}
+
+defaultproperties
+{
+	ActionString="set animation set"
+	bValidForTrigger=false
+	MeshAnimName=""
+}
+//=============================================================================
+// AlternatePath.
+//=============================================================================
+class AlternatePath extends NavigationPoint
+	notplaceable;
+
+
+
+var() byte Team;
+var() float SelectionWeight;
+var() bool bReturnOnly;
+
+defaultproperties
+{
+	bObsolete=true
+	SelectionWeight=+1.0000
+}
+//=============================================================================
+// Ambushpoint.
+//=============================================================================
+class AmbushPoint extends NavigationPoint
+	notplaceable;
+
+
+
+var vector lookdir; //direction to look while ambushing
+//at start, ambushing creatures will pick either their current location, or the location of
+//some ambushpoint belonging to their team
+var byte survivecount; //used when picking ambushpoint
+var() float SightRadius; // How far bot at this point should look for enemies
+var() bool	bSniping;	// bots should snipe from this position
+
+function PreBeginPlay()
+{
+	lookdir = 2000 * vector(Rotation);
+
+	Super.PreBeginPlay();
+}
+
+defaultproperties
+{
+	bObsolete=true
+     bDirectional=True
+     SoundVolume=128
+	 SightRadius=+5000.0
+	 bSniping=False
+}
+class AnimNotify_FireWeapon extends AnimNotify_Scripted;
+
+
+
+event Notify( Actor Owner )
+{
+	// fake fire - play weapon effect, but no real shot
+	Pawn(Owner).bIgnorePlayFiring = true;
+	WeaponAttachment(Pawn(Owner).Weapon.ThirdPersonActor).ThirdPersonEffects();
+//	if ( Pawn(Owner).Weapon.FireSound != None )
+//		Pawn(Owner).Weapon.PlaySound(Pawn(Owner).Weapon.FireSound, SLOT_None, 1.0);
+}
+class AnimNotify_HeadLookAt extends AnimNotify_Scripted;
+
+
+
+var() bool m_bEnabled;
+
+event Notify( Actor Owner )
+{
+	if (AnimPawn(Owner) != None)
+	{
+		if (!m_bEnabled)
+		{
+			AnimPawn(Owner).ResetLookAt( true, true, false );
+		}
+		AnimPawn(Owner).bDoHeadTurn = m_bEnabled;
+	}
+}
+class AnimNotify_ThrowGrenade extends AnimNotify_Scripted;
+
+
+
+event Notify( Actor Owner )
+{
+	if( ( Owner.Role<ROLE_Authority ) || (( PlayerController(Pawn( Owner ).Controller) != None) && (PlayerController(Pawn( Owner ).Controller).bBehindView == true)) )
+		return;
+
+	if (Weapon(Owner).FireMode[1] != None)
+	{
+		log("AnimNotify_ThrowGrenade( "$Owner$" )");
+		Weapon(Owner).FireMode[1].FireProjectile();
+	}
+}
+//=============================================================================
+// Blocks all actors from passing.
+//=============================================================================
+class BlockAll extends Keypoint;
+
+
+
+defaultproperties
+{
+	 bWorldGeometry=true
+     bCollideActors=True
+     bBlockActors=True
+     bBlockPlayers=True
+	 bObsolete=true
+}
+//=============================================================================
+// BlockedPath.
+//
+//=============================================================================
+class BlockedPath extends NavigationPoint
+	placeable;
+
+
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+	bCodeBlocked = !bCodeBlocked;
+}
+
+defaultproperties
+{
+	bCodeBlocked=true
+}
+//=============================================================================
+// BlockMonsters prevents monsters from passing, but allows players and projectiles to cross.
+//=============================================================================
+class BlockMonsters extends Keypoint;
+
+
+
+defaultproperties
+{
+     bCollideActors=True
+     bBlockActors=True
+	 bObsolete=true
+}
+//=============================================================================
+// BlockPlayers prevents players from passing, but allows monsters and projectiles to cross.
+//=============================================================================
+class BlockPlayer extends Keypoint;
+
+
+
+defaultproperties
+{
+     bBlockPlayers=True
+	 bObsolete=true
+}
+class Burned extends DamageType
+	abstract;
+
+
+
+defaultproperties
+{
+	DeathString="%o was sauteed."
+    FlashFog=(X=800,Y=600,Z=240)
+    bNoSpecificLocation=true
+}
+class Corroded extends DamageType
+	abstract;
+
+
+
+static function class<Effects> GetPawnDamageEffect( vector HitLocation, float Damage, vector Momentum, Pawn Victim, bool bLowDetail )
+{
+	return Default.PawnDamageEffect;
+}
+
+defaultproperties
+{
+     DeathString="%o was dissolved by %k's."
+	 FemaleSuicide="%o dissolved in slime."
+	 MaleSuicide="%o dissolved in slime."
+
+    FlashFog=(X=450,Y=700,Z=230)
+
+    bNoSpecificLocation=true
+}
+//=============================================================================
+// Counter: waits until it has been triggered 'NumToCount' times, and then
+// it sends Trigger/UnTrigger events to actors whose names match 'EventName'.
+//=============================================================================
+class Counter extends Triggers;
+
+
+
+//-----------------------------------------------------------------------------
+// Counter variables.
+
+var() byte       NumToCount;                // Number to count down from.
+var() bool       bShowMessage;              // Display count message?
+var() localized  string CountMessage;       // Human readable count message.
+var() localized  string CompleteMessage;    // Completion message.
+var   byte       OriginalNum;               // Number to count at startup time.
+
+//-----------------------------------------------------------------------------
+// Counter functions.
+
+//
+// Init for play.
+//
+function BeginPlay()
+{
+	OriginalNum = NumToCount;
+}
+
+/* Reset()
+reset actor to initial state - used when restarting level without reloading.
+*/
+function Reset()
+{
+	NumToCount = OriginalNum;
+}
+
+//
+// Counter was triggered.
+//
+function Trigger( actor Other, pawn EventInstigator )
+{
+	local string S;
+	local string Num;
+	local int i;
+
+	if( NumToCount > 0 )
+	{
+		if( --NumToCount == 0 )
+		{
+			// Trigger all matching actors.
+			if( bShowMessage && CompleteMessage != "" )
+				EventInstigator.ClientMessage( CompleteMessage );
+			TriggerEvent(Event,Other,EventInstigator);
+		}
+		else if( bShowMessage && CountMessage != "" )
+		{
+			// Still counting down.
+			switch( NumToCount )
+			{
+				case 1:  Num="one"; break;
+				case 2:  Num="two"; break;
+				case 3:  Num="three"; break;
+				case 4:  Num="four"; break;
+				case 5:  Num="five"; break;
+				case 6:  Num="six"; break;
+				default: Num=string(NumToCount); break;
+			}
+			S = CountMessage;
+			while( InStr(S, "%i") >= 0 )
+			{
+				i = InStr(S, "%i");
+				S = Left(S,i) $ Num $ Mid(S,i+2);
+			}
+			EventInstigator.ClientMessage( S );
+		}
+	}
+}
+
+defaultproperties
+{
+     NumToCount=2
+     bShowMessage=False
+     CountMessage="Only %i more to go..."
+     CompleteMessage="Completed!"
+	 Texture=Texture'Engine.S_TriggerCounter'
+}
+class CriticalEventLowPlus extends CriticalEventPlus;
+
+
+class CriticalEventPlus extends LocalMessage;
+
+
+
+static function float GetOffset(int Switch, float YL, float ClipY )
+{
+	return (Default.YPos/768.0) * ClipY;
+}
+
+defaultproperties
+{
+	bBeep=false
+	bFadeMessage=True
+	bIsSpecial=True
+	bIsUnique=True
+	Lifetime=3
+
+	DrawColor=(R=0,G=160,B=255,A=255)
+	FontSize=1
+}
+class CriticalStringPlus extends CriticalEventPlus;
+
+
+//=============================================================================
+// DecisionTrigger: Trigger that may or may not activate when touched or triggered
+// by AI controlled pawn, based on DecisionTrigger attributes and AIController decision
+// OBSOLETE - superceded by ScriptedSequence and ScriptedTrigger + TriggeredCondition
+//=============================================================================
+
+class DecisionTrigger extends Triggers
+	notplaceable;
+
+
+
+defaultproperties
+{
+	bObsolete=true
+}
+//=============================================================================
+// Defensepoint.
+//=============================================================================
+class DefensePoint extends AmbushPoint;
+
+
+
+var() byte team;
+var() byte priority;
+var() name FortTag;	//optional associated fort (for assault game)
+
+defaultproperties
+{
+     bDirectional=True
+     SoundVolume=128
+}
+class Depressurized extends DamageType
+	abstract;
+
+
+
+defaultproperties
+{
+     DeathString="%o was depressurized by %k."
+	 FemaleSuicide="%o was depressurized."
+	 MaleSuicide="%o was depressurized."
+	 bArmorStops=false
+	 GibModifier=+100.0
+}
+//=============================================================================
+// Dispatcher: receives one trigger (corresponding to its name) as input,
+// then triggers a set of specifid events with optional delays.
+// OBSOLETE - superceded by ScriptedTrigger
+//=============================================================================
+class Dispatcher extends Triggers
+	notplaceable;
+
+
+
+//-----------------------------------------------------------------------------
+// Dispatcher variables.
+
+var() name  OutEvents[32]; // Events to generate.
+var() float OutDelays[32]; // Relative delays before generating events.
+var int i;                // Internal counter.
+
+//=============================================================================
+// Dispatcher logic.
+
+//
+// When dispatcher is triggered...
+//
+function Trigger( actor Other, pawn EventInstigator )
+{
+	Instigator = EventInstigator;
+	gotostate('Dispatch');
+}
+
+//
+// Dispatch events.
+//
+state Dispatch
+{
+	ignores trigger;
+
+Begin:
+	for( i=0; i<ArrayCount(OutEvents); i++ )
+	{
+		if( (OutEvents[i] != '') && (OutEvents[i] != 'None') )
+		{
+			Sleep( OutDelays[i] );
+			TriggerEvent(OutEvents[i],self,Instigator);
+		}
+	}
+	GotoState('');
+}
+
+defaultproperties
+{
+	 Texture=Texture'Engine.S_Dispatcher'
+	 bObsolete=true
+}
+//=============================================================================
+// EFFECT_Alley:
+//=============================================================================
+
+class EFFECT_Alley extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=7.5;
+	EnvironmentDiffusion=0.30;
+	Room=-1000;
+	RoomHF=-271;
+	DecayTime=1.49;
+	DecayHFRatio=0.86;
+	Reflections=-1204;
+	ReflectionsDelay=0.007;
+	Reverb=-4;
+	ReverbDelay=0.011;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Bathroom
+//=============================================================================
+
+class EFFECT_Bathroom extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.4;
+	EnvironmentDiffusion=1.000;
+	Room=-1000;
+	RoomHF=-1200;
+	DecayTime=1.49;
+	DecayHFRatio=0.54;
+	Reflections=-370;
+	ReflectionsDelay=0.007;
+	Reverb=1031;
+	ReverbDelay=0.011;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_CarpetedHallway
+//=============================================================================
+
+class EFFECT_CarpetedHallway extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.9;
+	EnvironmentDiffusion=1.0;
+	Room=-1000;
+	RoomHF=-4000;
+	DecayTime=0.3;
+	DecayHFRatio=0.1;
+	Reflections=-1831;
+	ReflectionsDelay=0.002;
+	Reverb=-1630;
+	ReverbDelay=0.03;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Cave
+//=============================================================================
+
+class EFFECT_Cave extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=14.6;
+	EnvironmentDiffusion=1.0;
+	Room=-1000;
+	RoomHF=0;
+	DecayTime=2.910;
+	DecayHFRatio=1.30;
+	Reflections=-602;
+	ReflectionsDelay=0.015;
+	Reverb=-302;
+	ReverbDelay=0.022;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_CITY_ABANDONED
+//============================================================================
+
+class EFFECT_CITY_ABANDONED extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=3.0f;
+	EnvironmentDiffusion=0.690f;
+	Room=-1100;
+	RoomHF=-200;
+	RoomLF=-100;
+	DecayTime=3.28f;
+	DecayHFRatio=1.17f;
+	DecayLFRatio=0.91f;
+	Reflections=-1400;
+	ReflectionsDelay=0.044f;
+	Reverb=-2400;
+	ReverbDelay=0.024f;
+	EchoTime=0.250f;
+	EchoDepth=0.200f;
+	ModulationTime=0.250f;
+	ModulationDepth=0.000f;
+	AirAbsorptionHF=-0.0f;
+	HFReference=5000.0f;
+	LFReference=250.0f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x20;
+}
+//=============================================================================
+// EFFECT_CITY_STREETS
+//============================================================================
+
+class EFFECT_CITY_STREETS extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=3.0f;
+	EnvironmentDiffusion=0.780f;
+	Room=-1100;
+	RoomHF=-300;
+	RoomLF=-100;
+	DecayTime=1.79f;
+	DecayHFRatio=1.12f;
+	DecayLFRatio=0.91f;
+	Reflections=-1700;
+	ReflectionsDelay=0.046f;
+	Reverb=-2800;
+	ReverbDelay=0.028f;
+	EchoTime=0.250f;
+	EchoDepth=0.200f;
+	ModulationTime=0.250f;
+	ModulationDepth=0.000f;
+	AirAbsorptionHF=-0.0f;
+	HFReference=5000.0f;
+	LFReference=250.0f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x20;
+}
+//=============================================================================
+// EFFECT_ConcertHall
+//=============================================================================
+
+class EFFECT_ConcertHall extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=19.6;
+	EnvironmentDiffusion=1.0;
+	Room=-1000;
+	RoomHF=-500;
+	DecayTime=3.92;
+	DecayHFRatio=0.7;
+	Reflections=-1231;
+	ReflectionsDelay=0.02;
+	Reverb=-2;
+	ReverbDelay=0.029;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Dizzy
+//=============================================================================
+
+class EFFECT_Dizzy extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.8;
+	EnvironmentDiffusion=0.60;
+	Room=-1000;
+	RoomHF=-400;
+	DecayTime=17.23;
+	DecayHFRatio=0.56;
+	Reflections=-1713;
+	ReflectionsDelay=0.02;
+	Reverb=-613;
+	ReverbDelay=0.03;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Drugged
+//=============================================================================
+
+class EFFECT_Drugged extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.9;
+	EnvironmentDiffusion=0.5;
+	Room=-1000;
+	RoomHF=0;
+	DecayTime=8.39;
+	DecayHFRatio=1.39;
+	Reflections=-115;
+	ReflectionsDelay=0.002;
+	Reverb=985;
+	ReverbDelay=0.03;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Forest
+//=============================================================================
+
+class EFFECT_Forest extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=38.0;
+	EnvironmentDiffusion=0.30;
+	Room=-1000;
+	RoomHF=-3300;
+	DecayTime=1.49;
+	DecayHFRatio=0.54;
+	Reflections=-2560;
+	ReflectionsDelay=0.162;
+	Reverb=-229;
+	ReverbDelay=0.088;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Hallway
+//=============================================================================
+
+class EFFECT_Hallway extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.8;
+	EnvironmentDiffusion=1.00;
+	Room=-1000;
+	RoomHF=-300;
+	DecayTime=1.49;
+	DecayHFRatio=0.59;
+	Reflections=-1219;
+	ReflectionsDelay=0.007;
+	Reverb=441;
+	ReverbDelay=0.011;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Livingroom
+//=============================================================================
+
+class EFFECT_Livingroom extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=2.5;
+	EnvironmentDiffusion=1.000;
+	Room=-1000;
+	RoomHF=-6000;
+	DecayTime=0.5;
+	DecayHFRatio=0.1;
+	Reflections=-1376;
+	ReflectionsDelay=0.003;
+	Reverb=-1104;
+	ReverbDelay=0.004;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_MOOD_HEAVEN
+//============================================================================
+
+class EFFECT_MOOD_HEAVEN extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=19.6f;
+	EnvironmentDiffusion=0.940f;
+	Room=-1000;
+	RoomHF=-200;
+	RoomLF=-700;
+	DecayTime=5.04f;
+	DecayHFRatio=1.12f;
+	DecayLFRatio=0.56f;
+	Reflections=-1230;
+	ReflectionsDelay=0.020f;
+	Reverb=-200;
+	ReverbDelay=0.029f;
+	EchoTime=0.250f;
+	EchoDepth=0.080f;
+	ModulationTime=2.742f;
+	ModulationDepth=0.050f;
+	AirAbsorptionHF=-2.0f;
+	HFReference=5000.0f;
+	LFReference=250.0f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x3f;
+}
+//=============================================================================
+// EFFECT_MOOD_HELL
+//============================================================================
+
+class EFFECT_MOOD_HELL extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=100.0f;
+	EnvironmentDiffusion=0.570f;
+	Room=-1000;
+	RoomHF=-900;
+	RoomLF=-700;
+	DecayTime=3.57f;
+	DecayHFRatio=0.49f;
+	DecayLFRatio=2.00f;
+	Reflections=-10000;
+	ReflectionsDelay=0.020f;
+	Reverb=100;
+	ReverbDelay=0.030f;
+	EchoTime=0.110f;
+	EchoDepth=0.040f;
+	ModulationTime=2.109f;
+	ModulationDepth=0.520f;
+	AirAbsorptionHF=-5.0f;
+	HFReference=5000.0f;
+	LFReference=139.5f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x40;
+}
+//=============================================================================
+// EFFECT_MOOD_MEMORY
+//============================================================================
+
+class EFFECT_MOOD_MEMORY extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=8.0f;
+	EnvironmentDiffusion=0.850f;
+	Room=-1000;
+	RoomHF=-400;
+	RoomLF=-900;
+	DecayTime=4.06f;
+	DecayHFRatio=0.82f;
+	DecayLFRatio=0.56f;
+	Reflections=-2800;
+	ReflectionsDelay=0.000f;
+	Reverb=-500;
+	ReverbDelay=0.000f;
+	EchoTime=0.250f;
+	EchoDepth=0.000f;
+	ModulationTime=0.474f;
+	ModulationDepth=0.450f;
+	AirAbsorptionHF=-2.0f;
+	HFReference=5000.0f;
+	LFReference=250.0f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x0;
+}
+//=============================================================================
+// EFFECT_Mountains
+//=============================================================================
+
+class EFFECT_Mountains extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=100.0;
+	EnvironmentDiffusion=0.270;
+	Room=-1000;
+	RoomHF=-2500;
+	DecayTime=1.49;
+	DecayHFRatio=0.21;
+	Reflections=-2780;
+	ReflectionsDelay=0.3;
+	Reverb=-1435;
+	ReverbDelay=0.100;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_None: Plain room effect.
+//=============================================================================
+
+class EFFECT_None extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	Room=-10000;
+	RoomHF=-10000;
+	RoomRolloffFactor=0.0;
+	DecayTime=0.1;
+	DecayHFRatio=0.5;
+	Reflections=-10000;
+	ReflectionsDelay=0.0;
+	Reverb=-10000;
+	ReverbDelay=0.0;
+	EnvironmentSize=1;
+	EnvironmentDiffusion=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=false;
+	bReflectionsScale=false;
+	bReflectionsDelayScale=false;
+	bReverbScale=false;
+	bReverbDelayScale=false;
+	bEchoTimeScale=false;
+	bDecayHFLimit=false;
+}
+//=============================================================================
+// EFFECT_OUTDOORS_BACKYARD
+//============================================================================
+
+class EFFECT_OUTDOORS_BACKYARD extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=80.3f;
+	EnvironmentDiffusion=0.450f;
+	Room=-1100;
+	RoomHF=-1200;
+	RoomLF=-600;
+	DecayTime=1.12f;
+	DecayHFRatio=0.34f;
+	DecayLFRatio=0.46f;
+	Reflections=-1100;
+	ReflectionsDelay=0.049f;
+	Reverb=-1300;
+	ReverbDelay=0.023f;
+	EchoTime=0.218f;
+	EchoDepth=0.340f;
+	ModulationTime=0.250f;
+	ModulationDepth=0.000f;
+	AirAbsorptionHF=-5.0f;
+	HFReference=4399.1f;
+	LFReference=242.9f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x0;
+}
+//=============================================================================
+// EFFECT_OUTDOORS_CREEK
+//============================================================================
+
+class EFFECT_OUTDOORS_CREEK extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=80.3f;
+	EnvironmentDiffusion=0.350f;
+	Room=-1100;
+	RoomHF=-1500;
+	RoomLF=-600;
+	DecayTime=2.13f;
+	DecayHFRatio=0.21f;
+	DecayLFRatio=0.46f;
+	Reflections=-1700;
+	ReflectionsDelay=0.115f;
+	Reverb=-1100;
+	ReverbDelay=0.031f;
+	EchoTime=0.218f;
+	EchoDepth=0.340f;
+	ModulationTime=0.250f;
+	ModulationDepth=0.000f;
+	AirAbsorptionHF=-5.0f;
+	HFReference=4399.1f;
+	LFReference=242.9f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x0;
+}
+//=============================================================================
+// EFFECT_OUTDOORS_DEEPCANYON
+//============================================================================
+
+class EFFECT_OUTDOORS_DEEPCANYON extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=80.3f;
+	EnvironmentDiffusion=0.740f;
+	Room=-1100;
+	RoomHF=-1500;
+	RoomLF=-400;
+	DecayTime=3.89f;
+	DecayHFRatio=0.21f;
+	DecayLFRatio=0.46f;
+	Reflections=-2000;
+	ReflectionsDelay=0.193f;
+	Reverb=-1100;
+	ReverbDelay=0.019f;
+	EchoTime=0.250f;
+	EchoDepth=1.000f;
+	ModulationTime=0.250f;
+	ModulationDepth=0.000f;
+	AirAbsorptionHF=-5.0f;
+	HFReference=4399.1f;
+	LFReference=242.9f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x0;
+}
+//=============================================================================
+// EFFECT_OUTDOORS_ROLLINGPLAINS
+//============================================================================
+
+class EFFECT_OUTDOORS_ROLLINGPLAINS extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=80.3f;
+	EnvironmentDiffusion=0.000f;
+	Room=-1100;
+	RoomHF=-3900;
+	RoomLF=-400;
+	DecayTime=2.13f;
+	DecayHFRatio=0.21f;
+	DecayLFRatio=0.46f;
+	Reflections=-2000;
+	ReflectionsDelay=0.300f;
+	Reverb=-1500;
+	ReverbDelay=0.019f;
+	EchoTime=0.250f;
+	EchoDepth=1.000f;
+	ModulationTime=0.250f;
+	ModulationDepth=0.000f;
+	AirAbsorptionHF=-5.0f;
+	HFReference=4399.1f;
+	LFReference=242.9f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x0;
+}
+//=============================================================================
+// EFFECT_OUTDOORS_VALLEY
+//============================================================================
+
+class EFFECT_OUTDOORS_VALLEY extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=80.3f;
+	EnvironmentDiffusion=0.280f;
+	Room=-1100;
+	RoomHF=-3100;
+	RoomLF=-1600;
+	DecayTime=2.88f;
+	DecayHFRatio=0.26f;
+	DecayLFRatio=0.35f;
+	Reflections=-3200;
+	ReflectionsDelay=0.163f;
+	Reverb=-1000;
+	ReverbDelay=0.100f;
+	EchoTime=0.250f;
+	EchoDepth=0.340f;
+	ModulationTime=0.250f;
+	ModulationDepth=0.000f;
+	AirAbsorptionHF=-0.0f;
+	HFReference=2854.4f;
+	LFReference=107.5f;
+	RoomRolloffFactor=0.00f;
+	//Flags=0x0;
+}
+//=============================================================================
+// EFFECT_PaddedCell
+//=============================================================================
+
+class EFFECT_PaddedCell extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.4;
+	EnvironmentDiffusion=1.00;
+	Room=-1000;
+	RoomHF=-6000;
+	DecayTime=0.170;
+	DecayHFRatio=0.1;
+	Reflections=-1204;
+	ReflectionsDelay=0.001;
+	Reverb=207;
+	ReverbDelay=0.002;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Psychotic
+//=============================================================================
+
+class EFFECT_Psychotic extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.0;
+	EnvironmentDiffusion=0.50;
+	Room=-1000;
+	RoomHF=-151;
+	DecayTime=7.56;
+	DecayHFRatio=0.91;
+	Reflections=-626;
+	ReflectionsDelay=0.02;
+	Reverb=774;
+	ReverbDelay=0.03;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Room
+//=============================================================================
+
+class EFFECT_Room extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.9;
+	EnvironmentDiffusion=1.000;
+	Room=-1000;
+	RoomHF=-454;
+	DecayTime=0.4;
+	DecayHFRatio=0.83;
+	Reflections=-1646;
+	ReflectionsDelay=0.002;
+	Reverb=53;
+	ReverbDelay=0.003;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Sewerpipe
+//=============================================================================
+
+class EFFECT_Sewerpipe extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.7;
+	EnvironmentDiffusion=0.80;
+	Room=-1000;
+	RoomHF=-1000;
+	DecayTime=2.81;
+	DecayHFRatio=0.14;
+	Reflections=428;
+	ReflectionsDelay=0.014;
+	Reverb=1023;
+	ReverbDelay=0.021;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_StoneCorridor
+//=============================================================================
+
+class EFFECT_StoneCorridor extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=13.5;
+	EnvironmentDiffusion=1.000;
+	Room=-1000;
+	RoomHF=-237;
+	DecayTime=2.7;
+	DecayHFRatio=0.790;
+	Reflections=-1214;
+	ReflectionsDelay=0.013;
+	Reverb=395;
+	ReverbDelay=0.02;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Stoneroom
+//=============================================================================
+
+class EFFECT_Stoneroom extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=11.6;
+	EnvironmentDiffusion=1.000;
+	Room=-1000;
+	RoomHF=-300;
+	DecayTime=2.310;
+	DecayHFRatio=0.64;
+	Reflections=-711;
+	ReflectionsDelay=0.012;
+	Reverb=83;
+	ReverbDelay=0.017;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Trauma
+//=============================================================================
+
+class EFFECT_Trauma extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=9.37;
+	EnvironmentDiffusion=1.0;
+	Room=0;
+	RoomHF=-1127;
+	DecayTime=6.27;
+	DecayHFRatio=0.1;
+	Reflections=-859;
+	ReflectionsDelay=0.08;
+	Reverb=-1887;
+	ReverbDelay=0.1;
+	RoomRolloffFactor=10.0;
+	AirAbsorptionHF=-57.75;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+//=============================================================================
+// EFFECT_Underwater
+//=============================================================================
+
+class EFFECT_Underwater extends I3DL2Listener
+	editinlinenew;
+
+
+
+defaultproperties
+{
+	EnvironmentSize=1.8;
+	EnvironmentDiffusion=1.0;
+	Room=-1000;
+	RoomHF=-4000;
+	DecayTime=1.49;
+	DecayHFRatio=0.1;
+	Reflections=-449;
+	ReflectionsDelay=0.007;
+	Reverb=1700;
+	ReverbDelay=0.011;
+	RoomRolloffFactor=0.0;
+	AirAbsorptionHF=-5;
+	bDecayTimeScale=true;
+	bReflectionsScale=true;
+	bReflectionsDelayScale=true;
+	bReverbScale=true;
+	bReverbDelayScale=true;
+	bDecayHFLimit=true;
+}
+class FadeViewTrigger extends Triggers
+	notplaceable;
+
+
+
+var() vector ViewFlash, ViewFog;
+
+
+var() vector TargetFlash;
+var() bool bTriggerOnceOnly;
+var() float FadeSeconds;
+
+
+var vector OldViewFlash;
+var bool bTriggered;
+
+event Trigger( Actor Other, Pawn EventInstigator )
+{
+	if(bTriggered && !bTriggerOnceOnly)
+	{
+		bTriggered = False;
+		PhysicsVolume.ViewFlash = OldViewFlash;
+	}
+	else
+	{
+		bTriggered = True;
+		OldViewFlash = PhysicsVolume.ViewFlash;
+		GotoState('IsTriggered');
+	}
+}
+
+State IsTriggered
+{
+	event Tick(float DeltaTime)
+	{
+		local vector V;
+		local bool bXDone, bYDone, bZDone;
+
+		if(bTriggered)
+		{
+			bXDone = False;
+			bYDone = False;
+			bZDone = False;
+
+			V = PhysicsVolume.ViewFlash - (OldViewFlash - TargetFlash) * (DeltaTime/FadeSeconds);
+
+			if( V.X < TargetFlash.X ) { V.X = TargetFlash.X; bXDone = True; }
+			if( V.Y < TargetFlash.Y ) { V.Y = TargetFlash.Y; bYDone = True; }
+			if( V.Z < TargetFlash.Z ) { V.Z = TargetFlash.Z; bZDone = True; }
+
+			PhysicsVolume.ViewFlash = V;
+
+			if(bXDone && bYDone && bZDone)
+				GotoState('');;
+		}
+	}
+}
+
+defaultproperties
+{
+	TargetFlash=(X=-2,Y=-2,Z=-2)
+	FadeSeconds=5
+	bObsolete=true
+}
+//=============================================================================
+// FearSpot.
+// Creatures will tend to back away when entering this spot
+// To be effective, there should also not be any paths going through the area
+//=============================================================================
+class FearSpot extends AvoidMarker
+	placeable;
+
+
+
+var() bool bInitiallyActive;
+
+function Touch( actor Other )
+{
+	if ( bInitiallyActive && (Pawn(Other) != None) && (Pawn(Other).Controller != None) )
+		Pawn(Other).Controller.FearThisSpot(self);
+}
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+	bInitiallyActive = !bInitiallyActive;
+}
+
+defaultproperties
+{
+	CollisionRadius=+200.000
+}
+class FireVolumeToggleable extends PhysicsVolume
+	notplaceable;
+
+var() bool bStartEnabled;
+
+function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+
+	// Decide whether to enable or disable this thing at startup.
+	if ( bStartEnabled )
+	{
+		SetCollision( true, false, false );
+	}
+	else 
+	{
+		SetCollision( false, false, false );
+	}
+
+	SetTimer( 1.0, true );
+}
+
+function Trigger( Actor Other, Pawn EventInstigator )
+{
+	// Toggle between blocking and not blocking.
+	SetCollision( !bCollideActors, false, false );
+}
+
+function Timer()
+{
+	local Pawn P;
+
+	ForEach TouchingActors(class'Pawn', P)
+		if ( P.bCanBeDamaged && !P.bStatic && !P.IsDead() )
+			{
+				if ( P.IsA( 'InfantryUSA' ) )
+				{
+					CauseRealPainTo( P );
+				}
+			}
+}
+
+function CauseRealPainTo(Actor Other)
+{
+	if ( Other.IsA( 'InfantryUSA' ) )
+	{
+		Super.CausePainTo( Other );
+	}
+}
+
+function CausePainTo(Actor Other) {}
+
+defaultproperties
+{
+	bStartEnabled=false
+	bStatic=false
+	bObsolete=true
+	DamagePerSec=40
+	DamageType=class'Burned'
+	bPainCausing=True
+	//bWaterVolume=True
+	bDestructive=True
+	bNoInventory=true
+    ViewFog=(X=0.5859375,Y=0.1953125,Z=0.078125)
+    FluidFriction=+00004.000000
+	LocationName="on fire"
+}
+class gbxDisplayList extends object
+	Native;
+
+enum EMissionGameType
+{
+	MGT_MP,
+	MGT_Skirmish_US,
+	MGT_Skirmish_DE,
+	MGT_Lobby,
+};
+
+struct native MissionInfo
+{
+	var string		Map;
+	var int			ID;
+	var string		Name;
+	var string		NameLong;
+	var string		Image;
+	var string		Briefing;
+	var EMissionGameType	GameType;
+};
+
+var bool							bLoaded;
+var config string					strUnknownMapTexture;
+
+// exposing some parsing functions
+static native final function bool Parse(string in, string match, out string value);
+
+// scans the search paths for .int files with [Public] sections that define content
+static native function ScanForContent();
+
+event ParseContentFileInfoLine(string key, string line, string fileName);
+
+defaultproperties
+{
+	strUnknownMapTexture="t_interface_mb.chaper_preview.mp_unknown_prev"
+}
+//=============================================================================
+// gbxMPMPMissions
+// Static class containing mission maps, names, descriptions, etc.
+//=============================================================================
+class gbxMPMissionList extends gbxDisplayList;
+
+var config array<MissionInfo>		MPMissions;
+
+static function int GetMissionCount()
+{
+	GetMPMissions();
+
+	return default.MPMissions.Length;
+}
+
+static function string GetMissionImageName( int index )
+{
+	GetMPMissions();
+
+	if (IsIndexValid(index))
+		return default.MPMissions[index].Image;
+
+	return default.strUnknownMapTexture;
+}
+
+static function string GetMap( int index )
+{
+	GetMPMissions();
+
+	if (IsIndexValid(index))
+		return default.MPMissions[index].Map;
+
+	return "";
+}
+
+static function string GetMissionName( int index, optional bool bLongName )
+{
+	GetMPMissions();
+
+	if (IsIndexValid(index))
+	{
+		if (bLongName)
+			return default.MPMissions[index].NameLong;
+		else
+			return default.MPMissions[index].Name;
+	}
+		
+	return "";
+}
+
+static function int GetMissionID( int index )
+{
+	GetMPMissions();
+
+	if (IsIndexValid(index))
+		return default.MPMissions[index].ID;
+
+	return 0;
+}
+
+static function string GetBriefing( int index, optional string key )
+{
+	local string result;
+
+	GetMPMissions();
+
+	if (key == "") key = "MP";
+	if (IsIndexValid(index))
+	{
+		result = GetLocalizedString(default.MPMissions[index].Map, key);
+		if (result == "")
+			result = default.MPMissions[index].Briefing;
+	}
+
+	return result;
+}
+
+static function string FindMissionName( string mapFileName, optional bool bLongName )
+{
+	local int i;
+
+	GetMPMissions();
+
+	i = FindMapIndex( mapFileName );
+	if (i != -1)
+		return GetMissionName(i, bLongName);
+
+	return mapFileName;
+}
+
+static function int FindMissionIndexFromID(int ID)
+{
+	GetMPMissions();
+
+	return GetMissionByID(ID);
+}
+
+static function int FindMapIndex( string mapFileName )
+{
+	local int i;
+
+	GetMPMissions();
+
+	for (i=0; i<default.MPMissions.Length; i++)
+	{
+		if (default.MPMissions[i].Map ~= mapFileName)
+			return i;
+	}
+
+	return -1;
+}
+
+static function EMissionGameType GetGameType(int index)
+{
+	GetMPMissions();
+
+	if (IsIndexValid(index))
+		return default.MPMissions[index].GameType;
+
+	return MGT_MP;
+}
+
+private static function int GetMissionByID(int ID)
+{
+	local int i;
+
+	for (i=0; i<default.MPMissions.Length; i++)
+	{
+		if (default.MPMissions[i].ID == ID )
+			return i;
+	}
+
+	return -1;
+}
+
+
+private static function bool IsIndexValid(int index)
+{
+	return (index < default.MPMissions.Length) && (index >= 0);
+}
+
+// localization
+static function string GetLocalizedStringForIndex(int index, string key)
+{
+	local string result;
+
+	if (IsIndexValid(index))
+	{
+		result = GetLocalizedString(default.MPMissions[index].Map, key);
+	}
+
+	return result;
+}
+
+static function string GetLocalizedString(string map, string key)
+{
+	local string result;
+
+	result = Localize("MissionInfo", key, "S_" $map);
+
+	if (Left(result, 2) ~= "<?")
+	{
+		log("Unable to load loc string for map=" $map $", key=" $key, 'guilog');
+		result = "";
+	}
+
+	return result;
+}
+
+static function GetMPMissions(optional bool bForceReload)
+{
+	if (bForceReload || (!default.bLoaded && (default.MPMissions.Length == 0)))
+	{
+		default.bLoaded = true;
+		default.MPMissions.Length = 0;
+
+		ScanForContent();
+	}
+}
+
+static function InsertMission(MissionInfo newInfo)
+{
+	local int i;
+
+	for (i=0; i<default.MPMissions.Length; i++)
+	{
+		if (default.MPMissions[i].ID > newInfo.ID)
+			break;
+	}
+
+	log("InsertMission: Inserting mission " $newInfo.Map $" at index=" $i, 'guilog');
+	default.MPMissions.Insert(i, 1);
+	default.MPMissions[i] = newInfo;
+}
+
+event ParseContentFileInfoLine(string key, string line, string fileName)
+{
+	local MissionInfo newInfo;
+	local string s;
+
+	if (!(key ~= "MPMissions"))
+		return;
+
+//	log("ParseContentFileInfoLine: key=" $key $", value=" $line, 'guilog');
+	
+    if( !Parse( line, "Map=", newInfo.Map) )
+        return;
+
+	if( Parse( line, "ID=", s) )
+		newInfo.ID = int(s);
+//  Removed check for ID rss
+//	if ((newInfo.ID == 0) || (GetMissionByID(newInfo.ID) != -1))
+//		return;
+
+	Parse( line, "Briefing=", newInfo.Briefing);
+
+	// localize some fields
+	newInfo.Image = GetLocalizedString(newInfo.Map,"Image");
+	newInfo.Name = GetLocalizedString(newInfo.Map,"Name");
+	newInfo.NameLong = GetLocalizedString(newInfo.Map,"NameLong");
+
+	// make sure we have sane defaults
+	if (newInfo.Image == "")newInfo.Image = strUnknownMapTexture;
+
+	if (newInfo.Name == "")
+	{
+		// try the old way (usually for test maps)
+	    if( !Parse( line, "Name=", newInfo.Name) )
+			newInfo.Name = newInfo.Map;
+	}
+
+	if (newInfo.NameLong == "")
+	{
+	    if( !Parse( line, "NameLong=", newInfo.NameLong) )
+			newInfo.NameLong = newInfo.Name;
+	}
+
+	if (newInfo.Map ~= "SKR_Menu_Map")
+		newInfo.GameType = MGT_Lobby;
+	else if (Left(newInfo.Map, 6) ~= "SKR_US")
+		newInfo.GameType = MGT_Skirmish_US;
+	else if (Left(newInfo.Map, 6) ~= "SKR_DE")
+		newInfo.GameType = MGT_Skirmish_DE;
+	else
+		newInfo.GameType = MGT_MP;
+
+	InsertMission(newInfo);
+}
+
+defaultproperties
+{
+	strUnknownMapTexture="t_interface_mb.chaper_preview.mp_unknown_prev"
+}class gbxMutatorList extends gbxDisplayList;
+
+struct MutatorInfo
+{
+	var string		Name;
+    var string		FriendlyName;
+    var string      Class;
+    var string      Metaclass;
+    var string      Description;
+    var bool        IsActive;
+};
+
+var config array<MutatorInfo>  MutatorList;
+var bool bAlreadyLoaded;
+
+static function bool IsIndexValid(int index)
+{
+	return (index < default.MutatorList.Length) && (index >= 0);
+}
+
+static function int GetMutatorListSize()
+{
+    return( default.MutatorList.Length );
+}
+
+static function string GetMutatorName(int index)
+{
+	return default.MutatorList[index].Name;
+}
+
+static function string GetMutatorFriendlyName(int index)
+{
+	return default.MutatorList[index].FriendlyName;
+}
+
+static function string GetMutatorDescription(int index)
+{
+	return default.MutatorList[index].Description;
+}
+
+static function string GetActiveMutatorListString()
+{
+    local int i;
+    local int b;
+    local string s;
+    s = "";
+    b = 1;
+    for( i = 0 ;i < default.MutatorList.Length;i++)
+    {
+        if( default.MutatorList[i].IsActive == true )
+        {
+            if( b >= 2 ) // rss: anything after the first mutator needs a , infront of it
+                s = s $"," $default.MutatorList[i].Name;
+            else
+                s = "?Mutator=" $default.MutatorList[i].Name;
+            b++;
+        }
+    }
+   return s;
+}
+
+static function GetMutatorList()
+{
+   if( !default.bAlreadyLoaded )
+   {
+       ScanForContent();
+       default.bAlreadyLoaded = true;
+   }
+}
+
+static function bool GetIsActive(int index)
+{
+   return default.MutatorList[index].IsActive;
+}
+
+static function Activate(int index)
+{
+   default.MutatorList[index].IsActive = true;
+}
+
+static function Deactivate(int index)
+{
+   default.MutatorList[index].IsActive = false;
+}
+
+static function SetAllDeactive()
+{
+	local int i;
+	
+	for( i=0; i < default.MutatorList.Length; i++)
+		default.MutatorList[i].IsActive = false;
+}
+
+static function MutatorInfo GetMutatorByIndex(int index)
+{
+   return default.MutatorList[index];
+}
+
+static function int GetIndexByName(string mutName)
+{
+    local int i;
+
+    for( i=0; i < default.MutatorList.Length; i++)
+    {
+        if( default.MutatorList[i].Name ~= mutName  || default.MutatorList[i].FriendlyName ~= mutName)
+            return i;
+    }
+    return -1;
+}
+
+static function InsertMutator(MutatorInfo newInfo)
+{
+	local int i;
+    for(i = 0; i < default.MutatorList.Length; i++)
+    {
+          if(default.MutatorList[i].Metaclass ~= newInfo.MetaClass)
+          {
+               break;
+          }
+    }
+	default.MutatorList.Insert(i, 1);
+	default.MutatorList[i] = newInfo;
+}
+
+event ParseContentFileInfoLine(string key, string line, string fileName)
+{
+	local MutatorInfo newInfo;
+	local string s;
+	local int pos;
+
+	if (!(key ~= "Mutator"))
+		return;
+
+    if( !Parse( line, "Class=", newInfo.Class) )
+        return;
+
+	Parse( line, "MetaClass=", newInfo.Metaclass);
+    Parse( line, "Name=", newInfo.Name);
+	Parse( line, "Description=", newInfo.Description);
+
+	newInfo.IsActive = false;
+
+	pos = InStr(newInfo.Name,".");
+    s = Right( newInfo.Name,  Len(newInfo.Name) - pos - 1 );
+    newInfo.FriendlyName = s;
+
+	InsertMutator(newInfo);
+}
+
+defaultproperties
+{
+    bAlreadyLoaded = false;
+}
+//Extended Version of the MPMissionList to build a single player mission list JER
+
+
+
+class gbxSPMissionList extends gbxDisplayList;
+
+var config array<MissionInfo>		SPMissions;
+
+static function int GetMissionCount()
+{
+	GetSPMissions();
+
+	return default.SPMissions.Length;
+}
+
+static function string GetMissionImageName( int index )
+{
+	GetSPMissions();
+
+	if (IsIndexValid(index))
+		return default.SPMissions[index].Image;
+
+	return default.strUnknownMapTexture;
+}
+
+static function string GetMap( int index )
+{
+	GetSPMissions();
+
+	if (IsIndexValid(index))
+		return default.SPMissions[index].Map;
+
+	return "";
+}
+
+static function string GetMissionName( int index, optional bool bLongName )
+{
+	GetSPMissions();
+
+	if (IsIndexValid(index))
+	{
+		if (bLongName)
+			return default.SPMissions[index].NameLong;
+		else
+			return default.SPMissions[index].Name;
+	}
+
+	return "";
+}
+
+static function int GetMissionID( int index )
+{
+	GetSPMissions();
+
+	if (IsIndexValid(index))
+		return default.SPMissions[index].ID;
+
+	return 0;
+}
+
+static function string GetBriefing( int index )
+{
+	GetSPMissions();
+
+	if (IsIndexValid(index))
+		return default.SPMissions[index].Briefing;
+
+	return "";
+}
+
+static function string FindMissionName( string mapFileName, optional bool bLongName )
+{
+	local int i;
+
+	GetSPMissions();
+
+	i = FindMapIndex( mapFileName );
+	if (i != -1)
+		return GetMissionName(i, bLongName);
+
+	return mapFileName;
+}
+
+static function int FindMissionIndexFromID(int ID)
+{
+	GetSPMissions();
+
+	return GetMissionByID(ID);
+}
+
+static function int FindMapIndex( string mapFileName )
+{
+	local int i;
+
+	GetSPMissions();
+
+	for (i=0; i<default.SPMissions.Length; i++)
+	{
+		if (default.SPMissions[i].Map ~= mapFileName)
+			return i;
+	}
+
+	return -1;
+}
+
+private static function int GetMissionByID(int ID)
+{
+	local int i;
+
+	for (i=0; i<default.SPMissions.Length; i++)
+	{
+		if (default.SPMissions[i].ID == ID )
+			return i;
+	}
+
+	return -1;
+}
+
+
+private static function bool IsIndexValid(int index)
+{
+	return (index < default.SPMissions.Length) && (index >= 0);
+}
+
+
+static function GetSPMissions(optional bool bForceReload)
+{
+		default.bLoaded = true;
+		default.SPMissions.Length = 0;
+
+		ScanForContent();
+}
+
+static function InsertMission(MissionInfo newInfo)
+{
+	local int i;
+
+	for (i=0; i<default.SPMissions.Length; i++)
+	{
+		if (default.SPMissions[i].Map ~= newInfo.Map)
+			break;
+	}
+
+	log("InsertMission: Inserting mission " $newInfo.Map $" at index=" $i, 'guilog');
+	default.SPMissions.Insert(i, 1);
+	default.SPMissions[i] = newInfo;
+}
+
+
+event ParseContentFileInfoLine(string key, string line, string fileName)
+{
+	local MissionInfo newInfo;
+	local string s;
+
+	if (!(key ~= "SPMissions"))
+		return;
+
+	log("ParseContentFileInfoLine: key=" $key $", value=" $line, 'guilog');
+
+    if( !Parse( line, "Map=", newInfo.Map) )
+        return;
+
+	if( Parse( line, "ID=", s) )
+		newInfo.ID = int(s);
+
+    if( !Parse( line, "Name=", newInfo.Name) )
+        newInfo.Name = newInfo.Map;
+
+    if( !Parse( line, "NameLong=", newInfo.NameLong) )
+        newInfo.NameLong = newInfo.Name;
+
+	Parse( line, "Image=", newInfo.Image);
+	Parse( line, "Briefing=", newInfo.Briefing);
+
+	InsertMission(newInfo);
+}
+
+
+class Impact extends DamageType
+	abstract;
+
+
+
+defaultproperties
+{
+     DeathString="%o got smeared by %k's piston."
+	 DamageWeaponName="Impact Hammer"
+}
+class LatentPlayAnim extends LatentScriptedAction;
+
+
+
+function SetCurrentAnimationFor(ScriptedController C)
+{
+	if ( C.Pawn.IsAnimating(0) )
+		C.CurrentAnimationWait = self;
+	else
+		C.CurrentAnimationWait = None;
+}
+class LatentScriptedAction extends ScriptedAction
+	abstract;
+
+
+
+function DisplayDebug(Canvas Canvas, out float YL, out float YPos)
+{
+	Canvas.DrawText("Action "$GetActionString(), false);
+	YPos += YL;
+	Canvas.SetPos(4,YPos);
+}
+
+function bool InitActionFor(ScriptedController C)
+{
+	C.CurrentAction = self;
+	return true;
+}
+
+//*****************************************************************************************
+// Action Completion Queries
+
+function bool CompleteWhenTriggered()
+{
+	return false;
+}
+
+function bool CompleteOnAnim(ScriptedController C, int Channel)
+{
+	return false;
+}
+
+function bool CompleteWhenTimer()
+{
+	return false;
+}
+
+function bool WaitForPlayer()
+{
+	return false;
+}
+
+function bool TickedAction()
+{
+	return false;
+}
+
+//*****************************************************************************************
+// Action Queries
+
+function bool StillTicking(ScriptedController C, float DeltaTime)
+{
+	return false;
+}
+
+function bool MoveToGoal()
+{
+	return false;
+}
+
+function bool TurnToGoal()
+{
+	return false;
+}
+
+function ActorLite GetMoveTargetFor(ScriptedController C)
+{
+	return C.SequenceScript.GetMoveTarget();
+}
+
+function float GetDistance()
+{
+	return 0;
+}
+
+defaultproperties
+{
+}
+class LavaVolume extends PhysicsVolume
+	notplaceable;
+
+
+
+defaultproperties
+{
+	bObsolete=true
+	DamagePerSec=40
+	DamageType=class'Burned'
+	bPainCausing=True
+	bWaterVolume=True
+	bDestructive=True
+	bNoInventory=true
+    ViewFog=(X=0.5859375,Y=0.1953125,Z=0.078125)
+    FluidFriction=+00004.000000
+	LocationName="in lava"
+}
+class LavaZone extends ZoneInfo;
+
+
+
+
+defaultproperties
+{
+	Texture=Texture'Engine.S_ZoneLava'
+	bObsolete=true
+}
+//
+// Level Change
+// When triggered causes change to level described in URL
+// OBSOLETE - superceded by ScriptedTrigger
+//
+class LevelChange extends Triggers
+	notplaceable;
+
+
+
+var() string URL;
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+}
+
+defaultproperties
+{
+	bObsolete=true
+}
+//=============================================================================
+// MusicEvent.
+// OBSOLETE - superceded by ScriptedTrigger
+//=============================================================================
+class MusicEvent extends Triggers
+	notplaceable;
+
+
+
+// Variables.
+var() string           Song;
+var() EMusicTransition Transition;
+var() bool             bSilence;
+var() bool             bOnceOnly;
+var() bool             bAffectAllPlayers;
+
+// When gameplay starts.
+function BeginPlay()
+{
+	if( Song=="" )
+	{
+		Song = Level.Song;
+	}
+	if( bSilence )
+	{
+	}
+}
+
+// When triggered.
+function Trigger( actor Other, pawn EventInstigator )
+{
+	local PlayerController P;
+	local Controller A;
+
+	if( bAffectAllPlayers )
+	{
+		For ( A=Level.ControllerList; A!=None; A=A.nextController )
+			if ( A.IsA('PlayerController') )
+				PlayerController(A).ClientSetMusic( Song, Transition );
+	}
+	else
+	{
+		// Only affect the one player.
+		P = PlayerController(EventInstigator.Controller);
+		if( P==None )
+			return;
+
+		// Go to music.
+		P.ClientSetMusic( Song, Transition );
+	}
+
+	// Turn off if once-only.
+	if( bOnceOnly )
+	{
+		SetCollision(false,false,false);
+		disable( 'Trigger' );
+	}
+}
+
+defaultproperties
+{
+     Transition=MTRAN_Fade
+	 bAffectAllPlayers=True
+	 bObsolete=true
+}
+//=============================================================================
+// PressureZone.
+//=============================================================================
+class PressureVolume extends PhysicsVolume;
+
+
+
+var() float  KillTime;					// How long to kill the player?
+var() float  StartFlashScale;			// Fog values for client death sequence
+var() Vector StartFlashFog;
+var() float  EndFlashScale;
+var() Vector EndFlashFog;
+var   float  DieFOV;					// Field of view when dead (interpolates)
+var   float  DieDrawScale;				// Drawscale when dead
+var   float  TimePassed;
+var   bool   bTriggered;				// Ensure that it doesn't update until it should
+var	  bool	 bScreamed;
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+	local Controller P;
+
+	// The pressure zone has been triggered to kill something
+
+	Instigator = EventInstigator;
+
+	if ( (Instigator.Controller != None) && Instigator.Controller.IsA('Bot') )
+	{
+		// taunt the victim
+		for ( P=Level.ControllerList; P!=None; P=P.NextController )
+			if( (P.Pawn != None) && (P.Pawn.PhysicsVolume == self) && (P.Pawn.Health > 0) )
+			{
+				Instigator.Controller.Target = P.Pawn;
+				Instigator.Controller.GotoState('VictoryDance');
+			}
+	}
+
+	// Engage Tick so that death may be slow and dramatic
+	TimePassed = 0;
+	bTriggered = true;
+	bScreamed = false;
+	Disable('Trigger');
+	Enable('Tick');
+}
+
+function Tick( float DeltaTime )
+{
+	local float  		ratio, curScale;
+	local vector 		curFog;
+	local PlayerController	PC;
+	local Controller P, Killer;
+	local bool bActive;
+
+	if( !bTriggered )
+	{
+		Disable('Tick');
+		return;
+	}
+
+	TimePassed += DeltaTime;
+	ratio = TimePassed/KillTime;
+	if( ratio > 1.0 ) ratio = 1.0;
+
+	for ( P=Level.ControllerList; P!=None; P=P.NextController )
+	{
+		// Ensure player hasn't been dispatched through other means already (suicide?)
+		if( (P.Pawn.PhysicsVolume == self) && (P.Pawn.Health > 0) && !P.Pawn.IsA('Spectator') )
+		{
+			bActive = true;
+			P.Pawn.SetDrawScale(1 + (DieDrawScale-1) * ratio);
+
+			// Maybe scream?
+			if( !bScreamed && P.bIsPlayer && (Ratio > 0.2) && (FRand() < 2 * DeltaTime) )
+			{
+				// Scream now (from the terrible pain)
+				bScreamed = true;
+				P.Pawn.PlayDyingSound();
+			}
+
+			// Fog & Field of view
+			PC = PlayerController(P);
+			if( PC != None )
+			{
+				curScale = (EndFlashScale-StartFlashScale)*ratio + StartFlashScale;
+				curFog   = (EndFlashFog  -StartFlashFog  )*ratio + StartFlashFog;
+				PC.ClientFlash( curScale, 1000 * curFog );
+
+				PC.SetFOVAngle( (DieFOV-PC.default.FOVAngle)*ratio + PC.default.FOVAngle);
+			}
+			if ( ratio == 1.0 )
+			{
+				if ( Instigator != None )
+					Killer = Instigator.Controller;
+				P.Pawn.Died(Killer, class'Depressurized', P.Pawn.Location);
+				MakeNormal(P.Pawn);
+			}
+		}
+	}
+
+	if( !bActive && (TimePassed >= KillTime) )
+	{
+		Disable('Tick');
+		Enable('Trigger');
+		bTriggered = false;
+	}
+}
+
+function MakeNormal(Pawn P)
+{
+	local PlayerController PC;
+
+	P.SetDrawScale(P.Default.DrawScale);
+	PC = PlayerController(P.Controller);
+	if( PC != None )
+		PC.SetFOVAngle( PC.Default.FOVAngle );
+}
+
+// When an actor leaves this zone.
+event PawnLeavingVolume(Pawn Other)
+{
+	MakeNormal(Other);
+	Super.PawnLeavingVolume(Other);
+}
+
+defaultproperties
+{
+	bTriggered=false
+	DamageType=class'Depressurized'
+	DieFOV=150
+}
+
+//=============================================================================
+// PressureZone.
+//=============================================================================
+class PressureZone extends ZoneInfo;
+
+
+
+defaultproperties
+{
+	bObsolete=true
+}
+
+class RedirectionTrigger extends Triggers;
+
+
+
+var() name RedirectionEvent;
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+	local Pawn P;
+
+	ForEach DynamicActors(class'Pawn',P,Event)
+	{
+		if ( P.Health > 0 )
+			P.TriggerEvent(RedirectionEvent,self,P);
+	}
+}
+
+defaultproperties
+{
+	Texture=Texture'Engine.S_TriggerRedirection'
+}
+//=============================================================================
+// RockingSkyZoneInfo.
+//=============================================================================
+class RockingSkyZoneInfo extends SkyZoneInfo;
+
+
+
+simulated function Tick(float DeltaTime)
+{
+	local rotator NewRot;
+
+	Super.Tick(DeltaTime);
+
+	NewRot.Pitch = Rotation.Pitch + 1024 * DeltaTime;
+	NewRot.Roll  = Rotation.Roll;
+	NewRot.Yaw   = Rotation.Yaw;
+
+	SetRotation(NewRot);
+}
+//=============================================================================
+// RoundRobin: Each time it's triggered, it advances through a list of
+// outgoing events.
+// OBSOLETE - superceded by ScriptedTrigger
+//=============================================================================
+class RoundRobin extends Triggers
+	notplaceable;
+
+
+
+var() name OutEvents[16]; // Events to generate.
+var() bool bLoop;         // Whether to loop when get to end.
+var int i;                // Internal counter.
+
+//
+// When RoundRobin is triggered...
+//
+function Trigger( actor Other, pawn EventInstigator )
+{
+	TriggerEvent(OutEvents[i],self,EventInstigator);
+	i++;
+	if ( i>=ArrayCount(OutEvents) || (OutEvents[i]=='') || (OutEvents[i]=='None') )
+	{
+		if( bLoop )
+			i=0;
+		else
+			SetCollision(false,false,false);
+	}
+
+}
+
+defaultproperties
+{
+	bObsolete=true
+}
+//=============================================================================
+// ScaledSprite.
+//=============================================================================
+class ScaledSprite extends Decoration;
+
+
+
+defaultproperties
+{
+}
+class ScriptedAction extends Object
+		abstract
+		hidecategories(Object)
+		collapsecategories
+		editinlinenew;
+
+
+
+var localized string ActionString;
+var bool bValidForTrigger;
+
+function bool InitActionFor(ScriptedController C)
+{
+	return false;
+}
+
+function bool EndsSection()
+{
+	return false;
+}
+
+function bool StartsSection()
+{
+	return false;
+}
+
+function ScriptedSequence GetScript(ScriptedSequence S)
+{
+	return S;
+}
+
+function ProceedToNextAction(ScriptedController C)
+{
+	C.ActionNum += 1;
+}
+
+function ProceedToSectionEnd(ScriptedController C)
+{
+	local int Nesting;
+	local ScriptedAction A;
+
+	While ( C.ActionNum < C.SequenceScript.Actions.Length )
+	{
+		A = C.SequenceScript.Actions[C.ActionNum];
+		if ( A.StartsSection() )
+			Nesting++;
+		else if ( A.EndsSection() )
+		{
+			Nesting--;
+			if ( Nesting < 0 )
+				return;
+		}
+		C.ActionNum += 1;
+	}
+}
+
+function string GetActionString()
+{
+	return ActionString;
+}
+
+defaultproperties
+{
+	ActionString="unspecified action"
+	bValidForTrigger=true
+}
+// ScriptedController
+// AI controller which is controlling the pawn through a scripted sequence specified by
+// an AIScript
+
+class ScriptedController extends AIController
+	native;
+
+
+
+var controller PendingController;	// controller which will get this pawn after scripted sequence is complete
+var int ActionNum;
+var int AnimsRemaining;
+var ScriptedSequence SequenceScript;
+var LatentScriptedAction CurrentAction;
+var Action_PLAYANIM CurrentAnimation;
+var LatentPlayAnim	CurrentAnimationWait;
+var bool bCurrentVehicleAnimation;
+var bool bBroken;
+var bool bShootTarget;
+var bool bShootSpray;
+var bool bPendingShoot;
+var bool bFakeShot;			// FIXME - this is currently a hack
+var bool bUseScriptFacing;
+var		bool		bPendingDoubleJump;
+var		bool		bFineWeaponControl;
+var float m_flNextShootTime;
+var float m_flRefireTime;
+
+var Actor ScriptedFocus;
+var PlayerController MyPlayerController;
+var int NumShots;
+var name FiringMode;
+var int IterationCounter;
+var int IterationSectionStart;
+
+function bool WeaponFireAgain(float RefireRate, bool bFinishedFire)
+{
+	return false;
+}
+
+event NotifyJumpApex()
+{
+	local actor HitActor;
+	local vector HitNormal,HitLocation, HalfHeight,Start;
+
+	// double jump
+	if ( bPendingDoubleJump )
+	{
+		Pawn.bWantsToCrouch = false;
+		Pawn.DoDoubleJump(false);
+		bPendingDoubleJump = false;
+	}
+	else if ( bJumpOverWall )
+	{
+		// double jump if haven't cleared obstacle
+		Pawn.Acceleration = Destination - Pawn.Location;
+		Pawn.Acceleration.Z = 0;
+		HalfHeight = Pawn.GetCollisionExtent();
+		HalfHeight.Z *= 0.5;
+		Start = Pawn.Location - Pawn.CollisionHeight * vect(0,0,0.5);
+		HitActor = Pawn.Trace(HitLocation, HitNormal, Start + 8 * Normal(Pawn.Acceleration), Start, true,HalfHeight);
+		if ( HitActor != None )
+		{
+			Pawn.bWantsToCrouch = false;
+			Pawn.DoDoubleJump(false);
+		}
+	}
+}
+
+function TakeControlOf(Pawn aPawn)
+{
+	if ( Pawn != aPawn )
+	{
+		aPawn.PossessedBy(self);
+		Pawn = aPawn;
+	}
+	GotoState('Scripting');
+}
+
+function SetEnemyReaction(int AlertnessLevel);
+
+function DestroyPawn()
+{
+	if ( Pawn != None )
+		Pawn.Destroy();
+	Destroy();
+}
+
+function Pawn GetMyPlayer()
+{
+	if ( (MyPlayerController == None) || (MyPlayerController.Pawn == None) )
+		ForEach DynamicActors(class'PlayerController',MyPlayerController)
+			if ( MyPlayerController.Pawn != None )
+				break;
+	if ( MyPlayerController == None )
+		return None;
+	return MyPlayerController.Pawn;
+}
+
+function Pawn GetInstigator()
+{
+	if ( Pawn != None )
+		return Pawn;
+	return Instigator;
+}
+
+function Actor GetSoundSource()
+{
+	if ( Pawn != None )
+		return Pawn;
+	return SequenceScript;
+}
+
+function bool CheckIfNearPlayer(float Distance)
+{
+	local Pawn MyPlayer;
+
+	MyPlayer = GetMyPlayer();
+	return ( (MyPlayer != None) && (VSize(Pawn.Location - MyPlayer.Location) < Distance+CollisionRadius+MyPlayer.CollisionRadius ) && Pawn.PlayerCanSeeMe() );
+}
+
+function ClearScript()
+{
+	ActionNum = 0;
+	CurrentAction = None;
+	CurrentAnimation = None;
+	CurrentAnimationWait = None;
+	bCurrentVehicleAnimation = false;
+	ScriptedFocus = None;
+	Pawn.SetWalking(false);
+	Pawn.ShouldCrouch(false);
+}
+
+function SetNewScript(ScriptedSequence NewScript)
+{
+	MyScript = NewScript;
+	SequenceScript = NewScript;
+	Focus = None;
+	ClearScript();
+//	SetEnemyReaction(3);
+	SetEnemyReaction(0);
+	SequenceScript.SetActions(self);
+}
+
+function ClearAnimation()
+{
+	AnimsRemaining = 0;
+	bControlAnimations = false;
+	CurrentAnimation = None;
+	CurrentAnimationWait = None;
+	bCurrentVehicleAnimation = false;
+	Pawn.PlayWaiting();
+}
+
+function int SetFireYaw(int FireYaw)
+{
+	FireYaw = FireYaw & 65535;
+
+	if ( (Abs(FireYaw - (Rotation.Yaw & 65535)) > 8192)
+		&& (Abs(FireYaw - (Rotation.Yaw & 65535)) < 57343) )
+	{
+		if ( FireYaw ClockwiseFrom Rotation.Yaw )
+			FireYaw = Rotation.Yaw + 8192;
+		else
+			FireYaw = Rotation.Yaw - 8192;
+	}
+	return FireYaw;
+}
+
+function rotator AdjustAim(Ammunition FiredAmmunition, vector projStart, int AimError)
+{
+	local rotator LookDir;
+
+	// make sure bot has a valid target
+	if ( Target == None )
+		Target = ScriptedFocus;
+	if ( Target == None )
+	{
+		Target = Enemy;
+		if ( Target == None )
+		{
+			bFire = 0;
+			bAltFire = 0;
+			return Pawn.Rotation;
+		}
+	}
+	LookDir = rotator(Target.Location - projStart);
+	LookDir.Yaw = SetFireYaw(LookDir.Yaw);
+	return LookDir;
+}
+
+// GBX:naj - DEPRECATED.
+// GBX:PAD: Temporary overriding version of AdjustAim.
+/*
+function rotator AdjustAimNew(Ammunition FiredAmmunition, vector projStart, Rotator AimRotator, int AimError, int PawnAimError, optional out int bSkipDoTrace)
+{
+	local rotator LookDir;
+
+	// make sure bot has a valid target
+	if ( Target == None )
+		Target = ScriptedFocus;
+	if ( Target == None )
+	{
+		Target = Enemy;
+		if ( Target == None )
+		{
+			bFire = 0;
+			bAltFire = 0;
+			return Pawn.Rotation;
+		}
+	}
+	LookDir = rotator(Target.Location - projStart);
+	LookDir.Yaw = SetFireYaw(LookDir.Yaw);
+	return LookDir;
+}
+*/
+
+function LeaveScripting();
+
+state Scripting
+{
+	function DisplayDebug(Canvas Canvas, out float YL, out float YPos)
+	{
+		Super.DisplayDebug(Canvas,YL,YPos);
+		Canvas.DrawText("AIScript "$SequenceScript$" ActionNum "$ActionNum, false);
+		YPos += YL;
+		Canvas.SetPos(4,YPos);
+		CurrentAction.DisplayDebug(Canvas,YL,YPos);
+	}
+
+	/* UnPossess()
+	scripted sequence is over - return control to PendingController
+	*/
+	function UnPossess()
+	{
+		if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" unpossessing Pawn...");
+		Pawn.UnPossessed();
+		if ( (Pawn != None) && (PendingController != None) )
+		{
+			PendingController.bStasis = false;
+			PendingController.Possess(Pawn);
+		}
+		Pawn = None;
+		Destroy();
+	}
+
+	function LeaveScripting()
+	{
+		UnPossess();
+	}
+
+	function InitForNextAction()
+	{
+		SequenceScript.SetActions(self);
+
+		if ( CurrentAction == None )
+		{
+			LeaveScripting();
+			return;
+		}
+		MyScript = SequenceScript;
+		if ((( CurrentAnimation == None ) || (CurrentAnimationWait == None)) && ( bCurrentVehicleAnimation == false ))
+			ClearAnimation();
+	}
+
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" triggered by "$Other.name);
+		if ( CurrentAction.CompleteWhenTriggered() )
+			CompleteAction();
+	}
+
+	function Timer()
+	{
+		if ( CurrentAction.WaitForPlayer() && CheckIfNearPlayer(CurrentAction.GetDistance()) )
+		{
+			if ( SequenceScript.bLoggingEnabled )
+				Log(name $ " scripted pawn="$Pawn.name$" WaitForPlayer, player near scripted sequence");
+			CompleteAction();
+		}
+		else if ( CurrentAction.CompleteWhenTimer() )
+		{
+			if ( SequenceScript.bLoggingEnabled )
+				Log(name $ " scripted pawn="$Pawn.name$" WaitForTimer, timer expired");
+			CompleteAction();
+		}
+	}
+
+	function AnimEnd(int Channel)
+	{
+		if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" action="$CurrentAction$" animation ended - "$Level.TimeSeconds);
+		if ( CurrentAction.CompleteOnAnim(self, Channel) )
+		{
+			CompleteAction();
+			return;
+		}
+		if ( Channel == 0 )
+		{
+			if ( ((CurrentAnimation == None) || (CurrentAnimationWait == None)) || !CurrentAnimation.PawnPlayBaseAnim(self,false) )
+				ClearAnimation();
+			Pawn.AnimEnd(Channel);
+		}
+		else
+		{
+			// FIXME - support for CurrentAnimation play on other channels
+			Pawn.AnimEnd(Channel);
+		}
+	}
+
+	function CompleteAction()
+	{
+		ActionNum++;
+		Pawn.LastRenderTime = Level.TimeSeconds;
+		GotoState('Scripting','Begin');
+	}
+
+	function SetMoveTarget()
+	{
+		local ActorLite NextMoveTarget;
+
+		Focus = ScriptedFocus;
+		NextMoveTarget = CurrentAction.GetMoveTargetFor(self);
+		if ( NextMoveTarget == None )
+		{
+			if ( SequenceScript.bLoggingEnabled )
+				Log(name $ " scripted pawn="$Pawn.name$" MoveTarget not found!!!");
+			GotoState('Broken');
+			return;
+		}
+		if ( Focus == None )
+		{
+			if ( SequenceScript.bLoggingEnabled )
+				Log(name $ " scripted pawn="$Pawn.name$" setting Focus to "$NextMoveTarget.name);
+			Focus = NextMoveTarget;
+		}
+		if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" setting MoveTarget to "$NextMoveTarget.name);
+		MoveTarget = NextMoveTarget;
+		if ( !ActorReachable(MoveTarget) )
+		{
+			MoveTarget = FindPathToward(MoveTarget,false);
+			if ( Movetarget == None )
+			{
+				if ( SequenceScript.bLoggingEnabled )
+					Log(name $ " scripted pawn="$Pawn.name$" could not find path to MoveTarget");
+				AbortScript();
+				return;
+			}
+			if ( Focus == NextMoveTarget )
+				Focus = MoveTarget;
+		}
+	}
+
+	function AbortScript()
+	{
+		if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" aborting script...");
+		LeaveScripting();
+	}
+	/* WeaponFireAgain()
+	Notification from weapon when it is ready to fire (either just finished firing,
+	or just finished coming up/reloading).
+	Returns true if weapon should fire.
+	If it returns false, can optionally set up a weapon change
+	*/
+	function bool WeaponFireAgain(float RefireRate, bool bFinishedFire)
+	{
+		if (m_flNextShootTime > Level.TimeSeconds)
+		{
+			bFire = 0;
+			bAltFire = 0;
+			return false;
+		}
+
+		m_flNextShootTime = Level.TimeSeconds + m_flRefireTime;
+
+		if ( Pawn.bIgnorePlayFiring )
+		{
+			Pawn.bIgnorePlayFiring = false;
+			return false;
+		}
+
+		if ( NumShots < 0 )
+		{
+			if ( SequenceScript.bLoggingEnabled )
+				Log(name $ " scripted pawn="$Pawn.name$" NumShots < 0, stopped firing");
+			bShootTarget = false;
+			bShootSpray = false;
+			bPendingShoot = false;
+			StopFiring();
+			return false;
+		}
+		if ( bShootTarget && (ScriptedFocus != None) && !ScriptedFocus.bDeleteMe )
+		{
+			if ( SequenceScript.bLoggingEnabled )
+				Log(name $ " scripted pawn="$Pawn.name$" firing weapon at "$ScriptedFocus.name);
+			Target = ScriptedFocus;
+			if ( !Pawn.Weapon.CanAttack(Target) )
+				Log(name $ "Weapon CAN'T ATTACK!!!");
+
+			Pawn.Weapon.BotFire(bFinishedFire,FiringMode);
+
+			if ( NumShots > 0 )
+			{
+				NumShots--;
+				if ( NumShots == 0 )
+				{
+					NumShots = -1;
+					bPendingShoot = false;
+				}
+			}
+			return true;
+		}
+		StopFiring();
+		return false;
+	}
+
+	function Tick(float DeltaTime)
+	{
+		if ( bPendingShoot )
+		{
+			if (m_flNextShootTime < Level.TimeSeconds)
+			{
+				MayShootTarget();
+			}
+		}
+		if ( !bPendingShoot
+			&& ((CurrentAction == None) || !CurrentAction.StillTicking(self,DeltaTime)) )
+			disable('Tick');
+	}
+
+	function MayShootAtEnemy();
+
+	function MayShootTarget()
+	{
+		WeaponFireAgain(0,false);
+	}
+
+	function EndState()
+	{
+		bUseScriptFacing = true;
+		bFakeShot = false;
+	}
+
+Begin:
+	InitforNextAction();
+	if ( bBroken )
+		GotoState('Broken');
+	if ( CurrentAction.TickedAction() )
+		enable('Tick');
+	if ( !bFineWeaponControl )
+	{
+		if ( !bShootTarget )
+		{
+			bFire = 0;
+			bAltFire = 0;
+		}
+		else
+		{
+			Pawn.Weapon.RateSelf();
+			if ( bShootSpray )
+				MayShootTarget();
+		}
+	}
+	if ( CurrentAction.MoveToGoal() )
+	{
+		Pawn.SetMovementPhysics();
+		WaitForLanding();
+KeepMoving:
+		SetMoveTarget();
+		MayShootTarget();
+		if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" moving toward "$MoveTarget.name);
+		MoveToward(MoveTarget, Focus,,,Pawn.bIsWalking);
+		if ( (MoveTarget != CurrentAction.GetMoveTargetFor(self))
+			|| !Pawn.ReachedDestination(CurrentAction.GetMoveTargetFor(self)) )
+			Goto('KeepMoving');
+		if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" MoveToward reached destination");
+		CompleteAction();
+	}
+	else if ( CurrentAction.TurnToGoal() )
+	{
+		Pawn.SetMovementPhysics();
+		if (ScriptedFocus != None)
+			Focus = ScriptedFocus;
+		else
+			Focus = CurrentAction.GetMoveTargetFor(self);
+		if ( Focus == None )
+		{
+			FocalPoint = Pawn.Location + 1000 * vector(SequenceScript.Rotation);
+			if ( SequenceScript.bLoggingEnabled )
+				Log(name $ " scripted pawn="$Pawn.name$" turning towards point "$FocalPoint);
+		}
+		else if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" turning towards "$Focus.name);
+		FinishRotation();
+		CompleteAction();
+	}
+	else
+	{
+		if (Pawn.bUseRootMotion)
+			Pawn.SetPhysics(PHYS_RootMotion);
+		Pawn.Acceleration = vect(0,0,0);
+		Focus = ScriptedFocus;
+		if ( !bUseScriptFacing )
+			FocalPoint = Pawn.Location + 1000 * vector(Pawn.Rotation);
+		else if ( Focus == None )
+		{
+			MayShootAtEnemy();
+			FocalPoint = Pawn.Location + 1000 * vector(SequenceScript.Rotation);
+		}
+		FinishRotation();
+		MayShootTarget();
+	}
+}
+
+// Broken scripted sequence - for debugging
+State Broken
+{
+Begin:
+	if ( SequenceScript.bLoggingEnabled )
+		Log(name $ " scripted pawn="$Pawn.name$" scripted sequence BROKEN, action="$CurrentAction);
+	warn(Pawn$" Scripted Sequence BROKEN "$SequenceScript$" ACTION "$CurrentAction);
+	Pawn.bPhysicsAnimUpdate = false;
+	Pawn.StopAnimating();
+	if ( GetMyPlayer() != None )
+		PlayerController(GetMyPlayer().Controller).SetViewTarget(Pawn);
+}
+
+defaultproperties
+{
+	bHidden=true
+	bUseScriptFacing=true
+	IterationSectionStart=-1
+	bRotateToDesired=true
+}
+//=============================================================================
+// ScriptedSequence
+// used for setting up scripted sequences for pawns.
+// A ScriptedController is spawned to carry out the scripted sequence.
+//=============================================================================
+class ScriptedSequence extends AIScript;
+
+
+
+var(AIScript) export editinline Array<ScriptedAction> Actions;
+var class<ScriptedController>  ScriptControllerClass;
+
+/* SpawnController()
+Spawn and initialize an AI Controller (called by a non-player controlled Pawn at level startup)
+*/
+function SpawnControllerFor(Pawn P)
+{
+	Super.SpawnControllerFor(P);
+	TakeOver(P);
+}
+
+/* TakeOver()
+Spawn a scripted controller, which temporarily takes over the actions of the pawn,
+unless pawn is currently controlled by a scripted controller - then just change its script
+*/
+function TakeOver(Pawn P)
+{
+	local ScriptedController S;
+
+	if ( ScriptedController(P.Controller) != None )
+		S = ScriptedController(P.Controller);
+	else
+	{
+		S = spawn(ScriptControllerClass);
+		S.PendingController = P.Controller;
+		if ( S.PendingController != None )
+			S.PendingController.PendingStasis();
+	}
+	S.MyScript = self;
+	S.TakeControlOf(P);
+	S.SetNewScript(self);
+}
+
+//*****************************************************************************************
+// Script Changes
+
+function bool ValidAction(Int N)
+{
+	return true;
+}
+
+function SetActions(ScriptedController C)
+{
+	local ScriptedSequence NewScript;
+	local bool bDone;
+
+	if ( C.CurrentAnimation != None )
+		C.CurrentAnimation.SetCurrentAnimationFor(C);
+	else if ( C.CurrentAnimationWait != None )
+		C.CurrentAnimationWait.SetCurrentAnimationFor(C);
+	while ( !bDone )
+	{
+		if ( C.ActionNum < Actions.Length )
+		{
+			if ( ValidAction(C.ActionNum) )
+				NewScript = Actions[C.ActionNum].GetScript(self);
+			else
+			{
+				NewScript = None;
+				warn(GetItemName(string(self))$" action "$C.ActionNum@Actions[C.ActionNum].GetActionString()$" NOT VALID!!!");
+			}
+		}
+		else
+			NewScript = None;
+		if ( NewScript == None )
+		{
+			C.CurrentAction = None;
+			return;
+		}
+		if ( NewScript != self )
+		{
+			C.SetNewScript(NewScript);
+			return;
+		}
+		if ( Actions[C.ActionNum] == None )
+		{
+			Warn(self$" no action "$C.ActionNum$"!!!");
+			C.CurrentAction = None;
+			return;
+		}
+		bDone = Actions[C.ActionNum].InitActionFor(C);
+
+		if ( bLoggingEnabled )
+			Log(name $ " scripted pawn="$GetItemName(string(C.Pawn))$" tag="$GetItemName(string(tag))$" action="$C.ActionNum@Actions[C.ActionNum].GetActionString());
+
+		if  ( !bDone )
+		{
+			if ( Actions[C.ActionNum] == None )
+			{
+				Warn(self$" has no action "$C.ActionNum$"!!!");
+				C.CurrentAction = None;
+				return;
+			}
+			Actions[C.ActionNum].ProceedToNextAction(C);
+		}
+	}
+}
+
+defaultproperties
+{
+	bStatic=true
+	ScriptControllerClass=class'Gameplay.ScriptedController'
+	bCollideWhenPlacing=true
+    CollisionRadius=+00050.000000
+    CollisionHeight=+00100.000000
+	bDirectional=true
+	bNavigate=false
+	bLoggingEnabled=false
+}
+
+//=============================================================================
+// ScriptedTrigger
+// replaces Counter, Dispatcher, SpecialEventTrigger
+//=============================================================================
+class ScriptedTrigger extends ScriptedSequence;
+
+
+
+function PostBeginPlay()
+{
+	local ScriptedTriggerController TriggerController;
+
+	Super.PostBeginPlay();
+	TriggerController = Spawn(class'ScriptedTriggerController');
+	TriggerController.InitializeFor(self);
+}
+
+function bool ValidAction(Int N)
+{
+	return Actions[N].bValidForTrigger;
+}
+
+
+defaultproperties
+{
+     Texture=Texture'Engine.S_TriggerScript'
+     bNavigate=false
+}
+//=============================================================================
+// ScriptedTriggerController
+// used for playing ScriptedTrigger scripts
+// A ScriptedTriggerController never has a pawn
+//=============================================================================
+class ScriptedTriggerController extends ScriptedController;
+
+
+
+function InitializeFor(ScriptedTrigger T)
+{
+	SequenceScript = T;
+	ActionNum = 0;
+	SequenceScript.SetActions(self);
+	GotoState('Scripting');
+}
+
+function GameHasEnded() {}
+function ClientGameEnded() {}
+
+function DestroyPawn()
+{
+	if ( Instigator != None )
+		Instigator.Destroy();
+}
+
+function ClearAnimation() {}
+
+function SetNewScript(ScriptedSequence NewScript)
+{
+	SequenceScript = NewScript;
+	ActionNum = 0;
+	Focus = None;
+	SequenceScript.SetActions(self);
+}
+
+state Scripting
+{
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" triggered by "$Other.name);
+		Instigator = EventInstigator;
+		Super.Trigger(Other,EventInstigator);
+	}
+
+	function LeaveScripting()
+	{
+		if ( SequenceScript.bLoggingEnabled )
+			Log(name $ " scripted pawn="$Pawn.name$" leaving scripted trigger...");
+		Destroy();
+	}
+
+Begin:
+	InitforNextAction();
+	if ( bBroken )
+		GotoState('Broken');
+	if ( CurrentAction.TickedAction() )
+		enable('Tick');
+}
+
+// Broken scripted sequence - for debugging
+State Broken
+{
+Begin:
+	if ( SequenceScript.bLoggingEnabled )
+		Log(name $ " scripted pawn="$Pawn.name$" scripted trigger BROKEN, action="$CurrentAction);
+	warn(" Trigger Scripted Sequence BROKEN "$SequenceScript$" ACTION "$CurrentAction);
+}
+class SlimeVolume extends PhysicsVolume
+	notplaceable;
+
+
+
+defaultproperties
+{
+	bObsolete=true
+	DamagePerSec=40
+	DamageType=class'Corroded'
+	bPainCausing=True
+	bWaterVolume=True
+	bDestructive=True
+    ViewFog=(X=0.1875,Y=0.28125,Z=0.09375)
+    ViewFlash=(X=-0.1172,Y=-0.1172,Z=-0.1172)
+    FluidFriction=+00003.000000
+	LocationName="in slime"
+}
+class SlimeZone extends ZoneInfo;
+
+
+
+defaultproperties
+{
+	bObsolete=true
+}
+//=============================================================================
+// SpecialEvent:
+// Obsolete - when removed, remove Gameplay=Engine hack in package import code
+//=============================================================================
+class SpecialEvent extends SpecialEventTrigger
+	notplaceable;
+
+
+
+defaultproperties
+{
+	 bObsolete=true
+}
+//=============================================================================
+// SpecialEventTrigger: Receives trigger messages and does some "special event"
+// some combination of a message, sound playing, damage, and/or death to the instigator
+// if the event of this actor is set, will try to send player on the interpolation path
+// with tag matching this event.
+//=============================================================================
+class SpecialEventTrigger extends Triggers
+	notplaceable;
+
+
+
+//-----------------------------------------------------------------------------
+// Variables.
+
+var() int        Damage;         // how much to damage triggering actor
+var() class<DamageType>		 DamageType;
+var() sound      Sound;          // if not none, this sound effect will be played
+var() localized  string Message; // message to display
+var() bool       bBroadcast;     // To broadcast the message to all players.
+var() bool		 bPlayerJumpToInterpolation;	// if true, player is teleported to start of interpolation path
+var() bool		 bPlayersPlaySoundEffect;		// if true, have sound effect played at players' location
+var() bool		 bKillInstigator;	// if true, kill the instigator
+var() bool		 bViewTargetInterpolatedActor;	// if true, playercontroller viewtargets the interpolated actor
+var() bool		 bThirdPersonViewTarget;		// if true, playercontroller third person views the interpolated actor
+var() name		 InterpolatedActorTag;	// tag of actor to send on interpolation path (if none, then instigator is used)
+var() name		 PlayerScriptTag;		// tag of scripted sequence to put player's pawn while player is viewtargeting another actor
+
+//-----------------------------------------------------------------------------
+// Functions.
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+	local PlayerController P;
+	local ScriptedSequence S;
+	local Actor A;
+
+	if ( Len(Message) != 0 )
+	{
+		if( bBroadcast )
+			Level.Game.Broadcast(EventInstigator, Message, 'CriticalEvent'); // Broadcast message to all players.
+		else if( (len(Message)!=0) && (EventInstigator != None) )
+			EventInstigator.ClientMessage( Message ); // Send message to instigator only.
+	}
+
+	if ( Sound != None )
+	{
+		if ( bPlayersPlaySoundEffect )
+		{
+			ForEach DynamicActors(class'PlayerController', P)
+				P.ClientPlaySound(Sound);
+		}
+		else
+			PlaySound( Sound );
+	}
+
+	if ( Damage > 0 )
+		Other.TakeDamage( Damage, EventInstigator, EventInstigator.Location, Vect(0,0,0), DamageType);
+
+	if ( EventInstigator == None )
+		return;
+
+	if ( AmbientSound != None )
+		EventInstigator.AmbientSound = AmbientSound;
+
+	if ( bKillInstigator )
+		EventInstigator.Died( None, DamageType, EventInstigator.Location );
+
+	if( (Event != 'None') && (Event != '') && (Level.NetMode == NM_Standalone) )
+	{
+		if ( (InterpolatedActorTag == 'None') || (InterpolatedActorTag == '') )
+		{
+			if ( EventInstigator.IsPlayerPawn() )
+			{
+				A = EventInstigator;
+				if ( A.bInterpolating )
+					return;
+			}
+			else
+				return;
+		}
+		else
+		{
+			ForEach DynamicActors( class'Actor', A, InterpolatedActorTag )
+				break;
+			if ( (A == None) || A.bInterpolating )
+				return;
+			if ( bViewTargetInterpolatedActor && EventInstigator.IsHumanControlled() )
+			{
+				PlayerController(EventInstigator.Controller).SetViewTarget(A);
+				PlayerController(EventInstigator.Controller).bBehindView = bThirdPersonViewTarget;
+				if ( PlayerScriptTag != 'None' )
+				{
+					ForEach DynamicActors( class'ScriptedSequence', S, PlayerScriptTag )
+						break;
+					if ( S != None )
+					{
+						EventInstigator.Controller.Pawn = None;
+						PlayerController(EventInstigator.Controller).GotoState('Spectating');
+						S.TakeOver(EventInstigator);
+					}
+				}
+			}
+		}
+		//*WDM*
+		//ForEach AllActors( class 'InterpolationPoint',i, Event )
+		//	if( i.Position == 0 )
+		//	{
+		//		A.StartInterpolation(i.next, bPlayerJumpToInterpolation);
+		//		if ( AmbientSound != None )
+		//			A.AmbientSound = AmbientSound;
+		//		break;
+		//	}
+	}
+}
+
+defaultproperties
+{
+	 bObsolete=true
+     Texture=Texture'Engine.S_SpecialEvent'
+	 bPlayerJumpToInterpolation=true
+}
+//=============================================================================
+// SpectatorCam.
+//=============================================================================
+class SpectatorCam extends KeyPoint;
+
+
+
+var() bool bSkipView; // spectators skip this camera when flipping through cams
+var() float FadeOutTime;	// fade out time if used as EndCam
+
+defaultproperties
+{
+    CollisionRadius=+00020.000000
+    CollisionHeight=+00040.000000
+	bDirectional=true
+	DrawType=DT_Sprite
+	bClientAnim=true
+	texture=Texture'Engine.S_Camera'
+	FadeOutTime=+5.0
+}
+//=============================================================================
+// A directional spotlight.
+//=============================================================================
+class Spotlight extends Light;
+
+
+
+defaultproperties
+{
+	Texture=Texture'Engine.S_LightSpot'
+	bDirectional=True
+	LightEffect=LE_Spotlight
+}
+//=============================================================================
+// Directional sunlight
+//=============================================================================
+class Sunlight extends Light;
+
+
+
+defaultproperties
+{
+	Texture=Texture'Engine.S_LightSun'
+	bDirectional=True
+	LightEffect=LE_Sunlight
+}
+//=============================================================================
+// TeamTrigger: triggers for all except pawns with matching team
+//=============================================================================
+class TeamTrigger extends Trigger;
+
+
+
+var() byte Team;
+var() bool bTimed;
+
+function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+	if ( bTimed )
+		SetTimer(2.5, true);
+}
+
+function Timer()
+{
+	local Controller P;
+
+	for ( P=Level.ControllerList; P!=None; P=P.NextController )
+		if ( (P.Pawn != None) && (abs(Location.Z - P.Pawn.Location.Z) < CollisionHeight + P.CollisionHeight)
+			&& (VSize(Location - P.Pawn.Location) < CollisionRadius) )
+			Touch(P.Pawn);
+	SetTimer(2.5, true);
+}
+
+function bool IsRelevant( actor Other )
+{
+	if( !bInitiallyActive || !Level.Game.bTeamGame || (Other.Instigator == None)
+		|| Level.Game.IsOnTeam(Other.Instigator.Controller, Team) )
+		return false;
+	return Super.IsRelevant(Other);
+}
+
+function TakeDamage( int Damage, Pawn instigatedBy, Vector hitlocation,
+						Vector momentum, class<DamageType> damageType, optional name HitBoxName)
+{
+	if ( (InstigatedBy != None) && Level.Game.bTeamGame
+		&& !Level.Game.IsOnTeam(InstigatedBy.Controller, Team) )
+		Super.TakeDamage(Damage, instigatedBy, HitLocation, Momentum, DamageType);
+}
+//=============================================================================
+// TimedTrigger: causes an event after X seconds.
+//=============================================================================
+class TimedTrigger extends Trigger;
+
+
+
+var() float DelaySeconds;
+var() bool bRepeating;
+
+function Timer()
+{
+	TriggerEvent(Event,self,None);
+
+	if ( !bRepeating )
+		Destroy();
+}
+
+function MatchStarting()
+{
+	SetTimer(DelaySeconds, bRepeating);
+}
+
+defaultproperties
+{
+	Texture=Texture'Engine.S_TriggerTimed'
+	bObsolete=true
+	bCollideActors=false
+	DelaySeconds=1.0
+}
+	class TournamentConsole extends WindowConsole;
+
+var string ManagerWindowClass;
+var string SlotWindowType;
+
+var config string SavedPasswords[10];
+
+state UWindow
+{
+	exec function MenuCmd(int Menu, int Item)
+	{
+	}
+}
+
+state Typing
+{
+	exec function MenuCmd(int Menu, int Item)
+	{
+	}
+}
+
+function LaunchUWindow()
+{
+	Super.LaunchUWindow();
+
+	if( !bQuickKeyEnable &&
+	    ( Left(Viewport.Actor.Level.GetLocalURL(), 9) ~= "cityintro" ||
+	      Left(Viewport.Actor.Level.GetLocalURL(), 9) ~= "utcredits") )
+		Viewport.Actor.ClientTravel( "?entry", TRAVEL_Absolute, False );
+
+}
+
+function StartNewGame()
+{
+}
+/*
+event ConnectFailure( string FailCode, string URL )
+{
+	local int i, j;
+	local string Server;
+	//local UTPasswordWindow W;
+
+	if(FailCode == "NEEDPW")
+	{
+		Server = Left(URL, InStr(URL, "/"));
+		for(i=0; i<10; i++)
+		{
+			j = InStr(SavedPasswords[i], "=");
+			if(Left(SavedPasswords[i], j) == Server)
+			{
+				Viewport.Actor.ClearProgressMessages();
+				Viewport.Actor.ClientTravel(URL$"?password="$Mid(SavedPasswords[i], j+1), TRAVEL_Absolute, false);
+				return;
+			}
+		}
+	}
+* FIXME
+	if(FailCode == "NEEDPW" || FailCode == "WRONGPW")
+	{
+		Viewport.Actor.ClearProgressMessages();
+		CloseUWindow();
+		bQuickKeyEnable = True;
+		LaunchUWindow();
+		W = UTPasswordWindow(Root.CreateWindow(class'UTPasswordWindow', 100, 100, 100, 100));
+		UTPasswordCW(W.ClientArea).URL = URL;
+	}
+
+}
+*/
+
+function ConnectWithPassword(string URL, string Password)
+{
+	local int i;
+	local string Server;
+	local bool bFound;
+
+	if(Password == "")
+	{
+		Viewport.Actor.ClientTravel(URL, TRAVEL_Absolute, false);
+		return;
+	}
+
+	bFound = False;
+	Server = Left(URL, InStr(URL, "/"));
+	for(i=0; i<10; i++)
+	{
+		if(Left(SavedPasswords[i], InStr(SavedPasswords[i], "=")) == Server)
+		{
+			SavedPasswords[i] = Server$"="$Password;
+			bFound = True;
+			break;
+		}
+	}
+	if(!bFound)
+	{
+		for(i=9; i>0; i--)
+			SavedPasswords[i] = SavedPasswords[i-1];
+		SavedPasswords[0] = Server$"="$Password;
+	}
+	SaveConfig();
+	Viewport.Actor.ClientTravel(URL$"?password="$Password, TRAVEL_Absolute, false);
+}
+
+
+defaultproperties
+{
+	ManagerWindowClass="NotifyWindow"
+	ConsoleClass=class'UWindowConsoleWindow'
+	SlotWindowType="UWindowWindow"
+	RootWindow="UWindow.UWindowRootWindow"
+	UWindowKey=27
+	ShowDesktop=True
+}
+class TriggeredCondition extends Triggers;
+
+
+
+var()	bool	bToggled;
+var()	bool	bEnabled;
+var()	bool	bTriggerControlled;	// false if untriggered
+var		bool	bInitialValue;
+
+function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+	bInitialValue = bEnabled;
+}
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+	if ( bToggled )
+		bEnabled = !bEnabled;
+	else
+		bEnabled = !bInitialValue;
+}
+
+function Untrigger( actor Other, pawn EventInstigator )
+{
+	if ( bTriggerControlled )
+		bEnabled = bInitialValue;
+}
+
+defaultproperties
+{
+	Texture=Texture'Engine.S_TriggerCondition'
+}
+class TriggeredPlayerStart extends PlayerStart;
+
+
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+	bEnabled = !bEnabled;
+}
+
+defaultproperties
+{
+	Texture=Texture'Engine.S_PlayerStartTriggered'
+	bStatic=false
+}
+//=============================================================================
+// TriggerLight.
+// A lightsource which can be triggered on or off.
+//=============================================================================
+class TriggerLight extends Light;
+
+
+
+//-----------------------------------------------------------------------------
+// Variables.
+
+var() float ChangeTime;        // Time light takes to change from on to off.
+var() bool  bInitiallyOn;      // Whether it's initially on.
+var() bool  bDelayFullOn;      // Delay then go full-on.
+var() float RemainOnTime;      // How long the TriggerPound effect lasts
+
+var   float InitialBrightness; // Initial brightness.
+var   float Alpha, Direction;
+var   actor SavedTrigger;
+var   float poundTime;
+
+//-----------------------------------------------------------------------------
+// Engine functions.
+
+// Called at start of gameplay.
+simulated function BeginPlay()
+{
+	// Remember initial light type and set new one.
+	InitialBrightness = LightBrightness;
+	if( bInitiallyOn )
+	{
+		Alpha     = 1.0;
+		Direction = 1.0;
+	}
+	else
+	{
+		Alpha     = 0.0;
+		Direction = -1.0;
+	}
+	SetDrawType(DT_None);
+}
+
+// Called whenever time passes.
+function Tick( float DeltaTime )
+{
+	Alpha += Direction * DeltaTime / ChangeTime;
+	if( Alpha > 1.0 )
+	{
+		Alpha = 1.0;
+		Disable( 'Tick' );
+		if( SavedTrigger != None )
+			SavedTrigger.EndEvent();
+	}
+	else if( Alpha < 0.0 )
+	{
+		Alpha = 0.0;
+		Disable( 'Tick' );
+		if( SavedTrigger != None )
+			SavedTrigger.EndEvent();
+	}
+	if( !bDelayFullOn )
+		LightBrightness = Alpha * InitialBrightness;
+	else if( (Direction>0 && Alpha!=1) || Alpha==0 )
+		LightBrightness = 0;
+	else
+		LightBrightness = InitialBrightness;
+}
+
+//-----------------------------------------------------------------------------
+// Public states.
+
+// Trigger turns the light on.
+state() TriggerTurnsOn
+{
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		if( SavedTrigger!=None )
+			SavedTrigger.EndEvent();
+		SavedTrigger = Other;
+		SavedTrigger.BeginEvent();
+		Direction = 1.0;
+		Enable( 'Tick' );
+	}
+}
+
+// Trigger turns the light off.
+state() TriggerTurnsOff
+{
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		if( SavedTrigger!=None )
+			SavedTrigger.EndEvent();
+		SavedTrigger = Other;
+		SavedTrigger.BeginEvent();
+		Direction = -1.0;
+		Enable( 'Tick' );
+	}
+}
+
+// Trigger toggles the light.
+state() TriggerToggle
+{
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		if( SavedTrigger!=None )
+			SavedTrigger.EndEvent();
+		SavedTrigger = Other;
+		SavedTrigger.BeginEvent();
+		Direction *= -1;
+		Enable( 'Tick' );
+	}
+}
+
+// Trigger controls the light.
+state() TriggerControl
+{
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		if( SavedTrigger!=None )
+			SavedTrigger.EndEvent();
+		SavedTrigger = Other;
+		SavedTrigger.BeginEvent();
+		if( bInitiallyOn ) Direction = -1.0;
+		else               Direction = 1.0;
+		Enable( 'Tick' );
+	}
+	function UnTrigger( actor Other, pawn EventInstigator )
+	{
+		if( SavedTrigger!=None )
+			SavedTrigger.EndEvent();
+		SavedTrigger = Other;
+		SavedTrigger.BeginEvent();
+		if( bInitiallyOn ) Direction = 1.0;
+		else               Direction = -1.0;
+		Enable( 'Tick' );
+	}
+}
+
+state() TriggerDuration
+{
+
+	function Timer ()
+	{
+		Direction = -1;
+		Disable( 'Timer' );
+		Enable( 'Tick' );
+	}
+
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		if( SavedTrigger!=None )
+			SavedTrigger.EndEvent();
+		SavedTrigger = Other;
+		SavedTrigger.BeginEvent();
+		Direction = 1;
+		SetTimer ( FMax( RemainOnTime, ChangeTime ), false);		// wake up when it's time to reverse
+		Enable   ('Timer');
+		Enable   ('Tick');
+	}
+}
+
+/* GBX:naj - this code is BROKEN!!!!!  Use TriggerDuration instead.
+state() TriggerPound {
+
+	function Timer ()
+	{
+		log("NAJ**** Timer.", 'naj');
+		if (poundTime >= RemainOnTime) 
+		{
+			Disable ('Timer');
+		}
+		poundTime += ChangeTime;
+		Direction *= -1;
+		SetTimer (ChangeTime, false);
+	}
+
+	// DEBUG
+	function Tick( float DeltaTime )
+	{
+		Alpha += Direction * DeltaTime / ChangeTime;
+		if( Alpha > 1.0 )
+		{
+			Alpha = 1.0;
+			Disable( 'Tick' );
+			if( SavedTrigger != None )
+				SavedTrigger.EndEvent();
+		}
+		else if( Alpha < 0.0 )
+		{
+			Alpha = 0.0;
+			Disable( 'Tick' );
+			if( SavedTrigger != None )
+				SavedTrigger.EndEvent();
+		}
+		if( !bDelayFullOn )
+			LightBrightness = Alpha * InitialBrightness;
+		else if( (Direction>0 && Alpha!=1) || Alpha==0 )
+			LightBrightness = 0;
+		else
+			LightBrightness = InitialBrightness;
+	}
+	// DEBUG
+
+	function Trigger( actor Other, pawn EventInstigator )
+	{
+		log("NAJ**** Trigger.", 'naj');
+		if( SavedTrigger!=None )
+			SavedTrigger.EndEvent();
+		SavedTrigger = Other;
+		SavedTrigger.BeginEvent();
+		Direction = 1;
+		poundTime = ChangeTime;			// how much time will pass till reversal
+		//SetTimer (ChangeTime, false);		// wake up when it's time to reverse
+		SetTimer (RemainOnTime, false);		// wake up when it's time to reverse
+		Enable   ('Timer');
+		Enable   ('Tick');
+	}
+}
+*/
+
+defaultproperties
+{
+	RemoteRole=ROLE_SimulatedProxy
+	 bHidden=False
+     bStatic=False
+     bMovable=True
+}
+//=============================================================================
+// VacuumZone.
+//=============================================================================
+class VacuumVolume extends PhysicsVolume;
+
+
+
+defaultproperties
+{
+	bObsolete=true
+	DamageType=class'Depressurized'
+	LocationName="in a vacuum"
+}
+//=============================================================================
+// VacuumZone.
+//=============================================================================
+class VacuumZone extends ZoneInfo;
+
+
+
+defaultproperties
+{
+	bObsolete=true
+}
+//=============================================================================
+// ViewShaker:  Shakes view of any playercontrollers
+// within the ShakeRadius
+//=============================================================================
+class ViewShaker extends Triggers;
+
+
+
+//-----------------------------------------------------------------------------
+// Variables.
+
+var() float ShakeRadius;			// radius within which to shake player views
+var() float ViewRollTime;			// how long to roll the instigator's view
+var() float RollMag;				// how far to roll view
+var() float RollRate;				// how fast to roll view
+var() float OffsetMagVertical;		// max view offset vertically
+var() float OffsetRateVertical;		// how fast to offset view vertically
+var() float OffsetMagHorizontal;	// max view offset horizontally
+var() float OffsetRateHorizontal;	// how fast to offset view horizontally
+var() float OffsetIterations;		// how many iterations to offset view
+
+
+//-----------------------------------------------------------------------------
+// Functions.
+
+function Trigger( actor Other, pawn EventInstigator )
+{
+	local Controller C;
+	local vector OffsetMag, OffsetRate;
+
+	OffsetMag = OffsetMagHorizontal * vect(1,1,0) + OffsetMagVertical * vect(0,0,1);
+	OffsetRate = OffsetRateHorizontal * vect(1,1,0) + OffsetRateVertical * vect(0,0,1);
+	for ( C=Level.ControllerList; C!=None; C=C.NextController )
+		if ( (PlayerController(C) != None) && (VSize(Location - PlayerController(C).ViewTarget.Location) < ShakeRadius) )
+			C.ShakeView(ViewRollTime,RollMag,OffsetMag,RollRate,OffsetRate,OffsetIterations);
+}
+
+defaultproperties
+{
+	ShakeRadius=+2000.0
+	OffsetMagVertical=10
+	OffsetRateVertical=400
+	OffsetMagHorizontal=0
+	OffsetRateHorizontal=353
+	OffsetIterations=+500.0
+    Texture=Texture'Engine.S_TriggerViewShaker'
+}
+
+class VisibleTeleporter extends Teleporter
+	notplaceable;
+
+
+
+defaultproperties
+{
+	 bObsolete=true
+}
+class WaterVolume extends PhysicsVolume;
+
+var string EntrySoundName, ExitSoundName, EntryActorName, PawnEntryActorName;
+
+function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+
+	if ( EntrySoundName != "" )
+		EntrySound = Sound(DynamicLoadObject(EntrySoundName,class'Sound'));
+	if ( ExitSoundName != "" )
+		ExitSound = Sound(DynamicLoadObject(ExitSoundName,class'Sound'));
+	if ( EntryActorName != "" )
+		EntryActor = class<Actor>(DynamicLoadObject(EntryActorName,class'Class'));
+	if ( PawnEntryActorName != "" )
+		PawnEntryActor = class<Actor>(DynamicLoadObject(PawnEntryActorName,class'Class'));
+}
+
+defaultproperties
+{
+//	PawnEntryActorName="WaterRing"	//-BB
+//	EntrySoundName="PlayerSounds.FootstepWater1"
+//	ExitSoundName="GeneralImpacts.ImpactSplash2"
+	// bProjTarget=true
+	bBlockNonZeroExtentTraces=True
+	bBlockZeroExtentTraces=True
+	bWaterVolume=True
+    FluidFriction=+00002.400000
+	LocationName="under water"
+	bDistanceFog=true
+	DistanceFogColor=(R=32,G=64,B=128,A=64)
+	DistanceFogStart=+8.0
+	DistanceFogEnd=+2000.0
+	KExtraLinearDamping=2.5
+	KExtraAngularDamping=0.4
+
+}
+class WaterZone extends ZoneInfo;
+
+
+
+defaultproperties
+{
+	Texture=Texture'Engine.S_ZoneWater'
+	bObsolete=true
+}
+

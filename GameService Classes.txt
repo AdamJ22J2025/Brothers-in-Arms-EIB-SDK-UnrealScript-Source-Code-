@@ -1,0 +1,414 @@
+class GameService extends Info
+	native;
+  
+//-----------------------------------------------------------------------------------------
+// For player validation on server
+//-----------------------------------------------------------------------------------------
+enum PLAYER_STATUS
+{
+	E_GS_PLAYER_UNKNOWN,
+	E_GS_PLAYER_INVALID,
+	E_GS_PLAYER_VALID
+};
+     
+//-----------------------------------------------------------------------------------------
+// Client part
+//-----------------------------------------------------------------------------------------
+native static function int EnableClientService  ();
+native static function int DisableClientService  ();
+
+native static function bool SetIsServer(int IsServer);
+
+native static function bool NeedCDKey();
+//native static function bool Login  (string userName, string password, string CDKey);
+native static function bool EiBLogin  (string userName, string password, string CDKey);
+native static function bool LoginIsFinished  ();
+native static function bool LoginGetResult  (out int errorType, out int errorNumber);
+native static function bool LogOut  ();
+
+native static function bool RequestMOTD  (string language);
+native static function bool RequestMOTDIsFinished  ();
+native static function bool RequestMOTDGetResult  (out string ubiMOTD, out string biaMOTD);
+
+//native static function bool CreateAccount  (
+//	string nickName, 
+//	string password, 
+//	string firstName,
+//	string lastName, 
+//	string email, 
+//	string country);
+native static function bool EiBCreateAccount  (
+	string nickName, 
+	string password, 
+	string firstName,
+	string lastName, 
+	string email, 
+	string country);
+native static function bool CreateAccountIsFinished  ();
+native static function bool CreateAccountGetResult  (out int errorType, out int errorNumber);
+
+native static function bool ModifyAccount  (
+	string password);
+native static function bool ModifyAccountIsFinished  ();
+native static function bool ModifyAccountGetResult  (out int errorType, out int errorNumber);
+
+native static function bool JoinServer  (int lobbyId, int roomId, string password);
+native static function bool JoinServerIsFinished  ();
+native static function bool JoinServerGetResult  (out string IpAddress, out int Port, out string AltIpAddress, out int AltPort, out int errorType, out int errorNumber);
+native static function bool LeaveServer  ();
+
+native static function bool ServerQuery ();
+native static function int ServerQueryGetCount  ();
+native static function bool ServerQueryIsFinished  ();
+native static function bool ServerQueryGetResult  (int index, out string resultStr);
+
+native static function bool GetUserName(out string userName);
+native static function bool GetPassword(out string password);
+
+native static function bool IsOnline();
+native static function bool IsInLobby();
+//-----------------------------------------------------------------------------------------
+// Server part
+//-----------------------------------------------------------------------------------------
+native static function int EnableServerService  ();
+native static function int DisableServerService  ();
+
+native static function bool UpdateGameData  (string mapName);
+
+native static function bool RegisterServer  (
+	string serverName, 
+	int maxPlayers, 
+	int port,
+	string password);
+native static function bool RegisterServerIsFinished  ();
+native static function bool RegisterServerGetResult  (out int errorType, out int errorNumber);
+native static function bool UnRegisterServer  (); 
+
+native static function bool MemberJoinServer  (string player, byte autorizationID[20]);
+native static function bool MemberJoinServerIsFinished  (byte autorizationID[20]);
+native static function bool MemberJoinServerGetResult  (byte autorizationID[20], out PLAYER_STATUS status, out int errorType, out int errorNumber);
+native static function bool MemberLeaveServer  (string player, byte autorizationID[20]);
+
+native static function bool StartMatch  ();
+native static function bool FinishMatch  ();
+
+native static function string GetServerName  ();
+
+//-----------------------------------------------------------------------------------------
+// CDKey
+//-----------------------------------------------------------------------------------------
+native static function bool GetAuthorizationID(out byte autorizationID[20]);
+
+
+
+//-----------------------------------------------------------------------------------------
+// Patch ft
+//-----------------------------------------------------------------------------------------
+native static function bool StartPatchService  ();
+native static function bool AbortPatchUpdate  ();
+native static function bool	PatchUpdateIsFinished(out float totalBytes, out float totalRecvdBytes, out float fileBytes, out float fileRecvdBytes) ;
+native static function bool	PatchUpdateGetResult(out int errorType, out int errorNumber);
+native static function bool	ApplyPatch(bool apply);
+native static function bool EndPatchService();class GameServiceError extends Object
+   native;
+
+var const localized string	
+				StringDefaultError;
+var const localized string					StringSecureAccountError[13];
+var int										IndexSecureAccountError[13];
+
+var const localized string					StringRouterError[15];
+var int										IndexRouterError[15];
+
+var const localized string					StringLobbyError[42];
+var int										IndexLobbyError[42];
+
+var const localized string					StringCDKeyError[6];
+var int										IndexCDKeyError[6];
+
+var const localized string					StringNATError[3];
+var int										IndexNATError[3];
+
+var const localized string					StringPatchError[6];
+var int										IndexPatchError[6];
+
+var const localized string					StringConnectionError;
+
+enum EErrorType
+{
+	ET_SECURE_ACCOUNT,
+	ET_ROUTER,
+	ET_LOBBY,
+	ET_CDKEY,
+	ET_NAT,
+	ET_PATCH,
+	ET_CONNECTION,
+};
+
+	
+static event string GetErrorMessage(int errorIndex, int errorNumber)
+{
+	local int i;
+	local int currentErrorNumber;
+	
+	switch(EErrorType(errorIndex))
+	{
+		case ET_SECURE_ACCOUNT:
+			for (i=0;i < 13;i++)
+			{
+				currentErrorNumber = Default.IndexSecureAccountError[i];
+				if ( currentErrorNumber==errorNumber )
+				{
+					return Default.StringSecureAccountError[i];
+				}
+			}	
+			break;
+		case ET_ROUTER:
+			for (i=0;i < 15;i++)
+			{
+				currentErrorNumber = Default.IndexRouterError[i];
+				if ( currentErrorNumber==errorNumber )
+				{
+					return Default.StringRouterError[i];
+				}
+			}	
+			break;
+		case ET_LOBBY:
+			for (i=0;i < 42;i++)
+			{
+				currentErrorNumber = Default.IndexLobbyError[i];
+				if ( currentErrorNumber==errorNumber )
+				{
+					if (errorNumber == 16)
+						return Default.StringDefaultError;
+					else
+						return Default.StringLobbyError[i];
+				}
+			}	
+			break;
+		case ET_CDKEY:
+			for (i=0;i < 6;i++)
+			{
+				currentErrorNumber = Default.IndexCDKeyError[i];
+				if ( currentErrorNumber==errorNumber )
+				{
+					return Default.StringCDKeyError[i];
+				}
+			}	
+			break;
+		case ET_NAT:
+			for (i=0;i < 3;i++)
+			{
+				currentErrorNumber = Default.IndexNATError[i];
+				if ( currentErrorNumber==errorNumber )
+				{
+					return Default.StringNATError[i];
+				}
+			}	
+			break;
+		case ET_PATCH:
+			for (i=0;i < 6;i++)
+			{
+				currentErrorNumber = Default.IndexPatchError[i];
+				if ( currentErrorNumber==errorNumber )
+				{
+					return Default.StringPatchError[i];
+				}
+			}	
+			break;
+		case ET_CONNECTION:
+			return Default.StringConnectionError;
+			break;
+
+		default:
+			return Default.StringDefaultError;
+			break;
+	}
+	return Default.StringDefaultError;
+}
+
+
+
+defaultproperties
+{
+StringDefaultError = "Connection error, please check your connection."
+
+StringSecureAccountError(0) = "CREATE: The username already exists."
+StringSecureAccountError(1) = "CREATE: The username is malformed."
+StringSecureAccountError(2) = "CREATE: The username is not allowed to be used (e.g. contains smut)."
+StringSecureAccountError(3) = "LOGIN: The account does not exist"
+StringSecureAccountError(4) = "CREATE: The username is reserved (e.g. Ubi_* usernames)."
+StringSecureAccountError(5) = "CREATE/UPDATE: The password is malformed."
+StringSecureAccountError(6) = "CREATE/UPDATE: The password is not allowed (e.g. contains username)."
+StringSecureAccountError(7) = "LOGIN: The password is incorrect."
+StringSecureAccountError(8) = "CREATE/UPDATE: The country code is incorrect."
+StringSecureAccountError(9) = "ALL: The database returned an error."
+StringSecureAccountError(10) = "LOGIN: The account has been banned."
+StringSecureAccountError(11) = "LOGIN: The account has been blocked."
+StringSecureAccountError(12) = "LOGIN: The account has been locked."
+IndexSecureAccountError(0) = 1
+IndexSecureAccountError(1) = 2
+IndexSecureAccountError(2) = 3
+IndexSecureAccountError(3) = 4
+IndexSecureAccountError(4) = 5
+IndexSecureAccountError(5) = 11
+IndexSecureAccountError(6) = 13
+IndexSecureAccountError(7) = 15
+IndexSecureAccountError(8) = 30
+IndexSecureAccountError(9) = 100
+IndexSecureAccountError(10) = 501
+IndexSecureAccountError(11) = 502
+IndexSecureAccountError(12) = 512
+
+StringRouterError(0) = "Unknown error. Check your connection."
+StringRouterError(1) = "You are not registered, create a new account first."
+StringRouterError(2) = "Your password is incorrect."
+StringRouterError(3) = "Account already online. The service has not yet detected your disconnection."
+StringRouterError(4) = "The arena is not available."
+StringRouterError(5) = "The Friends server is not available."
+StringRouterError(6) = "A player with the same name as yours is already connected."
+StringRouterError(7) = "This player is not currently connected to the GameService."
+StringRouterError(8) = "This player is not registered on the GameService."
+StringRouterError(9) = "The name you chose is already used by another player."
+StringRouterError(10) = "You are already registered."
+StringRouterError(11) = "The version of GSClient you are using is too old and can't be upgraded."
+StringRouterError(12) = "GS Database problem. Some functions are disabled."
+StringRouterError(13) = "GS Database problem. Please notify the administrator."
+StringRouterError(14) = "The client is incompatible with the server."
+IndexRouterError(0) = 0
+IndexRouterError(1) = 1
+IndexRouterError(2) = 2
+IndexRouterError(3) = 3
+IndexRouterError(4) = 4
+IndexRouterError(5) = 5
+IndexRouterError(6) = 6
+IndexRouterError(7) = 7
+IndexRouterError(8) = 8
+IndexRouterError(9) = 9
+IndexRouterError(10) = 10
+IndexRouterError(11) = 11
+IndexRouterError(12) = 12
+IndexRouterError(13) = 13
+IndexRouterError(14) = 50
+
+StringLobbyError(0) = "Unknown error. Check your connection."
+StringLobbyError(1) = "This game is no longer available."
+StringLobbyError(2) = "Game not allowed."
+StringLobbyError(3) = "Spectators not allowed."
+StringLobbyError(4) = "No more players."
+StringLobbyError(5) = "No more spectators."
+StringLobbyError(6) = "The server is full."
+StringLobbyError(7) = "Member not registred."
+StringLobbyError(8) = "Game in progress."
+StringLobbyError(9) = "Wrong game version."
+StringLobbyError(10) = "Password not correct."
+StringLobbyError(11) = "Already in group."
+StringLobbyError(12) = "Not master."
+StringLobbyError(13) = "Not in group."
+StringLobbyError(14) = "Min players not reach."
+StringLobbyError(15) = "Connect add connection." // connection error
+StringLobbyError(16) = "Connect send login msg."
+StringLobbyError(17) = "Error login message."
+StringLobbyError(18) = "No host lobby server."
+StringLobbyError(19) = "LobbyServer disconnected."
+StringLobbyError(20) = "Invalid group name."
+StringLobbyError(21) = "Invalid game type."
+StringLobbyError(22) = "No more game module."
+StringLobbyError(23) = "Create not allowed."
+StringLobbyError(24) = "Group close."
+StringLobbyError(25) = "Wrong group type."
+StringLobbyError(26) = "Member not found."
+StringLobbyError(27) = "Match not exist."
+StringLobbyError(28) = "Match not finished."
+StringLobbyError(29) = "Game not initialized."
+StringLobbyError(30) = "Begin already done."
+StringLobbyError(31) = "Match already finished for you."
+StringLobbyError(32) = "Match score submission event fail."
+StringLobbyError(33) = "Match score submission already sent."
+StringLobbyError(34) = "Match result process not finished."
+StringLobbyError(35) = "Member banned."
+StringLobbyError(36) = "Passport fail."
+StringLobbyError(37) = "Not creator."
+StringLobbyError(38) = "Game not finished."
+StringLobbyError(39) = "Passport timeout."
+StringLobbyError(40) = "Passport not found."
+StringLobbyError(41) = "Group already exist."
+IndexLobbyError(0) = 0
+IndexLobbyError(1) = 1
+IndexLobbyError(2) = 2
+IndexLobbyError(3) = 4
+IndexLobbyError(4) = 5
+IndexLobbyError(5) = 6
+IndexLobbyError(6) = 7
+IndexLobbyError(7) = 8
+IndexLobbyError(8) = 9
+IndexLobbyError(9) = 10
+IndexLobbyError(10) = 11
+IndexLobbyError(11) = 12
+IndexLobbyError(12) = 13
+IndexLobbyError(13) = 14
+IndexLobbyError(14) = 15
+IndexLobbyError(15) = 16
+IndexLobbyError(16) = 17
+IndexLobbyError(17) = 18
+IndexLobbyError(18) = 19
+IndexLobbyError(19) = 20
+IndexLobbyError(20) = 21
+IndexLobbyError(21) = 22
+IndexLobbyError(22) = 23
+IndexLobbyError(23) = 24
+IndexLobbyError(24) = 25
+IndexLobbyError(25) = 26
+IndexLobbyError(26) = 27
+IndexLobbyError(27) = 30
+IndexLobbyError(28) = 31
+IndexLobbyError(29) = 32
+IndexLobbyError(30) = 33
+IndexLobbyError(31) = 34
+IndexLobbyError(32) = 35
+IndexLobbyError(33) = 36
+IndexLobbyError(34) = 37
+IndexLobbyError(35) = 38
+IndexLobbyError(36) = 39
+IndexLobbyError(37) = 40
+IndexLobbyError(38) = 41
+IndexLobbyError(39) = 42
+IndexLobbyError(40) = 43
+IndexLobbyError(41) = 44
+
+StringCDKeyError(0) = "Error CD-key success."
+StringCDKeyError(1) = "Error CD-key timeout."
+StringCDKeyError(2) = "Error CD-key invalid cd-key."
+StringCDKeyError(3) = "Error CD-key not challenge."
+StringCDKeyError(4) = "Error CD-key already online."
+StringCDKeyError(5) = "Error CD-key internal error."
+IndexCDKeyError(0) = 0
+IndexCDKeyError(1) = 1
+IndexCDKeyError(2) = 2
+IndexCDKeyError(3) = 3
+IndexCDKeyError(4) = 4
+IndexCDKeyError(5) = 5
+
+StringNATError(0) = "NAT internal error."
+StringNATError(1) = "The connection to the NAT Server could not be established."
+StringNATError(2) = "The NAT request timed out."
+IndexNATError(0) = 0
+IndexNATError(1) = 1
+IndexNATError(2) = 2
+
+StringPatchError(0) = "No update found."
+StringPatchError(1) = "An error occured. The update service could not continue. If you wish to get further information contact ubisoft technical support and add the text from the technical log below to your email.You can click on the Copy to Clipboard button below to automatically copy all the text and paste it in your email."
+StringPatchError(2) = "The update download could not be completed."
+StringPatchError(3) = "Could not find update version information. Please reinstall the sample."
+StringPatchError(4) = "Missing URLs."
+StringPatchError(5) = "Missing version targets."
+IndexPatchError(0) = 0
+IndexPatchError(1) = 1
+IndexPatchError(2) = 2
+IndexPatchError(3) = 3
+IndexPatchError(4) = 4
+IndexPatchError(5) = 5
+
+StringConnectionError = "Connection error, please check your connection."
+}
+

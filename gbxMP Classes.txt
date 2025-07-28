@@ -1,0 +1,5561 @@
+//=============================================================================
+// gbxFireTeamSpawnController: Controls the spawning of player fire teams in mp matches.
+//=============================================================================
+class gbxFireTeamSpawnController extends gbxBaseFireTeamSpawnController;
+
+var() Name HeadsUpAssaultTeam;
+var() Name HeadsUpBaseOfFireTeam;
+
+var() Name PairedAssaultTeam;
+var() Name PairedBaseOfFireTeam;
+
+var() Name AdvantagedAssaultTeam;
+var() Name AdvantagedBaseOfFireTeam;
+
+var() Name UnderdogAssaultTeam;
+var() Name UnderdogBaseOfFireTeam;
+
+function Name GetAppropriateFireTeamName(EUnitType UnitType)
+{
+	local Name result;
+	local int teamSize, opponentSize;
+	local WargameMultiplayer mpgi;
+
+	mpgi = WargameMultiplayer(Level.Game);
+	result = 'None';
+
+	if (PlayerTeam == TEAM_US)
+	{
+		teamSize = mpgi.GetTeam(TEAM_US).Size;
+		opponentSize = mpgi.GetTeam(TEAM_German).Size;
+	}
+	else
+	{
+		teamSize = mpgi.GetTeam(TEAM_German).Size;
+		opponentSize = mpgi.GetTeam(TEAM_US).Size;
+	}
+
+	if (teamSize == 1 && (opponentSize == 1 || opponentSize == 0) ) // This hack is included for 1 player games, to allow testing
+	{
+		if (UnitType == UnitType_Assault)
+		{
+			result = HeadsUpAssaultTeam;
+		}
+		else if (UnitType == UnitType_Base)
+		{
+			result = HeadsUpBaseOfFireTeam;
+		}
+	}
+	else if (teamSize == 2 && opponentSize == 2)
+	{
+		if (UnitType == UnitType_Assault)
+		{
+			result = PairedAssaultTeam;
+		}
+		else if (UnitType == UnitType_Base)
+		{
+			result = PairedBaseOfFireTeam;
+		}
+	}
+	else if (teamSize == 2 && opponentSize == 1)
+	{
+		if (UnitType == UnitType_Assault)
+		{
+			result = AdvantagedAssaultTeam;
+		}
+		else if (UnitType == UnitType_Base)
+		{
+			result = AdvantagedBaseOfFireTeam;
+		}
+	}
+	else if (teamSize == 1 && opponentSize == 2)
+	{
+		if (UnitType == UnitType_Assault)
+		{
+			result = UnderdogAssaultTeam;
+		}
+		else if (UnitType == UnitType_Base)
+		{
+			result = UnderdogBaseOfFireTeam;
+		}
+	}
+
+	return result;
+}
+
+function TriggerTeamForMemoryReport()
+{
+	if (PairedAssaultTeam != 'None')
+	{
+		TriggerEvent(PairedAssaultTeam, self, None);
+	}
+	
+	if (PairedBaseOfFireTeam != 'None')
+	{
+		TriggerEvent(PairedBaseOfFireTeam, self, None);
+	}
+}
+
+function bool IsPlayerUnderdog(ETeamIdentifier Team)
+{
+	local WargameMultiplayer wgmp;
+	local bool result;
+
+	wgmp = WargameMultiplayer(Level.Game);
+
+	if (wgmp != None)
+	{
+		result = wgmp.IsPlayerUnderdog(Team);
+	}
+	else
+	{
+		result = false;
+	}
+
+	return result;
+}
+
+defaultproperties
+{
+}
+// GEARBOX 2004-05-28 JWS created
+//
+// usage: place this in a map to allow teams to win by killing the opponent
+class gbxLastManStandingVictoryCondition extends gbxSecondaryVictoryCondition
+	placeable;
+
+// properties
+
+var() bool AllowUSVictory;		// allows US to win via LMS
+var() bool AllowGermanVictory;	// allows German to win via LMS
+
+// internal state
+
+function bool HasATeamWon(out ETeamIdentifier WinningTeam, out int reason)
+{
+	local gbxPawn gbxP;
+	local bool hasSomeoneWon;
+	local bool USAlive, DEAlive;
+
+	if (gbxPawnList(Level.PawnList).GetAmerican(0, gbxP) != -1)
+	{
+		USAlive = true;
+	}
+	else
+	{
+		USAlive = false;
+	}
+
+	if (gbxPawnList(Level.PawnList).GetGerman(0, gbxP) != -1)
+	{
+		DEAlive = true;
+	}
+	else
+	{
+		DEAlive = false;
+	}
+
+	if (!DEAlive && USAlive && AllowUSVictory && (DoesTeamHaveReinforcementsLeft(TEAM_German) == false))
+	{
+		WinningTeam = TEAM_US;
+		hasSomeoneWon = true;
+		reason = GetVictoryReason();
+
+		Log("US won by LastManStanding", 'JWS');
+	}
+	else if (!USAlive && DEAlive && AllowGermanVictory && (DoesTeamHaveReinforcementsLeft(TEAM_US) == false))
+	{
+		WinningTeam = TEAM_German;
+		hasSomeoneWon = true;
+		reason = GetVictoryReason();
+
+		Log("Germans won by LastManStanding", 'JWS');
+	}
+	else
+	{
+		hasSomeoneWon = false;
+	}
+
+	return hasSomeoneWon;
+}
+
+function notinship AllowPlayerToPlayAlone(bool gameOn)
+{
+	if (Level.Game.NumPlayers == 1 && gameOn) // this is a hack for development; it allows us to start a MP game with only 1 player to test maps
+	{
+		IsGameOn = false;
+	}
+}
+
+function SetGameOn(bool gameOn)
+{
+	IsGameOn = gameOn;
+
+	AllowPlayerToPlayAlone(gameOn);
+}
+
+defaultproperties
+{
+	AllowUSVictory	   = true
+	AllowGermanVictory = true
+
+	VictoryReason=100;
+	MessageSectionName="LastManStandingVictoryCondition"
+
+	bDelayedVictory = true
+}// GEARBOX 2004-05-06 JWS created
+//
+// usage: an object the player must own in order to complete an objective
+class gbxMcGuffin extends Powerups;
+
+// properties
+var()	Canvas.CanvasIcon	HUDIcon;	// HUD representation
+
+// internal state
+var gbxMcGuffinBeacon Beacon;
+
+// battle dialogue
+// these are the groupnames for battle dialogue that all mcguffins have
+var Name VictoryGroupName;		// You win
+
+var Name NeedGroupName;			// Need the McGuffin to win
+var Name DroppedGroupName;		// Your team dropped the McGuffin
+var Name OnGroundGroupName;		// The McGuffin is on the ground
+
+var Name EnemyDroppedGroupName;	// The enemy drops the McGuffin
+var Name EnemyHasGroupName;		// The enemy picks up the McGuffin
+
+function PostBeginPlay()
+{
+	Log(self $ " gbxMcGuffin::PostBeginPlay() called, Owner = " $ Owner, 'JWS');
+
+	Super.PostBeginPlay();
+}
+
+function Destroyed()
+{
+	Log(self $ " gbxMcGuffin::Destroyed() called, Owner = " $ Owner, 'JWS');
+
+	Super.Destroyed();
+}
+
+// The player should be able to hold multiple copies of McGuffin objects
+function bool HandlePickupQuery( Pickup Item )
+{
+	return false;
+}
+
+function gbxMcGuffinVictoryCondition GetMcGuffinVictoryCondition()
+{
+	local gbxMcGuffinVictoryCondition mcgvc;
+
+	foreach DynamicActors(class'gbxMcGuffinVictoryCondition', mcgvc)
+	{
+		if (mcgvc.McGuffinTag == Tag)
+		{
+			break;
+		}
+	}
+
+	return mcgvc;
+}
+
+function DropFrom(vector StartLocation)
+{
+	local gbxMcGuffinVictoryCondition mcgvc;
+
+	mcgvc = GetMcGuffinVictoryCondition();
+	mcgvc.McGuffinDropped(Pawn(Owner));
+
+	Super.DropFrom(StartLocation);
+}
+
+defaultproperties
+{
+    ItemName="The McGuffin"
+    PickupClass=class'gbxMcGuffinPickup'
+	//m_bItemBucket = 4
+	InventoryGroup = 4
+	bDropOnPawnDeath = true
+
+	HUDIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=94,V=66,UL=34,VL=34,DrawColor=(R=0,G=0,B=0,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0)
+}class gbxMcGuffinArtilleryObjectiveIcon extends gbxMcGuffinObjectiveIcon;
+
+defaultproperties
+{
+	DefendIcon = (Icon=Texture't_interface_mb.hud.interface_comp',U=94,V=188,UL=34,VL=34,DrawColor=(R=228,G=220,B=197,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0);			
+	AttackIcon = None
+}// GEARBOX 2004-05-25 JWS created
+//
+// usage: configurable beacon for the location of the McGuffin or the McGuffin target
+class gbxMcGuffinBeacon extends gbxLocalizedWaypointBeacon
+	placeable
+	native;
+
+// properties
+var() Name McGuffinTag;				// indicates which McGuffin type this will track
+
+// internal state
+var gbxMcGuffinBeaconOwner BeaconOwner;
+var gbxMcGuffinVictoryCondition VictoryCondition;
+
+var bool EnabledUS, EnabledGerman;	// the beacon is turned off for a given team (no longer visible under any circumstances)
+
+var Color FriendlyHeldColor;
+var Color EnemyHeldColor;
+var Color FriendlyDroppedColor;
+var Color EnemyDroppedColor;
+var Color EmptyLocationColor;
+var Color UnfoundColor;
+
+
+native simulated function Actor FindClosestWaypoint( Pawn aPlayerPawn );
+native simulated function bool VisibleToPlayer( PlayerController PC );
+native simulated function vector GetLocationForPlayer( PlayerController PC );
+native simulated function Color GetMarkerColorForPlayer( PlayerController PC );
+
+cpptext
+{
+	virtual AActor* FindClosestWaypoint( APawn *aPlayerPawn );
+	virtual UBOOL VisibleToPlayer( APlayerController *PC );
+	virtual FVector GetLocationForPlayer( APlayerController* PC );
+	virtual FColor GetMarkerColorForPlayer( APlayerController* PC );
+}
+
+
+replication
+{
+	reliable if (bNetInitial && Role == ROLE_Authority)
+		McGuffinTag, BeaconOwner, VictoryCondition;
+
+	reliable if (bNetDirty && ROLE == ROLE_Authority)
+		EnabledUS, EnabledGerman;
+}
+
+function PreBeginPlay()
+{
+	Super.PreBeginPlay();
+
+	if (Role == ROLE_Authority)
+	{
+		BeaconOwner = spawn(class'gbxMcGuffinBeaconOwner', self);
+
+		bHardAttach = true;
+		SetBase(BeaconOwner);
+
+		foreach DynamicActors(class'gbxMcGuffinVictoryCondition', VictoryCondition)
+		{
+			if (VictoryCondition.McGuffinTag == McGuffinTag)
+			{
+				Log(self $ " gbxMcGuffinBeacon::PreBeginPlay() found vc = " $ VictoryCondition, 'JWS');
+				break;
+			}
+			else
+			{
+				VictoryCondition = None;
+			}
+		}
+	}
+}
+
+function BeginPlay()
+{
+	Super.BeginPlay();
+
+	CreateMyInWorldIcon();
+}
+
+simulated function InitializeWaypointList()
+{
+	return;
+}
+
+// Assignment interface - determines where the beacon is so it can act accordingly for each player
+function AssignToLocation(gbxMcGuffinLocation loc)
+{
+	BeaconOwner.SetBeaconOwner(BOT_Location, loc);
+	Team = TEAM_None; // this is important as it establishes the Unfound state of the McGuffin...the beacon doesn't get a team setting until the first time it is picked up, and after that point it MUST be TEAM_US or TEAM_German
+	bEnabled = true;
+
+	Log(self $ " gbxMcGuffinBeacon assigned to location " $ loc, 'JWS');
+}
+
+function AssignToPickup(gbxMcGuffinPickup pickup)
+{
+	BeaconOwner.SetBeaconOwner(BOT_Pickup, pickup);
+
+	bEnabled = true;
+
+	Log(self $ " gbxMcGuffinBeacon assigned to pickup " $ pickup, 'JWS');
+}
+
+function AssignToPlayerPawn(gbxPlayerPawn pp)
+{
+	BeaconOwner.SetBeaconOwner(BOT_Player, pp);
+
+	bEnabled = true;
+
+	Log(self $ " gbxMcGuffinBeacon assigned to playerpawn " $ pp, 'JWS');
+}
+
+function TurnOff(ETeamIdentifier teamid)
+{
+	switch (teamid)
+	{
+		case TEAM_US:
+			EnabledUS = false;
+			break;
+
+		case TEAM_German:
+			EnabledGerman = false;
+			break;
+
+		case TEAM_None:
+		default:
+			EnabledUS = false;
+			EnabledGerman = false;
+			break;
+	}
+
+	Log(self $ " gbxMcGuffinBeacon::TurnOff() turned off beacon for team " $ teamid, 'JWS');
+
+	if (!EnabledUS && !EnabledGerman)
+	{
+		BeaconOwner = None;
+		bEnabled = false;
+
+		Log(self $ " gbxMcGuffinBeacon::TurnOff() turned off beacon entirely since it has been turned off for both teams ", 'JWS');
+	}
+}
+
+function Tick( float DeltaTime )
+{
+	// do nothing on Tick because we don't want the base class functionality of auto creating and destroying the icon
+}
+
+defaultproperties
+{
+	Tag = McGuffinBeacon
+	McGuffinTag = McGuffin
+
+	EnabledUS = true
+	EnabledGerman = true
+	Team = TEAM_None
+
+	FriendlyHeldColor    = (R=212,G=093,B=014,A=255) 
+	EnemyHeldColor	     = (R=212,G=093,B=014,A=255) 
+
+	FriendlyDroppedColor = (R=212,G=093,B=014,A=255) 
+	EnemyDroppedColor    = (R=212,G=093,B=014,A=255) 
+
+	EmptyLocationColor	 = (R=146,G=141,B=126,A=255)
+	UnfoundColor		 = (R=146,G=141,B=126,A=255)
+
+	LocalizationSectionName = "McGuffinObjectMessage"
+}// GEARBOX 2004-05-31 JWS created
+//
+// factored out the location of the beacon owner into its own object so that we can control its properties independent of the beacon
+class gbxMcGuffinBeaconOwner extends Actor
+	notplaceable
+	native;
+
+// indicates how the beacon is currently owned
+var enum BeaconOwnerType
+{
+	BOT_Location,
+	BOT_Pickup,
+	BOT_Player
+} OwnerType;
+
+// Location property indicates the location of the player, pickup, or location that currently has the beacon
+
+var Actor OwnerActor;
+
+replication
+{
+	reliable if (bNetDirty && Role == ROLE_Authority)
+		OwnerType, OwnerActor;
+}
+
+function Tick(float Delta)
+{
+	if (OwnerActor != None)
+	{
+		SetLocation(OwnerActor.Location);
+	}
+}
+
+function SetBeaconOwner(BeaconOwnerType type, Actor newOwner)
+{
+	OwnerType = type;
+	OwnerActor = newOwner;
+
+	Log(self $ " gbxMcGuffinBeaconOwner::SetBeaconOwner() type = " $ type $ " OwnerActor = " $ OwnerActor, 'JWS');
+}
+
+defaultproperties
+{
+	bHidden = true
+	RemoteRole = ROLE_DumbProxy
+
+	// critical; these 2 properties ensure the client will always know where the owner is
+	bAlwaysRelevant = true
+	bReplicateMovement = true
+}class gbxMcGuffinBridgeObjectiveIcon extends gbxMcGuffinObjectiveIcon;
+
+defaultproperties
+{
+	DefendIcon = (Icon=Texture't_interface_mb.hud.interface_comp',U=60,V=222,UL=34,VL=34,DrawColor=(R=228,G=220,B=197,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0);			
+	AttackIcon = None
+}// GEARBOX 2004-06-15 JWS created
+//
+// usage: beacon that indicates where the player should take the McGuffin.
+//		  Set the Team property in gbxBeacons section to TEAM_None if both teams use this as the objective. Otherwise,
+//		  Set Team to TEAM_US for the US objective and TEAM_German for the German objective
+class gbxMcGuffinDestinationBeacon extends gbxLocalizedWaypointBeacon
+	placeable
+	native;
+
+// internal state
+var byte DestNumber; // Should be 0 or 1...
+var Color Dest0Color, Dest1Color;
+
+
+native simulated function Color GetMarkerColorForPlayer( PlayerController PC );
+
+cpptext
+{
+	virtual FColor GetMarkerColorForPlayer( APlayerController* PC );
+}
+
+
+replication
+{
+	reliable if (bNetInitial && Role == ROLE_Authority)
+		DestNumber;
+}
+
+function BeginPlay()
+{
+	Super.BeginPlay();
+
+	CreateMyInWorldIcon();
+}
+
+function Tick( float DeltaTime )
+{
+	// do nothing on Tick because we don't want the base class functionality of auto creating and destroying the icon
+}
+
+function AssignDestinationNumber(byte number)
+{
+	//assert(number == 0 || number == 1);
+
+	DestNumber = number;
+
+	if (DestNumber == 1)
+	{
+		bDrawReservoirTip = true;
+	}
+}
+
+defaultproperties
+{
+	bDrawReservoirTip = false
+	Dest0Color=(R=193,G=188,B=44,A=255)
+	Dest1Color=(R=193,G=188,B=44,A=255)
+
+	LocalizationSectionName = "McGuffinTriggerMessage1"
+}
+// the place that the player will take the explosive McGuffin
+class gbxMcGuffinExplosiveTrigger extends gbxMcGuffinTrigger
+	placeable;
+
+enum EMcGuffinExplosiveObjectiveType
+{
+	Objective_Destroy_Artillery,
+	Objective_Destroy_Bridge,
+	Objective_Destroy_Vehicle
+};
+
+// properties
+var() bool		bDisabled;
+var() name		m_szUseTarget;		// This it the gbxMPGammonBomb that will be used when a player "uses" this trigger
+var() name		MPTag;				// Since Actor.Tag isn't replicated, this is the name of trigger used by gbxMcGuffinExplosiveVictoryCondition
+var() float		UseAngleCos;		// Defines the cosine of the angle at which the player must look at the bomb in order to use it
+
+// HUD related
+var() EMcGuffinExplosiveObjectiveType ObjectiveTypeIcon;
+
+// internal state
+var gbxMPGammonBomb	Explosive;				// the gammon bomb this trigger uses
+var bool			bExplosivePlanted;		// true if the correct team has planted the explosive
+var bool			bExplosiveDisarmed;		// true if the defending team has paused the explosive timer
+
+// network replication
+replication
+{
+	reliable if ( Role == ROLE_Authority )
+		Explosive, bExplosivePlanted, bExplosiveDisarmed;
+
+	reliable if ( bNetInitial && Role == ROLE_Authority )
+		ObjectiveTypeIcon;
+}
+
+simulated function PostNetBeginPlay()
+{
+	Log( self$ " ObjectiveTypeIcon = " $ObjectiveTypeIcon, 'PSV');
+	
+	// Setup HUD objective icons
+	switch( ObjectiveTypeIcon )
+	{
+		case Objective_Destroy_Artillery:
+			DefendingIcon = class'gbxMcGuffinArtilleryObjectiveIcon'.default.DefendIcon;
+			AttackingIcon = class'gbxMcGuffinArtilleryObjectiveIcon'.default.AttackIcon;
+			break;
+		case Objective_Destroy_Bridge:
+			DefendingIcon = class'gbxMcGuffinBridgeObjectiveIcon'.default.DefendIcon;
+			AttackingIcon = class'gbxMcGuffinBridgeObjectiveIcon'.default.AttackIcon;
+			break;
+		case Objective_Destroy_Vehicle:
+			DefendingIcon = class'gbxMcGuffinVehicleObjectiveIcon'.default.DefendIcon;
+			AttackingIcon = class'gbxMcGuffinVehicleObjectiveIcon'.default.AttackIcon;
+			break;
+		default:
+			DefendingIcon = class'gbxMcGuffinArtilleryObjectiveIcon'.default.DefendIcon;
+			AttackingIcon = class'gbxMcGuffinArtilleryObjectiveIcon'.default.AttackIcon;
+	}
+}
+
+function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+
+	// Link up reference to gammon bomb
+	foreach DynamicActors( class'gbxMPGammonBomb', Explosive, m_szUseTarget )
+	{
+		// Set TriggerToNotify to be used later when explosive communicates back to this trigger
+		Explosive.TriggerToNotify = self;
+		break;
+	}
+		
+	assert(Explosive != None);
+}
+
+// Display context use message depending on the player's team and current status of the bomb
+function Touch( Actor Other )
+{
+	local Pawn TouchedBy;
+	
+	TouchedBy = Pawn( Other );
+
+	//log(self$".Touch( "$Other$" ) - "$TouchedBy, 'MP');
+
+	if( !bDisabled &&
+		Other.Instigator != None &&
+		Explosive != None &&
+		TouchedBy != None &&
+		TouchedBy.IsHumanControlled() &&
+		!TouchedBy.IsDead() )
+	{
+		WargamePlayerController(TouchedBy.Controller).SetRelevantMPExplosive(Explosive);
+	}
+}
+
+function UnTouch( Actor Other )
+{
+	local Pawn TouchedBy;
+	
+	TouchedBy = Pawn( Other );
+
+	//log(self$".UnTouch( "$Other$" ) - "$TouchedBy, 'MP');
+
+	if( !bDisabled &&
+		Other.Instigator != None &&
+		Explosive != None &&
+		TouchedBy != None &&
+		TouchedBy.IsHumanControlled() )
+	{
+		WargamePlayerController(TouchedBy.Controller).SetRelevantMPExplosive(None);
+	}
+
+}
+
+
+event bool UsedBy( Pawn User )
+{
+	//Log( self$ " gbxMcGuffinExplosiveTrigger::UsedBy() User: " $User$ " Explosive: " $Explosive, 'MP');
+
+	if (bDisabled)
+	{
+		return false;
+	}
+
+	if ( Level.Game.GameReplicationInfo.GameType != GT_SKIRMISH )
+	{
+	// Make sure user is looking at target.
+	if (Explosive != None)
+	{
+		if (User.IsPawnLookingAtActor(Explosive, UseAngleCos) == false)  // about 60 degrees from straight ahead
+		{
+			//Log( self$ " gbxMcGuffinExplosiveTrigger::UsedBy() Not facing the bomb yo!", 'MP');
+			return false;
+		}
+	}
+	}
+
+	// CheckRelevant decides what action will modify the bomb's state, if any. 
+	if ( CheckRelevant( User ) )
+	{
+		TriggerEvent(Event, self, User);
+
+		WargamePlayerController(User.Controller).MPExplosiveUsed();
+
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+
+function TriggerEvent( Name EventName, Actor Other, Pawn EventInstigator )
+{
+	//Log( self$ " gbxMcGuffinExplosiveTrigger::TriggerEvent() EventName: " $EventName$ " Other: " $Other$ " Instigator: " $EventInstigator, 'MP');
+	
+	Super(gbxTrigger).TriggerEvent(EventName, Other, EventInstigator);
+}
+
+function bool CheckRelevant(actor Other)
+{
+	local bool victoryAchieved;
+	local String reason;
+	local Pawn p;
+
+	victoryAchieved = false;
+	p = Pawn(other);
+
+	// TODO: remove redundant functionality inherited from parent class
+	if (Super(gbxTrigger).IsRelevant(Other) && p != None && !p.IsDead() )
+	{
+		//Log(self $ " gbxMcGuffinExplosiveTrigger::Trigger() touched by " $ p $ " on team " $ p.PawnTeam $ ", checking for victory", 'MP');
+
+		if ((p.PawnTeam == TEAM_US && AllowUSVictory) ||
+			(p.PawnTeam == TEAM_German && AllowGermanVictory))
+		{
+			victoryAchieved = CheckForVictory(p, reason);
+			if ( !victoryAchieved )
+				DenyVictory(Pawn(Other), reason);
+		}
+		else
+		{
+			victoryAchieved = CheckForDisarm(p, reason);
+			if ( !victoryAchieved )
+				DenyDisarm(Pawn(Other), reason);
+		}
+	}
+
+	//Log(self $ " gbxMcGuffinExplosiveTrigger::Trigger() victoryAchieved: " $victoryAchieved, 'PSV');
+
+	return victoryAchieved;
+}
+
+// determines if the pawn has enough McGuffins
+function bool CheckForVictory(Pawn p, out String reason)
+{
+	local bool victoryAchieved;
+	local int count;
+
+	count = class'gbxMcGuffinVictoryCondition'.Static.CountMcGuffinsInInventory(p, Tag);
+
+	if (count >= McGuffinCount)
+	{
+		//Log(self $ " gbxMcGuffinExplosiveTrigger::CheckForVictory() saw count=" $ count $ " >= McGuffinCount=" $ McGuffinCount $ ", victory!!", 'PSV');
+
+		// We have enough McGuffins, but has explosive already been planted?
+		if ( !bExplosivePlanted )
+		{
+			// Plant teh explosive
+			//( self$ " gbxMcGuffinExplosiveTrigger::CheckForVictory() Planted teh bomb!", 'PSV');
+			Explosive.Plant( p );	
+			victoryAchieved = true;
+
+			//log( self$ " CheckForVictory() bExplosivePlanted == true!  Level.Game.GameReplicationInfo.GameType: "$Level.Game.GameReplicationInfo.GameType, 'MP' );
+
+			// Skirmish mode wants this to be false so that the background grime and timer will draw
+			if ( Level.Game.GameReplicationInfo.GameType != GT_SKIRMISH )
+			bHideObjectiveIcon = true;
+			else
+				bHideObjectiveIcon = false;
+
+			BroadcastLocalizedMessage(class'gbxMcGuffinTriggerMessage', 1, p.Controller.PlayerReplicationInfo, None, Beacon);
+
+			BombSet(p);
+		}
+		else if ( bExplosiveDisarmed )
+		{
+			// Rearm explosive
+			//( self$ " gbxMcGuffinExplosiveTrigger::CheckForVictory() Rearmed teh bomb!", 'PSV');
+			Explosive.ReactivateBomb( p );
+			victoryAchieved = true;
+			BroadcastLocalizedMessage(class'gbxMcGuffinTriggerMessage', 7, p.Controller.PlayerReplicationInfo, None, Beacon);
+
+			BombSet(p);
+		}
+		else
+		{
+			// Figure out why you can't do either
+			victoryAchieved = false;
+			if ( bExplosivePlanted )
+			{
+				//Log( self$ " gbxMcGuffinExplosiveTrigger::CheckForVictory() Bomb already planted!", 'PSV');
+				reason = "ExplosiveAlreadyPlanted";
+			}
+			else if ( !bExplosiveDisarmed )
+			{
+				//Log( self$ " gbxMcGuffinExplosiveTrigger::CheckForVictory() Explosived not paused!", 'PSV');
+				reason = "ExplosiveNotPaused";
+			}
+		}
+	}
+	else 
+	{
+		//Log(self $ " gbxMcGuffinExplosiveTrigger::CheckForVictory() saw count=" $ count $ " < McGuffinCount=" $ McGuffinCount $ ", NO VICTORY!!", 'PSV');
+
+		// Check for rearming of explosive
+		if ( !bExplosivePlanted )
+		{
+			// cant plant explosive
+			//Log(self$ " gbxMcGuffinExplosiveTrigger::CheckForVictory() Can't plant explosive " $reason, 'PSV');
+			victoryAchieved = false;
+			reason = "NotEnoughMcGuffins";	
+		}
+		else if ( bExplosiveDisarmed )
+		{
+			// rearm explosive
+			//Log(self$ " gbxMcGuffinExplosiveTrigger::CheckForVictory() Rearmed explosive " $reason, 'PSV');
+			Explosive.ReactivateBomb( p );
+			victoryAchieved = true;
+			BroadcastLocalizedMessage(class'gbxMcGuffinTriggerMessage', 7, p.Controller.PlayerReplicationInfo, None, Beacon);
+
+			BombSet(p);
+		}
+		else
+		{
+			// Figure out why you can't do either
+			victoryAchieved = false;
+			if ( bExplosivePlanted )
+			{
+				//Log(self$ " gbxMcGuffinExplosiveTrigger::CheckForVictory() " $reason, 'PSV');
+				reason = "ExplosiveAlreadyPlanted";
+			}
+			else if ( !bExplosiveDisarmed )
+			{
+				//Log(self$ " gbxMcGuffinExplosiveTrigger::CheckForVictory() " $reason, 'PSV');
+				reason = "ExplosiveNotPaused";
+			}
+		}
+	}
+
+	return victoryAchieved;
+}
+
+function DenyVictory(Pawn p, String reason)
+{
+	local PlayerController pc;
+
+	//Log(self $ " gbxMcGuffinExplosiveTrigger::DenyVictory(p=" $ p $ ", reason=" $ reason $ ")", 'PSV');
+
+	if (gbxPlayerPawn(p) != None)
+	{
+		pc = PlayerController(p.Controller);
+
+		if (reason == "WrongTeam")
+		{
+			// Removed because we decided this message is not useful. 2004-09-28 JWS
+			//pc.ReceiveLocalizedMessage(class'gbxMcGuffinTriggerMessage', 4, p.Controller.PlayerReplicationInfo, None, Beacon);
+		}
+		else if (reason == "NotEnoughMcGuffins")
+		{
+			pc.ReceiveLocalizedMessage(class'gbxMcGuffinObjectMessage', 7, p.Controller.PlayerReplicationInfo, None, VictoryCondition.McGuffinClass);
+		}
+		else // catch-all
+		{
+		}
+	}
+}
+
+function bool CheckForDisarm(Pawn p, out String reason)
+{
+	local bool disarmAchieved;
+
+	//Log( self$ " gbxMcGuffinExplosiveTrigger::CheckForDisarm() p: " $p, 'PSV');
+
+	if ( !bExplosivePlanted )
+	{
+		disarmAchieved = false;
+		reason = "ExplosiveNotPlantedYet";
+	}
+	else
+	{
+		if ( bExplosiveDisarmed ) 
+		{
+			disarmAchieved = false;
+			reason = "ExplosiveAlreadyDisarmed";
+		}
+		else
+		{
+			Explosive.DeactivateBomb( p );
+			disarmAchieved = true;
+			BroadcastLocalizedMessage(class'gbxMcGuffinTriggerMessage', 2, p.Controller.PlayerReplicationInfo, None, Beacon);
+
+			BombDefused(p);
+		}
+	}
+	
+	//Log( self$ " gbxMcGuffinExplosiveTrigger::CheckForDisarm() bExplosivePlanted: " $bExplosivePlanted$ " bExplosiveDisarmed: " $bExplosiveDisarmed$ " disarmAchieved: " $disarmAchieved, 'PSV');
+
+	return disarmAchieved;
+}
+
+function DenyDisarm(Pawn p, String reason)
+{
+	// I deleted all the code in this function in response to Bug 2659. These messages are not useful. 2004-11-03 JWS
+}
+
+function BombSet(Pawn p)
+{
+	gbxMcGuffinExplosiveVictoryCondition(VictoryCondition).ExplosivesSet(p);
+}
+
+function BombDefused(Pawn p)
+{
+	gbxMcGuffinExplosiveVictoryCondition(VictoryCondition).ExplosivesDefused(p);
+}
+
+function BombExploded(PlayerController BombingPlayer)
+{
+	// Once the explosive has detonated, this trigger is no longer an objective.
+	bActive = false;
+
+	bDisabled = true;
+
+	BroadcastLocalizedMessage(class'gbxMcGuffinTriggerMessage', 3, BombingPlayer.PlayerReplicationInfo, None, Beacon);
+
+	//set the unit back to a combat state
+	gbxMcGuffinExplosiveVictoryCondition(VictoryCondition).ExplosivesExploded(BombingPlayer);
+	gbxPawn(BombingPlayer.Pawn).MyUnit.MyUnitController.TNTResumeCombat();
+}
+
+
+defaultproperties
+{
+	Texture=Texture'Engine.S_TriggerContextUse'
+
+	bExplosivePlanted = false
+	bExplosiveDisarmed = false
+	bDisabled = false
+	UseAngleCos=0.65f // corresponds to about 50deg on either side of straight ahead
+
+	ObjectiveTypeIcon = Objective_Destroy_Artillery
+	bSameHUDIcon = true
+}
+
+
+// the victory condition used when a player will win by using explosive McGuffins
+class gbxMcGuffinExplosiveVictoryCondition extends gbxMcGuffinVictoryCondition
+	placeable;
+
+// constants
+const MAX_EXPLOSIVES = 2;
+
+// properties
+var() Name ExplosiveTriggerNames[MAX_EXPLOSIVES];	// No longer used
+var() int iNumRequiredBombsExploded;	// the number of bombs that have to explode to win
+var() bool bExplosiveReusable;	// if this is true, the explosive can be used more than once. otherwise they are removed from inventory
+
+// internal state
+var int NumBombsSet;
+var int iNumBombsExploded;
+var gbxMcGuffinExplosiveTrigger ExplosiveTriggers[MAX_EXPLOSIVES];
+var class<gbxMcGuffinTypeExplosives> ExplosivesClass;
+
+var bool bFirstNeedToSetBattleDialogue;
+var float NeedToSetBattleDialogueInterval;
+var float NeedToDefuseBattleDialogueInterval;
+var float NextNeedToSetBattleDialogue;
+var float NextNeedToDefuseBattleDialogue;
+var float ForceNeedToSetBattleDialogueWait;
+
+var Sound BombTickingSound;
+var int BombTickLoopHandle;
+var int LastNumBombsSet;
+
+replication
+{
+	reliable if (bNetDirty && Role == ROLE_Authority)
+		NumBombsSet;
+}
+
+simulated function PostNetReceive()
+{
+	Super.PostNetReceive();
+
+	if (NumBombsSet != LastNumBombsSet)
+	{
+		if (NumBombsSet == 0 && LastNumBombsSet > 0)
+		{
+			StopBombTickingSound();
+		}
+		else if (NumBombsSet > 0 && LastNumBombsSet == 0)
+		{
+			StartBombTickingSound();
+		}
+
+		LastNumBombsSet = NumBombsSet;
+	}
+}
+
+simulated function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+
+	if (Role == ROLE_Authority)
+	{
+		ExplosivesClass = class<gbxMcGuffinTypeExplosives>(McGuffinClass);
+
+		if (ExplosivesClass == None)
+		{
+			Log("WARNING: McGuffin class is not an explosives class, some functionality will be lost");
+		}
+	}
+}
+
+function Trigger(Actor Other, Pawn EventInstigator)
+{
+	//Log( self $ " gbxMcGuffinExplosiveVictoryCondition::Trigger() Other: " $Other$ " EventInstigator: " $EventInstigator, 'RSC' );
+
+	// Are we being triggered by a bomb or just another VC?
+	if ( gbxMPGammonBomb(Other) != None )
+	{
+		++iNumBombsExploded;		
+	
+		if ( iNumBombsExploded >= iNumRequiredBombsExploded )
+			victorTeam = gbxMPGammonBomb(Other).BombingTeam;
+	}
+	else if ( victorTeam == TEAM_None )
+	{
+		victorTeam = EventInstigator.PawnTeam;
+	}
+}
+
+function bool HasATeamWon(out ETeamIdentifier WinningTeam, out int reason)
+{
+	local bool result;
+		
+	// Check to see if the required number of bombs have successfully exploded on target
+	if ( victorTeam != TEAM_None && iNumBombsExploded >= iNumRequiredBombsExploded )
+	{
+		WinningTeam = victorTeam;
+		reason = GetVictoryReason();
+		result = true;
+
+		Log(self $ " gbxMcGuffinExplosiveVictoryCondition::HasATeamWon() noticed that " $ victorTeam $ " won with reason " $ reason, 'JWS');
+	}
+	else
+	{
+		result = Super.HasATeamWon(WinningTeam, reason);
+	}
+
+	return result;
+}
+
+simulated function DrawCustom(canvas Canvas, gbxHud Hud, FontInfo Fonts, int nPass)
+{
+	//local float XL, YL;
+	//local string remainingTime;
+	local int i, iNumTriggersActive, iNumTriggersToDraw, iSkirmishTimerToDraw;
+	local gbxMcGuffinExplosiveTrigger Trigger;
+	local vector pos;
+	local float fGap, fLargestTime, fCurrentTime;
+	local PlayerController P;
+
+	//Log( " gbxMcGuffinExplosiveVictoryCondition::DrawCustom()", 'MP' );
+
+	P = Canvas.Viewport.Actor;
+
+	fGap = 5;
+	pos.z = 0;
+
+    if ( P.GameReplicationInfo.GameType == GT_SKIRMISH )
+    {
+	    // Find out how many bombs are active
+	    for ( i = 0; i < MAX_MCGUFFIN_TRIGGERS; i++ )
+	    {
+		    Trigger = gbxMcGuffinExplosiveTrigger(McGuffinTriggers[i]);
+
+			if ( Trigger != None && Trigger.bExplosivePlanted && !Trigger.Explosive.bExploded )
+			{
+				fCurrentTime = float(Trigger.Explosive.iReplicatedFuseTime) / Trigger.Explosive.FuseTimeMax;
+
+				if ( fCurrentTime > fLargestTime )
+				{
+					fLargestTime = fCurrentTime;
+					iSkirmishTimerToDraw = i;
+				}
+			}
+	    }
+
+        // Reset trigger back to none
+	    Trigger = None;
+
+        //Log( " gbxMcGuffinExplosiveVictoryCondition::DrawCustom() iSkirmishTimerToDraw: "$iSkirmishTimerToDraw, 'MP' );
+    }
+
+	// Draw info about each bomb
+	for ( i = 0; i < MAX_MCGUFFIN_TRIGGERS; i++ )
+	{
+		Trigger = gbxMcGuffinExplosiveTrigger(McGuffinTriggers[i]);
+		
+		//Log( self$ " DrawGBXHud() - Trigger = " $Trigger$ " Pass = " $nPass, 'MP');
+		
+		if ( Trigger != None && Trigger.bActive )
+		{
+			//Log( self$ " gbxMcGuffinExplosiveVC::DrawGBXHud() McguffinTriggers: " $Trigger$ " Trigger.bExplosivePlanted: " $Trigger.bExplosivePlanted$ " Trigger.Explosive.bExploded: " $Trigger.Explosive.bExploded, 'MP');
+			if ( nPass == 0 )
+			{
+				if ( Trigger.bExplosivePlanted && !Trigger.Explosive.bExploded )
+				{
+					if ( P.GameReplicationInfo.GameType != GT_SKIRMISH )
+						iNumTriggersToDraw = iNumTriggersActive;
+
+					if ( P.GameReplicationInfo.GameType == GT_SKIRMISH && i != iSkirmishTimerToDraw )
+						continue;
+					
+					//Log( self$ " gbxMGEVC::DrawGBXHud() Trigger.Explosive.Clock: " $Trigger.Explosive.Clock, 'MP');
+
+					if ( !Hud.bIsSplitScreen )
+					{
+						pos.X = FirstObjectiveX + fGap + (fGap * iNumTriggersToDraw) + (34.0 * iNumTriggersToDraw) + 17.0;
+						pos.Y = FirstObjectiveY + 20;
+					}
+					else
+					{
+						pos.X = FirstObjectiveSplitScreenX + fGap + (fGap * iNumTriggersToDraw) + (34.0 * iNumTriggersToDraw) + 17.0;
+						pos.Y = FirstObjectiveSplitScreenY + 20;
+						//Log( self$ " pos(" $pos.X$ "," $pos.Y$ ") FirstObjX = " $FirstObjectiveSplitScreenX$ " FirstObjY = " $FirstObjectiveSplitScreenY, 'MP');
+					}
+
+					Trigger.Explosive.Clock.ClockPercentage = float(Trigger.Explosive.iReplicatedFuseTime) / Trigger.Explosive.FuseTimeMax;
+					Trigger.Explosive.Clock.SetLocation( pos );
+					Trigger.Explosive.Clock.DrawGBXHud( Canvas, Hud, Fonts, nPass ); 
+
+					iNumTriggersToDraw++;
+				}
+			}
+				
+			iNumTriggersActive++;
+		}
+	}
+}
+
+/* GBX:naj - TESTnaj
+function McGuffinFound(Pawn p)
+{
+	local WargameMultiplayer mpgi;
+	local WargameTeamInfo TeamInfo;
+
+	Super.McGuffinFound(p);
+
+	if (bFirstNeedToSetBattleDialogue)
+	{
+		mpgi = WargameMultiplayer(Level.Game);
+
+		// If there is only 1 player on the team, he may never find all McGuffins in a reasonable amount of time,
+		// so start the Need to Set timer when the first McGuffin is found
+		if (mpgi != None)
+		{
+			TeamInfo = mpgi.GetTeam(p.PawnTeam);
+
+			if (TeamInfo.Size == 1)
+			{
+				Log(self $ " gbxMcGuffinExplosiveVictoryCondition::McGuffinFound() TeamSize == 1, starting FIRST need to set timer", 'MPBattleDialogue');
+				StartNeedToSetTimer();
+			}
+		}
+	}
+}
+*/
+
+/* GBX:naj - TESTnaj
+function AllMcGuffinsFound(Pawn LastFinder)
+{
+	Super.AllMcGuffinsFound(LastFinder);
+
+	if (bFirstNeedToSetBattleDialogue)
+	{
+		Log(self $ " gbxMcGuffinExplosiveVictoryCondition::AllMcGuffinsFound() starting FIRST need to set timer", 'MPBattleDialogue');
+		StartNeedToSetTimer();
+	}
+}
+*/
+
+state McGuffinsSpawned
+{
+	// GBX:naj - TESTnaj
+	function BeginState()
+	{
+		//Log( self $ " McGuffinSpawned::BeginState()", 'RSC' );
+
+		GotoState( 'TNTOnGround' );
+	}
+	// GBX:naj - TESTnaj
+
+	function SetGameOn(bool gameOn)
+	{
+		//Log( self $ " McGuffinSpawned::SetGameOn()", 'RSC' );
+
+		if (!gameOn)
+		{
+			// GBX:naj - TESTnaj
+			//StopNeedToSetTimer();
+			// GBX:naj - TESTnaj
+			//StopNeedToDefuseTimer();
+
+			SetTimer(0.0, false);
+		}
+
+		Super.SetGameOn(gameOn);
+	}
+}
+
+/* GBX:naj - TESTnaj
+function StartNeedToSetTimer()
+{
+	NextNeedToSetBattleDialogue = Level.TimeSeconds + NeedToSetBattleDialogueInterval;
+	bFirstNeedToSetBattleDialogue = false;
+}
+*/
+
+/* GBX:naj - TESTnaj
+function StopNeedToSetTimer()
+{
+	NextNeedToSetBattleDialogue = 1000000.0f;
+	bFirstNeedToSetBattleDialogue = false;
+}
+*/
+
+/* GBX:naj - TESTnaj
+function StartNeedToDefuseTimer()
+{
+	NextNeedToDefuseBattleDialogue = Level.TimeSeconds + NeedToDefuseBattleDialogueInterval;
+}
+*/
+
+/* GBX:naj - TESTnaj
+function StopNeedToDefuseTimer()
+{
+	NextNeedToDefuseBattleDialogue = 1000000.0f;
+}
+*/
+
+simulated function StartBombTickingSound()
+{
+	BombTickLoopHandle = PlaySound(BombTickingSound);
+}
+
+simulated function StopBombTickingSound()
+{
+	if (BombTickLoopHandle != 0)
+	{
+		StopSound(BombTickLoopHandle);
+		BombTickLoopHandle = 0;
+	}
+}
+
+function ExplosivesSet(Pawn p)
+{
+	local Inventory Inv;
+	local int i;
+	local gbxMcGuffinExplosiveTrigger Trigger;
+	local bool bEmptyBombLocationFound;
+
+	//Log( self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesSet()", 'MP' );
+
+	assert(NumBombsSet >= 0 && NumBombsSet <= MAX_EXPLOSIVES);
+	NumBombsSet++;
+	assert(NumBombsSet >= 0 && NumBombsSet <= MAX_EXPLOSIVES);
+
+	if (NumBombsSet == 1)
+	{
+		StartBombTickingSound();
+
+		PauseSecondaryVictoryConditions();
+
+		//Log(self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesSet() stopping need to set timer", 'MPBattleDialogue');
+		
+		// GBX:naj - TESTnaj
+		//bDoMcGuffinOnGroundDialogue = false;
+		// GBX:naj - TESTnaj
+		//StopNeedToSetTimer();
+		//Log(self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesSet() starting need to defuse timer", 'MPBattleDialogue');
+		// GBX:naj - TESTnaj
+		//StartNeedToDefuseTimer();
+	}
+
+	// GBX:RSC - delete the Mcguffin from player's inventory
+	if( !bExplosiveReusable )
+	{
+		for ( Inv=p.Inventory; Inv!=None; Inv=Inv.Inventory )
+		{
+			if( gbxMcGuffin(Inv) != None )
+			{
+				//Log( self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesSet() - DeleteInventory=" $ Inv, 'RSC' );
+				p.DeleteInventory( Inv );
+
+				//Log( "gbxMcGuffinExplosiveVictoryCondition::ExplosivesSet() - " $ p.PawnTeam, 'RSC' );
+				McGuffinOwners[p.PawnTeam]--;
+				iNumMcGuffins--;
+				McGuffinsFound--;
+				break;
+			}
+		}
+	}
+
+	// PSV: Bug 9087: BIA 1 legacy bug - After the last explosive is planted and the user is killed, the message regarding the loss of explosive appears.
+	// Check the triggers and if they all have a bomb planted on them, disable the mcguffin dropped messages
+	if ( Level.Game.GameReplicationInfo.GameType == GT_MULTIPLAYER )
+	{
+		//Log( self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesSet() 1", 'MP' );
+		
+		bEmptyBombLocationFound	= false;
+	
+		// Find out how many bombs are active
+	    for ( i = 0; i < MAX_MCGUFFIN_TRIGGERS; i++ )
+	    {
+		    Trigger = gbxMcGuffinExplosiveTrigger(McGuffinTriggers[i]);
+
+			//Log( self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesSet()"$Trigger$" bExplosivePlanted "$Trigger.bExplosivePlanted, 'MP' );
+
+			if ( Trigger != None && !Trigger.bExplosivePlanted )
+			{
+				bEmptyBombLocationFound = true;
+				break;
+			}
+	    }	
+
+		if ( !bEmptyBombLocationFound )
+		{
+			//Log( self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesSet() Setting bAnnounceMcGuffinDrop to false!", 'MP' );
+			bAnnounceMcGuffinDrop = false;
+		}
+	}
+
+	// TODO: Battle Dialog
+	EmitBattleDialogToUnits(p, ExplosivesClass.default.SetGroupName, '', ExplosivesClass.default.EnemySetGroupName);
+}
+
+function ExplosivesDefused(Pawn p)
+{
+	//Log( self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesDefused()", 'RSC' );
+
+	assert(NumBombsSet >= 0 && NumBombsSet <= MAX_EXPLOSIVES);
+	NumBombsSet--;
+	assert(NumBombsSet >= 0 && NumBombsSet <= MAX_EXPLOSIVES);
+
+	if (NumBombsSet == 0)
+	{
+		StopBombTickingSound();
+
+		UnPauseSecondaryVictoryConditions();
+
+		// GBX:naj - TESTnaj
+		//bDoMcGuffinOnGroundDialogue = true;
+
+		//Log(self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesDefused() starting need to set timer", 'MPBattleDialogue');
+		// GBX:naj - TESTnaj
+		//StartNeedToSetTimer();
+		//Log(self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesDefused() stopping need to defuse timer", 'MPBattleDialogue');
+		// GBX:naj - TESTnaj
+		//StopNeedToDefuseTimer();
+	}
+
+	// TODO: Battle Dialog
+	EmitBattleDialogToUnits(p, ExplosivesClass.default.DefuseGroupName, '', ExplosivesClass.default.EnemyDefusedGroupName);
+
+}
+
+// This function needs to take a PlayerController as an argument rather than a Pawn because Pawns can die before the bomb goes off
+// but we still need this information. Thus the interface needs to differ a little from its brethren.
+function ExplosivesExploded(PlayerController BombingPlayer)
+{
+	local Name YouAllyGroupName;
+	local Name EnemyGroupName;
+	local ETeamIdentifier YouAllyTeam;
+	local ETeamIdentifier EnemyTeam;
+
+	//Log( self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesExploded()", 'RSC' );
+
+	assert(NumBombsSet >= 0 && NumBombsSet <= MAX_EXPLOSIVES);
+	NumBombsSet--;
+	assert(NumBombsSet >= 0 && NumBombsSet <= MAX_EXPLOSIVES);
+
+	if (NumBombsSet == 0)
+	{
+		StopBombTickingSound();
+
+		// Bug 6290: If we have declared a winner, don't allow a secondary victory condition to do so.
+		if (VictorTeam == TEAM_None)
+		{
+			UnPauseSecondaryVictoryConditions();
+
+			// GBX:naj - TESTnaj
+			//bDoMcGuffinOnGroundDialogue = true;
+
+			//Log(self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesExploded() starting need to set timer", 'MPBattleDialogue');
+			// GBX:naj - TESTnaj
+			//StartNeedToSetTimer();
+			//Log(self $ " gbxMcGuffinExplosiveVictoryCondition::ExplosivesExploded() stopping need to defuse timer", 'MPBattleDialogue');
+			// GBX:naj - TESTnaj
+			//StopNeedToDefuseTimer();
+		}
+	}
+
+	assert(iNumBombsExploded >= 1 && iNumBombsExploded <= iNumRequiredBombsExploded);
+	
+	// TODO: Battle Dialog
+	if (iNumBombsExploded != iNumRequiredBombsExploded)
+	{
+		YouAllyGroupName = ExplosivesClass.default.ExplodedOneGroupName;
+		EnemyGroupName = ExplosivesClass.default.EnemyExplodedOneGroupName;
+	}
+	else
+	{
+		YouAllyGroupName = ExplosivesClass.default.ExplodedAllGroupName;
+		EnemyGroupName = ExplosivesClass.default.EnemyExplodedAllGroupName;
+	}
+
+	if (BombingPlayer.PlayerReplicationInfo.Team.TeamIndex == 1)
+	{
+		YouAllyTeam = TEAM_US;
+		EnemyTeam = TEAM_German;
+	}
+	else
+	{
+		YouAllyTeam = TEAM_German;
+		EnemyTeam = TEAM_US;
+	}
+	
+	EmitBattleDialogToTeamUnits(YouAllyTeam, YouAllyGroupName);
+	EmitBattleDialogToTeamUnits(EnemyTeam, EnemyGroupName);
+}
+
+function Tick(float DeltaSeconds)
+{
+	local ETeamIdentifier Team;
+
+	Super.Tick(DeltaSeconds);
+
+	// Check the battle dialogue timers as long as the game is still running
+	if (!gameEnded)
+	{
+		// This condition helps players out who find one McGuffin and then don't do anything for a while
+		if (bFirstNeedToSetBattleDialogue && (McGuffinsFound == 1) && ((Level.TimeSeconds - Level.MissionStartTime) >= ForceNeedToSetBattleDialogueWait))
+		{
+			//Log(self $ " gbxMcGuffinExplosiveVictoryCondition::Tick() starting FIRST need to set timer", 'MPBattleDialogue');
+			// GBX:naj - TESTnaj
+			//StartNeedToSetTimer();
+		}
+
+		if ((NumBombsSet > 0) && (Level.TimeSeconds >= NextNeedToDefuseBattleDialogue))
+		{
+			if (AllowUSPickup)
+			{
+				Team = TEAM_German;
+			}
+			else
+			{
+				Team = TEAM_US;
+			}
+
+			// TODO: Battle Dialog
+			EmitBattleDialogToTeamUnits(Team, ExplosivesClass.default.NeedDefuseGroupName);
+
+			//Log(self $ " gbxMcGuffinExplosiveVictoryCondition::Tick() starting need to defuse timer", 'MPBattleDialogue');
+			// GBX:naj - TESTnaj
+			//StartNeedToDefuseTimer();
+		}
+
+		if ((NumBombsSet == 0) && (Level.TimeSeconds >= NextNeedToSetBattleDialogue))
+		{
+			if (AllowUSPickup)
+			{
+				Team = TEAM_US;
+			}
+			else
+			{
+				Team = TEAM_German;
+			}
+
+			// TODO: Battle Dialog
+			EmitBattleDialogToTeamUnits(Team, ExplosivesClass.default.NeedSetGroupName);
+
+			//Log(self $ " gbxMcGuffinExplosiveVictoryCondition::Tick() starting need to set timer", 'MPBattleDialogue');
+			// GBX:naj - TESTnaj
+			//StartNeedToSetTimer();
+		}
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// GBX:naj - Victory condition logic rewritten using Unreal states.
+state TNTOnGround extends McGuffinsSpawned
+{
+	function BeginState()
+	{
+		//Log( self $ " TNTOnGround::BeginState()", 'RSC' );
+
+		SetTimer( BattleDialogOnGroundDelay, true );
+	}
+
+	function EndState()
+	{
+		//Log( self $ " TNTOnGround::EndState()", 'RSC' );
+
+		SetTimer( 0.0f, false );
+	}
+
+	function McGuffinPickedUp(Pawn p)
+	{
+		//Log( self $ " TNTOnGround::McGuffinPickedUp()", 'RSC' );
+
+		Global.McGuffinPickedUp( P );
+		GotoState( 'TNTInPlayersHands' );
+	}
+	
+	function Timer()
+	{
+		if (AllowUsPickup)
+		{
+			// TODO: Battle Dialog
+			EmitBattleDialogToTeamUnits(TEAM_US, McGuffinClass.default.OnGroundGroupName);
+		}
+
+		if (AllowGermanPickup)
+		{
+			// TODO: Battle Dialog
+			EmitBattleDialogToTeamUnits(TEAM_German, McGuffinClass.default.OnGroundGroupName);
+		}
+	}
+}
+
+state TNTInPlayersHands extends McGuffinsSpawned
+{
+	function BeginState()
+	{
+		//Log( self $ " TNTInPlayersHands::BeginState()", 'RSC' );
+
+		SetTimer( NeedToSetBattleDialogueInterval, true );
+	}
+	
+	function EndState()
+	{
+		//Log( self $ " TNTInPlayersHands::EndState()", 'RSC' );
+
+		SetTimer( 0.0f, false );
+	}
+
+	function McGuffinDropped(Pawn P)
+	{
+		//Log( self $ " TNTInPlayersHands::McGuffinDropped()", 'RSC' );
+
+		Global.McGuffinDropped( P );
+
+		if ( McGuffinOwners[ P.PawnTeam ] == 0 )
+		{
+			GotoState( 'TNTOnGround' );
+		}
+	}
+
+	function ExplosivesSet(Pawn P)
+	{
+		//Log( self $ " TNTInPlayersHands::ExplosivesSet()", 'RSC' );
+
+		Global.ExplosivesSet( P );
+		GotoState( 'TNTPlanted' );
+	}
+
+	function Timer()
+	{
+		local ETeamIdentifier Team;
+
+		if (AllowUSPickup)
+		{
+			Team = TEAM_US;
+		}
+		else
+		{
+			Team = TEAM_German;
+		}
+
+		EmitBattleDialogToTeamUnits(Team, ExplosivesClass.default.NeedSetGroupName);
+	}
+}
+
+state TNTPlanted extends McGuffinsSpawned
+{
+	function BeginState()
+	{
+		//Log( self $ " TNTPlanted::BeginState()", 'RSC' );
+
+		SetTimer( NeedToDefuseBattleDialogueInterval, true );
+	}
+
+	function EndState()
+	{
+		//Log( self $ " TNTPlanted::EndState()", 'RSC' );
+
+		SetTimer( 0.0f, false );
+	}
+
+	function ExplosivesDefused(Pawn P)
+	{
+		//Log( self $ " TNTPlanted::ExplosivesDefused()", 'RSC' );
+
+		Global.ExplosivesDefused( P );
+		
+		if ( NumBombsSet == 0 )
+		{
+			if ( McGuffinOwners[ P.PawnTeam ] == 0 )
+				GotoState( 'TNTOnGround' );
+			else
+				GotoState( 'TNTInPlayersHands' );
+		}
+	}
+
+	function ExplosivesExploded(PlayerController BombingPlayer)
+	{
+		local ETeamIdentifier Team;
+
+		//Log( self $ " TNTPlanted::ExplosivesExploded()", 'RSC' );
+
+		Global.ExplosivesExploded( BombingPlayer );
+		
+		if ( iNumBombsExploded == iNumRequiredBombsExploded )
+		{
+			GotoState( '' );
+		}
+		else if (NumBombsSet == 0)
+		{
+			if ( AllowUSPickup )
+				Team = TEAM_US;
+			else
+				Team = TEAM_German;
+
+			if (VictorTeam == TEAM_None)
+			{
+				if ( McGuffinOwners[ Team ] == 0 )
+					GotoState( 'TNTOnGround' );
+				else
+					GotoState( 'TNTInPlayersHands' );
+			}
+		}
+	}
+
+	function Timer()
+	{
+		local ETeamIdentifier Team;
+
+		if ( NumBombsSet > 0 )
+		{
+			if (AllowUSPickup)
+			{
+				Team = TEAM_German;
+			}
+			else
+			{
+				Team = TEAM_US;
+			}
+
+			// TODO: Battle Dialog
+			EmitBattleDialogToTeamUnits(Team, ExplosivesClass.default.NeedDefuseGroupName);
+		}
+	}
+}
+////////////////////////////////////////////////////////////////////////////////////////
+
+defaultproperties
+{
+	iNumRequiredBombsExploded = 1
+	iNumBombsExploded = 0
+	NumBombsSet = 0
+
+	MessageSectionName="ExplosivesVictoryCondition"
+
+	bFirstNeedToSetBattleDialogue = true
+	NextNeedToSetBattleDialogue = 1000000.0f
+	NextNeedToDefuseBattleDialogue = 1000000.0f
+	NeedToSetBattleDialogueInterval = 90.0f
+	NeedToDefuseBattleDialogueInterval = 5.25f
+	ForceNeedToSetBattleDialogueWait = 120.0f
+
+	BombTickingSound = Sound'MP_MISC.STOPWATCH_LOOP'
+
+	bDelayedVictory = true
+	VictoryReason = 400
+
+	bNetNotify=true
+
+	bExplosiveReusable=true
+}// GEARBOX 2004-05-06 JWS created
+//
+// usage: specifies a location that a McGuffin can be in the map
+class gbxMcGuffinLocation extends Actor
+	placeable;
+
+// properties
+var() Name BeaconTag;				// indicates which gbxMcGuffinBeacon to use for this location
+var() bool Valid2P;					// indicates this location can be used in a 2 player game
+var() bool Valid3PUSUnderdog;			// indicates this location can be used in a 3 player game when the Us team is the underdog 
+var() bool Valid3PGermanUnderdog;		// indicates this location can be used in a 3 player game when the German team is the underdog
+var() bool Valid4P;					// indicates this location can be used in a 4 player game
+
+// internal state
+var bool McGuffinSpawnedHere;
+var bool TouchedUS, TouchedGerman;
+var gbxMcGuffinBeacon Beacon;
+var() int	nCheckpointID;
+
+function PreBeginPlay()
+{
+	beacon = GetAssociatedBeacon();
+
+	Beacon.AssignToLocation(self);
+
+	Super.PreBeginPlay();
+}
+
+function bool IsValid()
+{
+	local bool valid;
+	local int playercount;
+	local WargameMultiplayer mpgi;
+	local int nSavedCheckpointID;
+
+	mpgi = WargameMultiplayer(Level.Game);
+
+	if (mpgi != None)
+	{
+		playercount = mpgi.GetNumberOfActualPlayers();
+
+		if ( Level.Game.IsA('WargameSkirmish') )
+		{
+			if (mpgi.CanUseCheckpoints( -1 ))
+			{
+				nSavedCheckpointID = Level.MissionManager.SkirmishGetCheckpointID();
+			}
+			
+			if ( playercount > 0 )
+			{
+				if ((nSavedCheckpointID >= 0) && (nCheckpointID >= 0))
+				{
+					if (nSavedCheckpointID == nCheckpointID)
+					{
+						valid = Valid2P;
+					}
+					else
+					{
+						valid = false;
+					}
+				}
+				else
+				{
+					valid = Valid2P;
+				}
+			}
+		}
+		else if ( Level.Game.IsA('WargameMultiplayer') )
+		{
+			if (playercount == 2)
+			{
+				valid = Valid2P;
+			}
+			else if (playercount == 3)
+			{
+				if (mpgi.IsPlayerUnderdog(TEAM_US))
+				{
+					valid = Valid3PUSUnderdog;
+				}
+				else
+				{
+					valid = Valid3PGermanUnderdog;
+				}
+			}
+			else
+			{
+				valid = Valid4P;
+			}
+		}	
+	}
+	else
+	{
+		valid = false;
+	}
+
+	return valid;
+}
+
+function gbxMcGuffinBeacon GetAssociatedBeacon()
+{
+	foreach DynamicActors(class'gbxMcGuffinBeacon', Beacon, BeaconTag)
+	{
+		break;
+	}
+
+	Log(self $ " gbxMcGuffinLocation::GetAssociatedBeacon() found beacon " $ Beacon $ " to match BeaconTag=" $ BeaconTag, 'JWS');
+
+	return Beacon;
+}
+
+function McGuffinSpawned(gbxMcGuffinPickup pickup)
+{
+	// let the associated beacon know that it has the McGuffin, since by default the Beacon follows the Location
+	Beacon.AssignToPickup(pickup);
+	pickup.SetFoundWhenPickedUp(true);
+	McGuffinSpawnedHere = true;
+}
+
+function AllMcGuffinsFound()
+{
+	if (!McGuffinSpawnedHere)
+	{
+		Beacon.TurnOff(TEAM_None);
+		// Fixes Bug 1314: Once all McGuffins are found, any locations that were never visited should not give players messages
+		// about finding the McGuffin.
+		TouchedUS = true;
+		TouchedGerman = true;
+	}
+}
+
+function MarkAsUnused()
+{
+	Log(self $ " gbxMcGuffinLocation::MarkAsInvalid() turning associated beacon off.", 'JWS');
+	Beacon.TurnOff(TEAM_None);
+}
+
+function Touch(Actor Other)
+{
+	local ETeamIdentifier teamid;
+	local gbxPlayerPawn p;
+
+	Super.Touch(Other);
+
+	p = gbxPlayerPawn(Other);
+
+	if (p != None && !McGuffinSpawnedHere)
+	{
+		teamid = p.PawnTeam;
+
+		if ((teamid == TEAM_US && !TouchedUS && Beacon.VictoryCondition.AllowUSPickup) || (teamid == TEAM_German && !TouchedGerman && Beacon.VictoryCondition.AllowGermanPickup))
+		{
+			Log(self $ " gbxMcGuffinLocation::Touch() McGuffin not found, turning beacon off", 'JWS');
+			Beacon.TurnOff(teamid);
+
+			// tell the player and his teammate that a McGuffin was not found
+			PlayerController(p.Controller).ReceiveLocalizedMessage(class'gbxMcGuffinObjectMessage', 3, p.Controller.PlayerReplicationInfo, None, Beacon.VictoryCondition.McGuffinClass);
+
+			if (teamid == TEAM_US)
+			{
+				TouchedUS = true;
+			}
+			else
+			{
+				TouchedGerman = true;
+			}
+		}
+	}
+}
+
+defaultproperties
+{
+	bCollideActors = true
+	CollisionRadius = 384.0f;
+
+	Tag = McGuffinLocation
+	BeaconTag = McGuffinBeacon
+	bHidden = true
+	Valid2P = true
+	Valid3PUSUnderdog = true
+	Valid3PGermanUnderdog = true
+	Valid4P = true
+	McGuffinSpawnedHere = false
+	TouchedUS = false
+	TouchedGerman = false
+	nCheckpointID = -1
+}// GEARBOX 2004-06-17 JWS created
+//
+// usage: base class for localized messages for McGuffin feedback
+class gbxMcGuffinMessage extends LocalMessage
+	abstract;
+
+var string MessageSectionName;
+
+static simulated function ClientReceive( 
+	PlayerController P,
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1, 
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject
+	)
+{
+	// Need a small tweak to the base class functionality - we want to generate the message string based on the player that will get the message.
+	// So this is a copy of that functionality, modified accordingly. 2004-06-17 JWS
+	local string msg;
+
+	msg = Static.GetStringForPlayer( Switch, RelatedPRI_1, RelatedPRI_2, OptionalObject, P );
+
+	if ( P.myHud != None )
+	P.myHUD.LocalizedMessage( Default.Class, Switch, RelatedPRI_1, RelatedPRI_2, OptionalObject, msg );
+
+    if ( Default.bIsConsoleMessage && (P.Player != None) && (P.Player.Console != None) )
+		P.Player.InteractionMaster.Process_Message( msg, 6.0, P.Player.LocalInteractions);
+}
+
+static function string GetStringForPlayer(
+	int Switch,
+	PlayerReplicationInfo RelatedPRI_1, 
+	PlayerReplicationInfo RelatedPRI_2,
+	Object OptionalObject,
+	PlayerController DisplayPlayer);
+
+static function bool IsPRISelf(PlayerController player, PlayerReplicationInfo pri)
+{
+	local bool result;
+
+	if (player.PlayerReplicationInfo == pri)
+	{
+		result = true;
+	}
+	else
+	{
+		result = false;
+	}
+
+	return result;
+}
+
+static function bool IsPRIAlly(PlayerController player, PlayerReplicationInfo pri)
+{
+	local bool result;
+
+	if (player.PlayerReplicationInfo.Team.TeamIndex == pri.Team.TeamIndex)
+	{
+		result = true;
+	}
+	else
+	{
+		result = false;
+	}
+
+	return result;
+}
+
+static function string GetMessageSectionName(Object Switch)
+{
+	return default.MessageSectionName;
+}
+
+static function string GetLocalizedMissionString(string Key, Object Switch, LevelInfo TheLevel)
+{
+	local string text;
+
+	text = TheLevel.S_Localize(Key, , static.GetMessageSectionName(Switch));
+
+	return text;
+}
+
+defaultproperties
+{
+	bBeep=false
+	bFadeMessage=True
+	bIsSpecial=True
+	bIsUnique=True
+	Lifetime=5
+
+	DrawColor=(R=0,G=160,B=255,A=255)
+	FontSize=1
+
+	YPos=240
+}class gbxMcGuffinObjectiveIcon extends Object;
+
+var		Canvas.CanvasIcon	DefendIcon;
+var		Canvas.CanvasIcon	AttackIcon;
+
+defaultproperties
+{
+	DefendIcon = (Icon=Texture't_interface_mb.hud.interface_comp',U=134,V=59,UL=34,VL=34,DrawColor=(R=228,G=220,B=197,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0);			
+	AttackIcon = (Icon=Texture't_interface_mb.hud.interface_comp',U=168,V=59,UL=34,VL=34,DrawColor=(R=228,G=220,B=197,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0);			
+}// GEARBOX 2004-06-17 JWS created
+//
+// usage: localized messages for McGuffin feedback
+class gbxMcGuffinObjectMessage extends gbxMcGuffinMessage;
+
+// switch 0 - McGuffin is found for the first time
+var string YouFound;
+var string AllyFound;
+var string EnemyFound;
+
+// switch 1 - McGuffin is dropped
+var string AllyDropped;
+var Sound YouDropMcGuffinSound;
+var string EnemyDropped;
+
+// switch 2 - McGuffin is picked up
+var string AllyPickedUp;
+var Sound YouPickUpMcGuffinSound;
+var string EnemyPickedUp;
+
+// switch 3 - McGuffin is not found at a potential spawn location
+var string YouNotHere;
+var string AllyNotHere;
+
+// switch 4 - All McGuffins have been found
+var string AllMcGuffinsFound;
+
+// Removed because we decided this message is not useful. 2004-09-28 JWS
+// switch 5 - Can't pickup because you are on the wrong team
+//var string NoPickupWrongTeam;
+
+// switch 6 - Can't pickup because you have too many
+var string NoPickupTooMany;
+
+// switch 7 - need more McGuffins
+var string NeedMoreMcGuffins;
+
+var Sound USHappySound;
+var Sound USSadSound;
+var Sound DEHappySound;
+var Sound DESadSound;
+
+static simulated function ClientReceive( 
+	PlayerController P,
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1, 
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject
+	)
+{
+	local bool isself, isally;
+	
+	Super.ClientReceive(P, Switch, RelatedPRI_1, RelatedPRI_2, OptionalObject);
+	
+	if (RelatedPRI_1 != None)
+	{
+		isself = static.IsPRISelf(P, RelatedPRI_1);
+
+		if (isself)
+		{
+			isally = false;
+		}
+		else
+		{
+			isally = static.IsPRIAlly(P, RelatedPRI_1);
+		}
+
+		switch( Switch )
+		{
+
+			// McGuffin is dropped
+		case 1:
+
+			if (isself)
+			{
+				P.PlayOwnedSound( default.YouDropMcGuffinSound, SLOT_None,,,,, );
+			}
+
+			if (RelatedPRI_1.Team != None && ETeamIdentifier(RelatedPRI_1.Team.TeamIndex) == TEAM_US)
+			{
+				P.PlayOwnedSound( default.USSadSound, SLOT_None,,,,, );
+			}
+			else if (RelatedPRI_1.Team != None && ETeamIdentifier(RelatedPRI_1.Team.TeamIndex) == TEAM_German)
+			{
+				P.PlayOwnedSound( default.DESadSound, SLOT_None,,,,, );
+			}
+			break;
+
+			// McGuffin is picked up
+		case 2:
+
+			if (isself && P.GameReplicationInfo.GameType != GT_SKIRMISH )
+			{
+				P.PlayOwnedSound( default.YouPickUpMcGuffinSound, SLOT_None,,,,, );
+			}
+
+			if (RelatedPRI_1.Team != None && ETeamIdentifier(RelatedPRI_1.Team.TeamIndex) == TEAM_US)
+			{
+				P.PlayOwnedSound( default.USHappySound, SLOT_None,,,,, );
+			}
+			else if (RelatedPRI_1.Team != None && ETeamIdentifier(RelatedPRI_1.Team.TeamIndex) == TEAM_German)
+			{
+				P.PlayOwnedSound( default.DEHappySound, SLOT_None,,,,, );
+			}
+			break;
+		}
+	}
+}
+
+// PRI1 is the player that generated the message
+// OptionalObject is a gbxMcGuffin class
+static function string GetStringForPlayer(
+	int Switch,
+	PlayerReplicationInfo RelatedPRI_1, 
+	PlayerReplicationInfo RelatedPRI_2,
+	Object OptionalObject,
+	PlayerController DisplayPlayer)
+{
+	local string msg;
+	local bool isself, isally;
+	local LevelInfo level;
+
+	msg = "";
+   	
+	level = DisplayPlayer.Level;
+
+	assert(RelatedPRI_1 != None);
+
+	if (RelatedPRI_1 != None)
+	{
+		isself = static.IsPRISelf(DisplayPlayer, RelatedPRI_1);
+
+		if (isself)
+		{
+			isally = false;
+		}
+		else
+		{
+			isally = static.IsPRIAlly(DisplayPlayer, RelatedPRI_1);
+		}
+
+		switch (Switch)
+		{
+			// McGuffin is found for the first time
+		case 0:
+			if (isself)
+			{
+				msg = GetLocalizedMissionString(default.YouFound, None, level);
+			}
+			else if (isally)
+			{
+				msg = GetLocalizedMissionString(default.AllyFound, None, level);
+			}
+			else
+			{
+				msg = GetLocalizedMissionString(default.EnemyFound, None, level);
+			}
+			break;
+
+			// McGuffin is dropped
+		case 1:
+			if (isself)
+			{
+				; // no message if you dropped it
+			}
+			else if (isally)
+			{
+				msg = GetLocalizedMissionString(default.AllyDropped, None, level);
+			}
+			else
+			{
+				msg = GetLocalizedMissionString(default.EnemyDropped, None, level);
+			}
+			break;
+
+			// McGuffin is picked up
+		case 2:
+			if (isself)
+			{
+				; // no message if you picked it up
+			}
+			else if (isally)
+			{
+				msg = GetLocalizedMissionString(default.AllyPickedUp, None, level);
+			}
+			else
+			{
+				msg = GetLocalizedMissionString(default.EnemyPickedUp, None, level);
+			}
+			break;
+
+			// McGuffin is not found at a potential spawn location
+		case 3:
+			if (isself)
+			{
+				// Bug 4974: Don't display this message if you are carrying a McGuffin, as it is confusing.
+				if (class'gbxMcGuffinVictoryCondition'.static.CountMcGuffinsInInventory(DisplayPlayer.Pawn, '') == 0)
+				{
+					msg = GetLocalizedMissionString(default.YouNotHere, None, level);
+				}
+			}
+			else if (isally)
+			{
+				msg = GetLocalizedMissionString(default.AllyNotHere, None, level);
+			}
+			// don't let the enemy know
+			break;
+
+			// All McGuffins have been found
+		case 4:
+			// doesn't matter who is getting it, this is a general information message
+			msg = GetLocalizedMissionString(default.AllMcGuffinsFound, None, level);
+			break;
+
+			// Can't pickup because you are on the wrong team
+			// Removed because we decided this message is not useful. 2004-09-28 JWS
+			//		case 5:
+			//			if (isself)
+			//			{
+			//				msg = default.NoPickupWrongTeam @ mcgc.default.ItemName;
+			//			}
+			//			break;
+
+			// Can't pickup because you have too many
+		case 6:
+			if (isself)
+			{
+				msg = GetLocalizedMissionString(default.NoPickupTooMany, None, level);
+			}
+			break;
+
+			// need more McGuffins
+		case 7:
+			if (isself)
+			{
+				msg = GetLocalizedMissionString(default.NeedMoreMcGuffins, None, level);
+			}
+		}
+	}
+	else
+	{
+		// Fall back for cases where the player is no longer around. This sucks, but there's not much else we can do except ignore the message
+		msg = "";
+	}
+
+	return msg;
+}
+
+defaultproperties
+{
+	MessageSectionName="McGuffinObjectMessage"
+
+	YouFound="YOUFOUND"
+	AllyFound="ALLYFOUND"
+	EnemyFound="ENEMYFOUND"
+
+	AllyDropped="ALLYDROPPED"
+	EnemyDropped="ENEMYDROPPED"
+
+	AllyPickedUp="ALLYPICKEDUP"
+	EnemyPickedUp="ENEMYPICKEDUP"
+
+	YouNotHere="YOUNOTHERE"
+	AllyNotHere="ALLYNOTHERE"
+
+	AllMcGuffinsFound="ALLMCGUFFINSFOUND"
+	// Removed because we decided this message is not useful. 2004-09-28 JWS
+	//NoPickupWrongTeam="Your team cannot pickup"
+	NoPickupTooMany="NOPICKUPTOOMANY"
+	NeedMoreMcGuffins="NEEDMOREMCGUFFINS"
+
+	YouDropMcGuffinSound=Sound'MP_MISC.ALLY_DROP_MCGUFFIN'
+	YouPickUpMcGuffinSound=Sound'MP_MISC.ALLY_PICK_UP_MCGUFFIN'
+
+	// TODO fixme
+	USHappySound=Sound'MP_MISC.US_PICKUP'
+	USSadSound=Sound'MP_MISC.US_DROP'
+
+	DEHappySound=Sound'MP_MISC.GER_PICKUP'
+	DESadSound=Sound'MP_MISC.GER_DROP'
+}// GEARBOX 2004-05-06 JWS created
+//
+// usage: the pickup for the McGuffin
+class gbxMcGuffinPickup extends Pickup
+	notplaceable;
+
+// properties
+var float RealCollisionRadius;
+
+// internal state
+var gbxMcGuffinBeacon Beacon;
+var bool FoundWhenPickedUp;
+
+simulated function PostBeginPlay()
+{
+	Log(self $ " gbxMcGuffinPickup::PostBeginPlay() called", 'JWS');
+
+	Super.PostBeginPlay();
+
+	SetStaticMesh(StaticMesh(DynamicLoadObject("s_gib.us_paratrooper.us_paratrooper_calf", class'StaticMesh')));
+	SetDrawType( DT_StaticMesh );
+}
+
+function Destroyed()
+{
+	Log(self $ " gbxMcGuffinPickup::Destroyed() called", 'JWS');
+
+	Super.Destroyed();
+}
+
+function gbxMcGuffinVictoryCondition GetMcGuffinVictoryCondition()
+{
+	local gbxMcGuffinVictoryCondition mcgvc;
+
+	foreach DynamicActors(class'gbxMcGuffinVictoryCondition', mcgvc)
+	{
+		if (mcgvc.McGuffinTag == Tag)
+		{
+			break;
+		}
+	}
+
+	return mcgvc;
+}
+
+simulated event FellOutOfWorld(eKillZType KillType)
+{
+	Log(self $ " gbxMcGuffinPickup::FellOutOfWorld() KillType=" $ KillType $ " Location=" $ Location, 'JWS');
+}
+
+function SetFoundWhenPickedUp(bool b)
+{
+	Log(self $ " gbxMcGuffinPickup::SetFoundWhenPickedUp(" $ b $ ") called", 'JWS');
+	FoundWhenPickedUp = b;
+	bDisplayPickupMessage = !FoundWhenPickedUp;
+}
+
+// these 2 functions ensure that the McGuffin and its pickup retain the tag in order to find the controller
+function InitDroppedPickupFor(Inventory Inv)
+{
+	local gbxMcGuffin mcg;
+
+	Super.InitDroppedPickupFor(Inv);
+
+	Tag = Inv.Tag;
+	mcg = gbxMcGuffin(Inv);
+	Beacon =  mcg.Beacon;
+	Beacon.AssignToPickup(self);
+
+	// can't do the McGuffinVictoryCondition.McGuffinDropped() call here because by now Inv.Owner and Inv.Instigator are == None. Instead, do it in gbxMcGuffin.DropFrom().
+	log(self $ " gbxMcGuffinPickup::InitDroppedPickupFor() spawning McGuffin pickup Tag = " $ Tag, 'JWS');
+}
+
+function Inventory SpawnCopy(Pawn Other)
+{
+	local Inventory Copy;
+	local gbxMcGuffin mcg;
+	local gbxMcGuffinVictoryCondition mcgvc;
+
+	Copy = Super.SpawnCopy(Other);
+	Copy.Tag = Tag;
+	mcg = gbxMcGuffin(Copy);
+	mcg.Beacon = Beacon;
+	Beacon.Team = Other.PawnTeam;   // when the McGuffin is picked up, it changes teams. when it is dropped, it still belongs to the team that last had it.
+	Beacon.AssignToPlayerPawn(gbxPlayerPawn(Other));
+
+	log(self $ " gbxMcGuffinPickup::SpawnCopy() spawning McGuffin " $ Copy $ " Tag = " $ Tag, 'JWS');
+
+	mcgvc = GetMcGuffinVictoryCondition();
+	mcgVc.McGuffinPickedUp(Other);
+	
+	// Check to see if this pickup represents the McGuffin being found; this only happens the first time it is picked up, since gbxMcGuffinLocation knows of the find
+	if (FoundWhenPickedUp)
+	{
+		Log(self $ " gbxMcGuffinPickup::SpawnCopy() McGuffin found, notifying VC", 'JWS');
+		mcgvc.McGuffinFound(Other);
+	}
+
+	return Copy;
+}
+
+// This strange pattern accounts for the somewhat unintuitive inheritance rules for derived states and derived classes.
+// For more information see https://udn.epicgames.com/lists/showpost.php?list=unprog&id=22259	2004-09-03 JWS
+function bool TheRealValidTouch( actor Other )
+{
+	local bool result;
+	local gbxPawn gbxp;
+	local gbxMcGuffinVictoryCondition mcgvc;
+	local BlockingVolumeTeamSpecific v;
+
+	result = true;
+	gbxp = gbxPawn(Other);
+	mcgvc = GetMcGuffinVictoryCondition();
+
+	if (gbxp != None && mcgvc != None)
+	{
+		result = result && mcgvc.AllowPawnToPickupMcGuffin(gbxp);
+
+		v = gbxp.IsTouchingTeamBlockingVolume();
+
+		// Disallow pickups if the player is touching a team blocking volume to prevent players from hiding with the mcguffin
+		if (v != None && v.bBlockPlayersSpecial)
+		{
+			result = false;
+		}
+	}
+	else
+	{
+		result = false;
+	}
+
+	return result;
+}
+
+event Landed(vector HitLocation, Vector HitNormal)
+{
+	Super.Landed(HitLocation, HitNormal);
+
+	SetCollisionSize(RealCollisionRadius, CollisionHeight);
+}
+
+auto state Pickup
+{
+	function bool ValidTouch( actor Other )
+	{
+		return TheRealValidTouch(Other) && Super.ValidTouch(other);
+	}
+}
+
+state FallingPickup
+{
+	function bool ValidTouch( actor Other )
+	{
+		return TheRealValidTouch(Other) && Super.ValidTouch(other);
+	}
+}
+
+State FadeOut
+{
+	function bool ValidTouch( actor Other )
+	{
+		return TheRealValidTouch(Other) && Super.ValidTouch(other);
+	}
+
+	// ignore the bs behavior most pickups have...
+	function BeginState()
+	{
+		Log(self $ " gbxMcGuffinPickup::BeginState for state FadeOut setting state to Pickup", 'JWS');
+		GotoState('Pickup');
+	}
+}
+
+defaultproperties
+{
+	FoundWhenPickedUp=false
+	RealCollisionRadius = 128.0f
+	CollisionRadius = 15.0f
+	CollisionHeight = 8.0f
+
+	Physics=PHYS_Falling
+	DrawType=DT_Sprite
+	Texture=Texture'Engine.S_Weapon'
+	InventoryType=class'gbxMcGuffin'
+    MessageClass=class'PickupMessagePlus'
+	PickupMessage="You got The McGuffin."
+    //PickupForce="PickupUSM1_"  // jdf // what is this??? 2004-05-07 JWS
+
+	MaxDesireability=0 // AI guys should never pickup McGuffins
+//	StaticMesh=StaticMesh's_gib.us_paratrooper.us_paratrooper_calf'
+//  DrawType=DT_StaticMesh
+	DrawScale3D = (X=4.0,Y=2.0,Z=1.0)
+    bAcceptsProjectors=false // what is this??? 2004-05-07
+}// GEARBOX 2004-05-25 JWS created
+//
+// usage: the place that the player will take the McGuffin
+class gbxMcGuffinTrigger extends gbxTrigger
+	placeable;
+
+#exec OBJ LOAD FILE=..\texture\t_interface_mb.utx
+
+// properties
+var() int McGuffinCount;		// the number of McGuffins needed to win
+var() bool AllowUSVictory;		// allow US players to achieve victory by carrying the McGuffin into this trigger
+var() bool AllowGermanVictory;	// allow German players to achieve victory by carrying the McGuffin into this trigger
+var() ETeamIdentifier	DefendingTeam;	// the team that is defending an object or area
+var() Name DestinationBeacon;	// The tag name of the destination beacon for this trigger
+
+// internal state
+var gbxMcGuffinVictoryCondition VictoryCondition;
+var gbxMcGuffinDestinationBeacon Beacon;
+var bool bActive;
+var() bool bHideObjectiveIcon;	// if true, the base VC class will only draw grime graphics and derived class will be responsible for drawing icon.
+								
+
+var	bool bSameHUDIcon;			// if true, then reference the defending icon for both attack/defend
+var Canvas.CanvasIcon DefendingIcon;
+var Canvas.CanvasIcon AttackingIcon;
+
+
+replication
+{
+	reliable if (bNetDirty && Role == ROLE_Authority)
+		bActive, bHideObjectiveIcon;
+
+	reliable if (bNetInitial && Role == ROLE_Authority)
+		DefendingIcon, AttackingIcon, DefendingTeam, bSameHUDIcon, Beacon, AllowUSVictory, AllowGermanVictory;
+}
+
+function PostBeginPlay()
+{
+	foreach DynamicActors(class'gbxMcGuffinVictoryCondition', VictoryCondition)
+	{
+		if (VictoryCondition.McGuffinTag == Tag)
+		{
+			break;
+		}
+		else
+		{
+			VictoryCondition = None;
+		}
+	}
+
+	assert(VictoryCondition != None);
+
+	foreach DynamicActors(class'gbxMcGuffinDestinationBeacon', Beacon, DestinationBeacon)
+	{
+		break;
+	}
+
+	// Setup HUD objective icons
+	DefendingIcon = class'gbxMcGuffinObjectiveIcon'.default.DefendIcon;
+	AttackingIcon = class'gbxMcGuffinObjectiveIcon'.default.AttackIcon;
+
+	assert(Beacon != None);
+}
+
+function TriggerEvent( Name EventName, Actor Other, Pawn EventInstigator )
+{
+	Super.TriggerEvent(EventName, Other, EventInstigator);
+
+	BroadcastLocalizedMessage(class'gbxMcGuffinTriggerMessage', 0, EventInstigator.Controller.PlayerReplicationInfo, None, Beacon);
+}
+
+function bool IsRelevant(actor Other)
+{
+	local bool victoryAchieved;
+	local String reason;
+	local Pawn p;
+
+	victoryAchieved = false;
+	p = Pawn(other);
+
+	if (Super.IsRelevant(Other) && p != None)
+	{
+		Log(self $ " gbxMcGuffinTrigger::Trigger() touched by " $ p $ " on team " $ p.PawnTeam $ ", checking for victory", 'JWS');
+
+		if ((p.PawnTeam == TEAM_US && AllowUSVictory) ||
+			(p.PawnTeam == TEAM_German && AllowGermanVictory))
+		{
+			victoryAchieved = CheckForVictory(p, reason);
+		}
+		else
+		{
+			victoryAchieved = false;
+			reason = "WrongTeam";
+		}
+
+		if (!victoryAchieved)
+		{
+			DenyVictory(Pawn(Other), reason);
+		}
+	}
+
+	return victoryAchieved;
+}
+
+// determines if the pawn has enough McGuffins
+function bool CheckForVictory(Pawn p, out String reason)
+{
+	local bool victoryAchieved;
+	local int count;
+
+	count = class'gbxMcGuffinVictoryCondition'.Static.CountMcGuffinsInInventory(p, Tag);
+
+	if (count >= McGuffinCount)
+	{
+		Log(self $ " gbxMcGuffinTrigger::CheckForVictory() saw count=" $ count $ " >= McGuffinCount=" $ McGuffinCount $ ", victory!!", 'JWS');
+
+		victoryAchieved = true;
+	}
+	else
+	{
+		Log(self $ " gbxMcGuffinTrigger::CheckForVictory() saw count=" $ count $ " < McGuffinCount=" $ McGuffinCount $ ", NO VICTORY!!", 'JWS');
+
+		victoryAchieved = false;
+		reason = "NotEnoughMcGuffins";
+	}
+
+	return victoryAchieved;
+}
+
+function DenyVictory(Pawn p, String reason)
+{
+	local PlayerController pc;
+
+	Log(self $ " gbxMcGuffinTrigger::DenyVictory(p=" $ p $ ", reason=" $ reason $ ")", 'JWS');
+
+	if (gbxPlayerPawn(p) != None)
+	{
+		pc = PlayerController(p.Controller);
+
+		if (reason == "WrongTeam")
+		{
+			// Removed because we decided this message is not useful. 2004-09-28 JWS
+			//pc.ReceiveLocalizedMessage(class'gbxMcGuffinTriggerMessage', 4, p.Controller.PlayerReplicationInfo, None, Beacon);
+		}
+		else if (reason == "NotEnoughMcGuffins")
+		{
+			pc.ReceiveLocalizedMessage(class'gbxMcGuffinObjectMessage', 7, p.Controller.PlayerReplicationInfo, None, VictoryCondition.McGuffinClass);
+
+			// TODO: Battle Dialog
+			VictoryCondition.EmitBattleDialogToUnits(p, VictoryCondition.McGuffinClass.default.NeedGroupName, '', '');
+		}
+		else // catch-all
+		{
+		}
+	}
+}
+
+defaultproperties
+{
+	Tag = McGuffin
+	Event = McGuffinVC
+	McGuffinCount = 1
+	TriggerType = TT_HumanPlayerProximity
+
+	DefendingTeam = TEAM_German
+	bSameHUDIcon = false
+	bActive = true
+	bHideObjectiveIcon = false
+
+	bAlwaysRelevant = true
+	Role = ROLE_Authority
+	RemoteRole = ROLE_DumbProxy
+	bOnlyDirtyReplication = true
+	bSkipActorPropertyReplication = true
+}
+// GEARBOX 2004-06-17 JWS created
+//
+// usage: localized messages for McGuffin feedback when the trigger is hit
+class gbxMcGuffinTriggerMessage extends gbxMcGuffinMessage;
+
+// switch 0 - trigger hit (for a touch exit)
+var string YouTouched;
+var string AllyTouched;
+var string EnemyTouched;
+
+// switch 1 - explosives planted
+var string YouPlanted;
+var string AllyPlanted;
+var Sound PlantedMcGuffinSound;
+var string EnemyPlanted;
+
+// switch 2 - explosives defused
+var string YouDefused;
+var string AllyDefused;
+var Sound DefusedMcGuffinSound;
+var string EnemyDefused;
+
+// switch 3 - explosives exploded
+var string YouExploded;
+var string AllyExploded;
+var string EnemyExploded;
+
+// Removed because we decided this message is not useful. 2004-09-28 JWS
+// switch 4 - your team can't win
+//var localized string WrongTeam;
+
+// Removed because this message is not used. 2004-09-29 JWS
+// switch 5 - explosive already planted
+//var string ExplosiveAlreadyPlanted;
+
+// Removed because this message is not used - see Bug 2659. 2004-11-03 JWS
+// switch 6 - explosive can't be defused
+//var string ExplosiveCantBeDefused;
+
+// switch 7 - explosives rearmed
+var string YouRearmed;
+var string AllyRearmed;
+var Sound RearmedMcGuffinSound;
+var string EnemyRearmed;
+
+static simulated function ClientReceive( 
+	PlayerController P,
+	optional int Switch,
+	optional PlayerReplicationInfo RelatedPRI_1, 
+	optional PlayerReplicationInfo RelatedPRI_2,
+	optional Object OptionalObject
+	)
+{
+	local bool isself, isally;
+	
+	Super.ClientReceive(P, Switch, RelatedPRI_1, RelatedPRI_2, OptionalObject);
+	
+	if (RelatedPRI_1 != None)
+	{
+		isself = static.IsPRISelf(P, RelatedPRI_1);
+
+		if (isself)
+		{
+			isally = false;
+		}
+		else
+		{
+			isally = static.IsPRIAlly(P, RelatedPRI_1);
+		}
+
+		switch( Switch )
+		{
+
+			// explosives planted
+		case 1:
+			P.PlayOwnedSound( default.PlantedMcGuffinSound, SLOT_None,,,,, );
+			break;
+
+
+			// explosives defused
+		case 2:
+			P.PlayOwnedSound( default.DefusedMcGuffinSound, SLOT_None,,,,, );
+			break;
+
+			// explosives rearmed
+		case 7:
+			P.PlayOwnedSound( default.RearmedMcGuffinSound, SLOT_None,,,,, );
+			break;
+		}
+	}
+}
+
+static function string GetMessageSectionName(Object Switch)
+{
+	local gbxMcGuffinDestinationBeacon beacon;
+	local string sectionName;
+
+	sectionName = default.MessageSectionName;
+
+	if (Switch != None)
+	{
+		beacon = gbxMcGuffinDestinationBeacon(Switch);
+
+		if (beacon != None)
+		{
+			sectionName = beacon.GetLocalizationSectionName();
+		}
+	}
+
+	return sectionName;
+}
+
+// PRI1 is the player that generated the message
+// OptionalObject is a gbxMcGuffinDestinationBeacon instance
+static function string GetStringForPlayer(
+	int Switch,
+	PlayerReplicationInfo RelatedPRI_1, 
+	PlayerReplicationInfo RelatedPRI_2,
+	Object OptionalObject,
+	PlayerController DisplayPlayer)
+{
+	local string msg;
+	local gbxMcGuffinDestinationBeacon beacon;
+	local bool isself, isally;
+	local LevelInfo level;
+
+	msg = "";
+   	
+	level = DisplayPlayer.Level;
+   	
+	beacon = gbxMcGuffinDestinationBeacon(OptionalObject);
+
+	assert(beacon != None);
+	
+	if (RelatedPRI_1 != None)
+	{
+		isself = static.IsPRISelf(DisplayPlayer, RelatedPRI_1);
+
+		if (isself)
+		{
+			isally = false;
+		}
+		else
+		{
+			isally = static.IsPRIAlly(DisplayPlayer, RelatedPRI_1);
+		}
+
+		switch (Switch)
+		{
+			// trigger hit (for a touch exit)
+		case 0:
+			if (isself)
+			{
+				msg = GetLocalizedMissionString(default.YouTouched, beacon, level);
+			}
+			else if (isally)
+			{
+				msg = GetLocalizedMissionString(default.AllyTouched, beacon, level);
+			}
+			else
+			{
+				msg = GetLocalizedMissionString(default.EnemyTouched, beacon, level);
+			}
+			break;
+
+			// explosives planted
+		case 1:
+			if (isself)
+			{
+				msg = GetLocalizedMissionString(default.YouPlanted, beacon, level);
+			}
+			else if (isally)
+			{
+				msg = GetLocalizedMissionString(default.AllyPlanted, beacon, level);
+			}
+			else
+			{
+				msg = GetLocalizedMissionString(default.EnemyPlanted, beacon, level);
+			}
+			break;
+
+			// explosives defused
+		case 2:
+			if (isself)
+			{
+				msg = GetLocalizedMissionString(default.YouDefused, beacon, level);
+			}
+			else if (isally)
+			{
+				msg = GetLocalizedMissionString(default.AllyDefused, beacon, level);
+			}
+			else
+			{
+				msg = GetLocalizedMissionString(default.EnemyDefused, beacon, level);
+			}
+			break;
+
+			// explosives exploded
+		case 3:
+			if (isself)
+			{
+				msg = GetLocalizedMissionString(default.YouExploded, beacon, level);
+			}
+			else if (isally)
+			{
+				msg = GetLocalizedMissionString(default.AllyExploded, beacon, level);
+			}
+			else
+			{
+				msg = GetLocalizedMissionString(default.EnemyExploded, beacon, level);
+			}
+			break;
+
+			// your team can't win
+			// Removed because we decided this message is not useful. 2004-09-28 JWS
+			//		case 4:
+			//			if (isself)
+			//			{
+			//				msg = default.WrongTeam;
+			//			}
+			//			break;
+
+			// explosive already planted
+
+			// Removed because this message is not used. 2004-09-29 JWS
+			//		case 5: 
+			//			if (isself)
+			//			{
+			//				msg = GetLocalizedMissionString(default.ExplosiveAlreadyPlanted, beacon, level);
+			//			}
+			//			break;
+
+			// Removed because this message is not used - see Bug 2659. 2004-11-03 JWS
+			// explosive can't be defused
+			//		case 6:
+			//			if (isself)
+			//			{
+			//				msg = GetLocalizedMissionString(default.ExplosiveCantBeDefused, beacon, level);
+			//			}
+			//			break;
+
+			// explosives rearmed
+		case 7:
+			if (isself)
+			{
+				msg = GetLocalizedMissionString(default.YouRearmed, beacon, level);
+			}
+			else if (isally)
+			{
+				msg = GetLocalizedMissionString(default.AllyRearmed, beacon, level);
+			}
+			else
+			{
+				msg = GetLocalizedMissionString(default.EnemyRearmed, beacon, level);
+			}
+			break;
+		}
+	}
+	else
+	{
+		// Fall back for cases where the player is no longer around. This sucks, but there's not much else we can do except ignore the message
+		msg = "";
+	}
+
+	return msg;
+}
+
+defaultproperties
+{
+	MessageSectionName="McGuffinTriggerMessage"
+
+	YouTouched="YOUTOUCHED"
+	AllyTouched="ALLYTOUCHED"
+	EnemyTouched="ENEMYTOUCHED"
+
+	YouPlanted="YOUPLANTED"
+	AllyPlanted="ALLYPLANTED"
+	EnemyPlanted="ENEMYPLANTED"
+
+	YouDefused="YOUDEFUSED"
+	AllyDefused="ALLYDEFUSED"
+	EnemyDefused="ENEMYDEFUSED"
+
+	YouExploded="YOUEXPLODED"
+	AllyExploded="ALLYEXPLODED"
+	EnemyExploded="ENEMYEXPLODED"
+
+	// Removed because we decided this message is not useful. 2004-09-28 JWS
+	//WrongTeam="You cannot win here"
+	// Removed because this message is not used. 2004-09-29 JWS
+	//ExplosiveAlreadyPlanted="EXPLOSIVEALREADYPLANTED"
+	// Removed because this message is not used - see Bug 2659. 2004-11-03 JWS
+	//ExplosiveCantBeDefused="EXPLOSIVECANTBEDEFUSED"
+
+	YouRearmed="YOUREARMED"
+	AllyRearmed="ALLYREARMED"
+	EnemyRearmed="ENEMYREARMED"
+
+	PlantedMcGuffinSound=Sound'MP_MISC.ALLY_PLANT_BOMB'
+	DefusedMcGuffinSound=Sound'MP_MISC.ALLY_DIFFUSE_BOMB'
+	RearmedMcGuffinSound=Sound'MP_MISC.ALLY_RESET_BOMB'
+}// GEARBOX 2004-10-22 JWS created
+//
+// usage: the codebook for MP missions
+class gbxMcGuffinTypeCodebook extends gbxMcGuffin;
+
+defaultproperties
+{
+    ItemName="The Codebook"
+    PickupClass=class'gbxMcGuffinTypeCodebookPickup'
+
+	HUDIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=94,V=66,UL=34,VL=34,DrawColor=(R=255,G=255,B=255,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0)
+
+	VictoryGroupName=CodebookVictory
+	NeedGroupName=CodebookNeeded
+	DroppedGroupName=CodebookDropped
+	OnGroundGroupName=CodebookOnGround
+	EnemyDroppedGroupName=CodebookEnemyDropped
+	EnemyHasGroupName=CodebookEnemyHas
+}// GEARBOX 2004-10-22 JWS created
+//
+// usage: the codebook for MP missions
+class gbxMcGuffinTypeCodebookPickup extends gbxMcGuffinPickup;
+
+simulated function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("S_military_us.equipment.us_map_bag", class'StaticMesh')));
+	SetDrawType( DT_StaticMesh );
+}
+
+defaultproperties
+{
+	InventoryType=class'gbxMcGuffinTypeCodebook'
+	DrawType=DT_Sprite
+	Texture=Texture'Engine.S_Weapon'
+//	StaticMesh=StaticMesh'S_military_us.equipment.us_map_bag'
+	PickupMessage="You got The Codebook."
+	DrawScale3D = (X=1.0,Y=1.0,Z=1.0)
+}// GEARBOX 2004-10-22 JWS created
+//
+// usage: the explosives for MP missions
+class gbxMcGuffinTypeExplosives extends gbxMcGuffin;
+
+// battle dialogue
+// the explosives has extra battle dialogue for the events regular McGuffins don't deal with
+var Name SetGroupName;				// The player has set the explosives
+var Name DefuseGroupName;			// The player has defused the explosives
+
+var Name NeedDefuseGroupName;		// The player needs to defuse the explosives
+var Name NeedSetGroupName;			// The player needs to set the explosives
+
+var Name EnemyDefusedGroupName;		// The enemy has defused the explosives
+var Name EnemySetGroupName;			// The enemy has set the explosives
+
+var Name ExplodedOneGroupName;		// You or your ally blew up one of two objectives
+var Name ExplodedAllGroupName;		// You or your ally blew up the only objective
+
+var Name EnemyExplodedOneGroupName;	// You blew up one of two objectives
+var Name EnemyExplodedAllGroupName;	// You blew up the only objective
+
+defaultproperties
+{
+    ItemName="The Explosives"
+    PickupClass=class'gbxMcGuffinTypeExplosivesPickup'
+
+	HUDIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=1,V=221,UL=34,VL=34,DrawColor=(R=255,G=255,B=255,A=225),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0)
+
+	VictoryGroupName=
+	NeedGroupName=ExplosivesNeeded
+	DroppedGroupName=ExplosivesDropped
+	OnGroundGroupName=ExplosivesOnGround
+	EnemyDroppedGroupName=ExplosivesEnemyDropped
+	EnemyHasGroupName=ExplosivesEnemyHas
+
+	SetGroupName=ExplosivesSet
+	DefuseGroupName=ExplosivesDefused
+	NeedDefuseGroupName=ExplosivesNeedDefuse
+	NeedSetGroupName=ExplosivesNeedSet
+	EnemyDefusedGroupName=ExplosivesEnemyDefused
+	EnemySetGroupName=ExplosivesEnemySet
+
+	ExplodedOneGroupName=ExplodedOne
+	ExplodedAllGroupName=ExplodedAll
+
+	EnemyExplodedOneGroupName=EnemyExplodedOne
+	EnemyExplodedAllGroupName=EnemyExplodedAll
+}// GEARBOX 2004-10-22 JWS created
+//
+// usage: the explosives for MP missions
+class gbxMcGuffinTypeExplosivesPickup extends gbxMcGuffinPickup;
+
+simulated function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("s_mp_misc.mcguffins.explosives", class'StaticMesh')));
+	SetDrawType( DT_StaticMesh );
+}
+
+defaultproperties
+{
+	InventoryType=class'gbxMcGuffinTypeExplosives'
+	DrawType=DT_Sprite
+	Texture=Texture'Engine.S_Weapon'
+//	StaticMesh=StaticMesh's_mp_misc.mcguffins.explosives'
+	PickupMessage="You got the Explosives."
+	DrawScale3D = (X=1.0,Y=1.0,Z=1.0)
+}
+// GEARBOX 2004-10-22 JWS created
+//
+// usage: the maps for MP missions
+class gbxMcGuffinTypeMaps extends gbxMcGuffin;
+
+defaultproperties
+{
+    ItemName="The Maps"
+    PickupClass=class'gbxMcGuffinTypeMapsPickup'
+
+	HUDIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=94,V=66,UL=34,VL=34,DrawColor=(R=255,G=255,B=255,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0)
+
+	VictoryGroupName=MapsVictory
+	NeedGroupName=MapsNeeded
+	DroppedGroupName=MapsDropped
+	OnGroundGroupName=MapsOnGround
+	EnemyDroppedGroupName=MapsEnemyDropped
+	EnemyHasGroupName=MapsEnemyHas
+}// GEARBOX 2004-10-22 JWS created
+//
+// usage: the maps for MP missions
+class gbxMcGuffinTypeMapsPickup extends gbxMcGuffinPickup;
+
+simulated function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("S_military_us.equipment.us_map_bag", class'StaticMesh')));
+	SetDrawType( DT_StaticMesh );
+}
+
+defaultproperties
+{
+	InventoryType=class'gbxMcGuffinTypeMaps'
+	DrawType=DT_Sprite
+	Texture=Texture'Engine.S_Weapon'
+//	StaticMesh=StaticMesh'S_military_us.equipment.us_map_bag'
+	PickupMessage="You got The Maps."
+	DrawScale3D = (X=1.0,Y=1.0,Z=1.0)
+}// GEARBOX 2004-10-22 JWS created
+//
+// usage: the orders for MP missions
+class gbxMcGuffinTypeOrders extends gbxMcGuffin;
+
+defaultproperties
+{
+    ItemName="The Orders"
+    PickupClass=class'gbxMcGuffinTypeOrdersPickup'
+
+	HUDIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=94,V=66,UL=34,VL=34,DrawColor=(R=255,G=255,B=255,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0)
+
+	VictoryGroupName=OrdersVictory
+	NeedGroupName=OrdersNeeded
+	DroppedGroupName=OrdersDropped
+	OnGroundGroupName=OrdersOnGround
+	EnemyDroppedGroupName=OrdersEnemyDropped
+	EnemyHasGroupName=OrdersEnemyHas
+}// GEARBOX 2004-10-22 JWS created
+//
+// usage: the orders for MP missions
+class gbxMcGuffinTypeOrdersPickup extends gbxMcGuffinPickup;
+
+simulated function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+
+	SetStaticMesh(StaticMesh(DynamicLoadObject("S_military_us.equipment.us_map_bag", class'StaticMesh')));
+	SetDrawType( DT_StaticMesh );
+}
+
+defaultproperties
+{
+	InventoryType=class'gbxMcGuffinTypeOrders'
+	DrawType=DT_Sprite
+	Texture=Texture'Engine.S_Weapon'
+//	StaticMesh=StaticMesh'S_military_us.equipment.us_map_bag'
+	PickupMessage="You got The Orders."
+	DrawScale3D = (X=1.0,Y=1.0,Z=1.0)
+}// GEARBOX 2004-10-22 JWS created
+//
+// usage: the supplies for MP missions
+class gbxMcGuffinTypeSupplies extends gbxMcGuffin;
+
+defaultproperties
+{
+    ItemName="The Supplies"
+    PickupClass=class'gbxMcGuffinTypeSuppliesPickup'
+
+	HUDIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=94,V=66,UL=34,VL=34,DrawColor=(R=255,G=255,B=255,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0)
+
+	VictoryGroupName=SuppliesVictory
+	NeedGroupName=SuppliesNeeded
+	DroppedGroupName=SuppliesDropped
+	OnGroundGroupName=SuppliesOnGround
+	EnemyDroppedGroupName=SuppliesEnemyDropped
+	EnemyHasGroupName=SuppliesEnemyHas
+}// GEARBOX 2004-10-22 JWS created
+//
+// usage: the supplies for MP missions
+class gbxMcGuffinTypeSuppliesPickup extends gbxMcGuffinPickup;
+
+simulated function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+	
+	SetStaticMesh(StaticMesh(DynamicLoadObject("S_military_us.equipment.us_map_bag", class'StaticMesh')));
+	SetDrawType( DT_StaticMesh );
+}
+
+defaultproperties
+{
+	InventoryType=class'gbxMcGuffinTypeSupplies'
+	DrawType=DT_Sprite
+	Texture=Texture'Engine.S_Weapon'
+//	StaticMesh=StaticMesh'S_military_us.equipment.us_map_bag'
+	PickupMessage="You got The Supplies."
+	DrawScale3D = (X=1.0,Y=1.0,Z=1.0)
+}class gbxMcGuffinVehicleObjectiveIcon extends gbxMcGuffinObjectiveIcon;
+
+defaultproperties
+{
+	DefendIcon = (Icon=Texture't_interface_mb.hud.interface_comp',U=94,V=222,UL=34,VL=34,DrawColor=(R=228,G=220,B=197,A=255),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0);			
+	AttackIcon = None
+}// GEARBOX 2004-05-06 JWS created
+//
+// usage: controls how the McGuffins are spawned and operated in the map. set the tag to be what the trigger should hit when victory is achieved.
+//		  when triggered, the game ends and the triggering player's team is the victor. set McGuffinTag to match the set of McGuffins this should manage.
+class gbxMcGuffinVictoryCondition extends gbxPrimaryVictoryCondition
+	placeable
+	native;
+
+#exec OBJ LOAD FILE=..\texture\t_interface_mb.utx
+
+enum EMcGuffinType
+{
+	McGuffin_Book,
+	McGuffin_Satchel
+};
+
+// constants
+const MAX_MCGUFFIN_TRIGGERS = 10;
+
+// properties
+var() int McGuffinCount1P;                  // specifies how many McGuffins are created in a 1 player game (only skirmish supports 1 player games)
+var() int McGuffinCount2P;					// specifies how many McGuffins are created in a 2 player game
+var() int McGuffinCount3PUSUnderdog;		// specifies how many McGuffins are created in a 3 player game when the Us team is the underdog
+var() int McGuffinCount3PGermanUnderdog;	// specifies how many McGuffins are created in a 3 player game when the German team is the underdog
+var() int McGuffinCount4P;					// specifies how many McGuffins are created in a 4 player game
+
+var float BattleDialogOnGroundDelay;
+
+// GBX:naj - TESTnaj
+//var bool bDoMcGuffinOnGroundDialogue;
+
+var(gbxMcGuffinBeacon) bool VisibleToEnemyDropped;		// if true, the enemy team can see the beacon when your team owned the McGuffin and then dropped it
+var(gbxMcGuffinBeacon) bool VisibleToEnemyHeld;			// if true, the enemy team can see the beacon when your team owned the McGuffin and then dropped it
+var(gbxMcGuffinBeacon) bool EmptyLocationVisibleUS;		// if true, the US team can see empty McGuffin location until one is picked up
+var(gbxMcGuffinBeacon) bool EmptyLocationVisibleGerman;	// if true, the German team can see empty McGuffin location until one is picked up
+var(gbxMcGuffinBeacon) bool UnfoundVisibleUS;			// if true, the US team can see the initial McGuffin pickup (before either team has picked it up)
+var(gbxMcGuffinBeacon) bool UnfoundVisibleGerman;		// if true, the German team can see the initial McGuffin pickup (before either team has picked it up)
+
+var() bool AllowUSPickup;					// allows US players to pickup the McGuffin
+var() bool AllowGermanPickup;				// allows German players to pickup the McGuffin
+var() int MaximumMcGuffinsPerPlayer;		// specifies the maximum number of McGuffins each player may carry
+var() Name McGuffinLocationTag;				// specifies which gbxMcGuffinLocations to send McGuffins to
+var() Name McGuffinTag;						// specifies which McGuffins to manage.
+var() class<gbxMcGuffin> McGuffinClass;		// specifies what kind of McGuffin to manage
+var() EMcGuffinType	McGuffinTypeIcon;	// determines what type of McGuffin is used in map; icon drawn on HUD.
+
+// internal state
+var array<gbxMcGuffinLocation> McGuffinLocations;
+var int McGuffinsFound;
+var int McGuffinOwners[3]; // This must match ETeamIdentifier length...
+var Canvas.CanvasIcon McGuffinIcon;
+var ETeamIdentifier victorTeam;
+var int iNumMcGuffins;		// Save this value when the game starts, because calling GetNumMcGuffins() could change if players leave the game.
+var Canvas.CanvasIcon GrimeIcon;
+var Canvas.CanvasIcon RingIcon;
+var Canvas.CanvasIcon USIcon;
+var Canvas.CanvasIcon GermanIcon;
+var Canvas.CanvasIcon BackgroundIcon;
+var Canvas.CanvasIcon BackgroundIconPrime;
+var Color BackgroundUSColor;
+var Color BackgroundGermanColor;
+
+var gbxMcGuffinTrigger McGuffinTriggers[MAX_MCGUFFIN_TRIGGERS];
+
+// hud related
+var   int   IconSpacing;
+var   int   IconSpacingY;
+var   int	McGuffinBackgroundX;
+var   int	McGuffinBackgroundY;
+var   int   McGuffinBackgroundSplitscreenX;
+var   int   McGuffinBackgroundSplitscreenY;
+
+var   int   FirstMcGuffinX;
+var   int   FirstMcGuffinY;
+var   int	FirstMcGuffinYSplitscreen;
+var   int   TeamIconOffsetX;
+var   int   TeamIconOffsetY;
+var   int   TeamIconOffsetSplitScreenX;
+var   int   TeamIconOffsetSplitScreenY;
+
+var   int   ObjectiveOffsetY;
+var   int   FirstObjectiveX;
+var   int   FirstObjectiveY;
+var   int	FirstObjectiveSplitscreenX;
+var   int	FirstObjectiveSplitscreenY;
+var   int   ObjectiveIconSpacing;
+
+var   int	McGuffinRingU;			// Outer shape
+var	  int   McGuffinRingV;
+var   int	McGuffinRingWidth;
+var   int   McGuffinRingHeight;
+var   float McGuffinRingScale;
+var   int   McGuffinRingX;
+var   int   McGuffinRingY;
+var   int	McGuffinRingSplitscreenX;
+var   int	McGuffinRingSplitscreenY;
+
+var	  bool  bAnnounceMcGuffinDrop;		// If true, text and audio will be given when a McGuffin is dropped.
+
+// network replication
+replication
+{
+	reliable if (bNetDirty && Role == ROLE_Authority)
+		McGuffinOwners, McGuffinTriggers;
+
+	reliable if (bNetInitial && Role == ROLE_Authority)
+		VisibleToEnemyDropped, VisibleToEnemyHeld, EmptyLocationVisibleUS, EmptyLocationVisibleGerman, UnfoundVisibleUS, UnfoundVisibleGerman, McGuffinTag, McGuffinIcon, iNumMcGuffins;
+}
+
+function PostNetBeginPlay()
+{
+	local gbxMcGuffinTrigger trigger;
+	local int count;
+
+	Super.PostNetBeginPlay();
+
+	count = 0;
+
+	foreach DynamicActors(class'gbxMcGuffinTrigger', trigger)
+	{
+		if ( count < MAX_MCGUFFIN_TRIGGERS )
+		{
+			Log( self$ " gbxMcGuffinVC::PostBeginPlay() Found trigger: " $ trigger $ " assigning number " $ count, 'MP');
+			
+			trigger.Beacon.AssignDestinationNumber(count);
+			McGuffinTriggers[ count ] = trigger;
+			McGuffinTriggers[ count ].Beacon.CompassStringIndex = count;
+		}
+
+		count++;
+	}
+
+	if ( count > MAX_MCGUFFIN_TRIGGERS )
+		Warn( self$ " gbxMcGuffinVictoryCondition::PostNetBeginPlay() Map has " $count$ " McGuffinTriggers and only " $MAX_MCGUFFIN_TRIGGERS$ " McGuffinTriggers are currently supported.  Have a programmer increase MAX_MCGUFFIN_TRIGGERS!");
+
+	Log( self$ " gbxMcVC::PostNetBeginPlay() iNumMcGuffins: " $iNumMcGuffins$ " triggers found: " $count, 'MP');
+}
+
+simulated function PostBeginPlay()
+{
+	Super.PostBeginPlay();
+
+	log( "gbxMcVC::PostBeginPlay()", 'MP' );
+
+	if (Role == ROLE_Authority)
+	{
+		bAnnounceMcGuffinDrop = true;
+		victorTeam = TEAM_None;
+
+		iNumMcGuffins = GetMcGuffinCount();
+
+		// Save the McGuffin icon so we can draw it later
+		McGuffinIcon = McGuffinClass.default.HUDIcon;
+
+		McGuffinOwners[ETeamIdentifier.TEAM_None] = iNumMcGuffins;
+		McGuffinOwners[ETeamIdentifier.TEAM_US] = 0;
+		McGuffinOwners[ETeamIdentifier.TEAM_German] = 0;
+
+		Log(self $ " gbxMcGuffinVictoryCondition::PostBeginPlay(), Orphaned = " $ McGuffinOwners[ETeamIdentifier.TEAM_None] $ " US = " $ McGuffinOwners[ETeamIdentifier.TEAM_US] $ " German = " $ McGuffinOwners[ETeamIdentifier.TEAM_German], 'MP');
+	}
+}
+
+static simulated function int CountMcGuffinsInInventory(Pawn p, Name TagToMatch)
+{
+	local Inventory Inv;
+	local int count;
+
+	if (p == None)
+		return 0;
+  	                 
+	for ( Inv=p.Inventory; Inv!=None; Inv=Inv.Inventory )
+	{
+        // PSV: 7/15/2004 Comment out tag comparision since tag isn't replicated and we're removing this feature.
+		if (gbxMcGuffin(Inv) != None/* && Inv.Tag == TagToMatch*/)
+		{
+			count++;
+		}
+	}
+
+	return count;
+}
+
+function GetMcGuffinLocations(Name loctag)
+{
+	local gbxMcGuffinLocation loc;
+	
+	McGuffinLocations.Length = 0;
+
+	foreach DynamicActors(class'gbxMcGuffinLocation', loc, loctag)
+	{
+		if (loc.IsValid())
+		{
+			Log(self $ " gbxMcGuffinVictoryCondition::GetMcGuffinLocations() adding to list loc =  " $ loc, 'MP');
+
+			McGuffinLocations.Insert(McGuffinLocations.Length, 1);
+			McGuffinLocations[ McGuffinLocations.Length-1 ] = loc;
+		}
+		else
+		{
+			loc.MarkAsUnused();
+			Log(self $ " gbxMcGuffinVictoryCondition::GetMcGuffinLocations() skipped invalid loc = " $ loc, 'MP');
+		}
+	}
+
+	Log(self $ " gbxMcGuffinVictoryCondition::GetMcGuffinLocations() finished, array now has " $ McGuffinLocations.Length $ " elements", 'MP');
+}
+
+// find the next McGuffin location randomly
+function gbxMcGuffinLocation GetNextMcGuffinLocation()
+{
+	local int index;
+	local gbxMcGuffinLocation loc;
+
+	index = Rand(McGuffinLocations.Length);
+	
+	Log(self $ " gbxMcGuffinVictoryCondition::GetNextMcGuffinLocation() chose index = " $ index $ " when locs.Length = " $ McGuffinLocations.Length, 'MP');
+
+	loc = McGuffinLocations[index];
+	McGuffinLocations.Remove(index, 1);
+	
+	Log(self $ " gbxMcGuffinVictoryCondition::GetNextMcGuffinLocation() locs.Length is now " $ McGuffinLocations.Length $ ", returning loc = " $ loc, 'MP');
+
+	return loc;
+}
+
+function int GetMcGuffinCount()
+{
+	local int count;
+	local int playercount;
+	local WargameMultiplayer mpgi;
+
+	log( self$ " GMCGVC::GetMcGuffinCount() Level.Game: " $Level.Game, 'MP' );
+
+	mpgi = WargameMultiplayer(Level.Game);
+
+	log( self$ " GMCGVC::GetMcGuffinCount() mpgi: "$mpgi, 'MP' );
+
+	if (mpgi != None)
+	{
+		playercount = mpgi.GetNumberOfActualPlayers();
+
+		log( self$ " GMCGVC::GetMcGuffinCount() playercount: " $playercount, 'MP' );
+
+		if ( Level.Game.IsA('WargameSkirmish') )
+		{
+			if ( playercount > 1 )
+			{
+				count = McGuffinCount2P;
+				log( self$ " GMCGVC::GetMcGuffinCount() count: "$count, 'MP' );
+  	        }
+  	        else
+  	        {
+  	            count = McGuffinCount1P;
+                log( self$ " GMCGVC::GetMcGuffinCount() count: "$count, 'MP' );
+			}
+		}
+		else if ( Level.Game.IsA('WargameMultiplayer') )
+		{
+			if (playercount == 2)
+			{
+				count = McGuffinCount2P;
+			}
+			else if (playercount == 3)
+			{
+				if (mpgi.IsPlayerUnderdog(TEAM_US))
+				{
+					count = McGuffinCount3PUSUnderdog;
+				}
+				else
+				{
+					count = McGuffinCount3PGermanUnderdog;
+				}
+			}
+			else
+			{
+				count = McGuffinCount4P;
+			}
+		}
+	}
+	else
+	{
+		count = 0;
+	}
+
+	return count;
+}
+
+// This distributes the McGuffins randomly to the McGuffin locations.
+function PlaceMcGuffinsInWorld()
+{
+	local gbxMcGuffinLocation loc;
+	local int i;
+	local int count;
+
+	log( self$ " gbxMCGVC::PlaceMcGuffinsInWorld() McGuffinLocationTag: " $McGuffinLocationTag$ " iNumMcGuffins: " $iNumMcGuffins, 'MP' );
+
+	GetMcGuffinLocations(McGuffinLocationTag);
+
+	loc = None;
+	count = iNumMcGuffins; 
+
+	for (i = 0; i < count; i++)
+	{
+		loc = GetNextMcGuffinLocation();
+
+		if (loc != None)
+		{
+			SpawnMcGuffinAtLocation(loc);
+		}
+		else
+		{
+			Log(self $ " gbxMcGuffinVictoryCondition::PutMcGuffinsInWorld() could not find a valid location for McGuffin " $ i $ " - McGuffin not placed", 'MP');
+		}
+	}
+}
+
+function gbxMcGuffinPickup SpawnMcGuffinAtLocation(gbxMcGuffinLocation loc)
+{
+	local class<Pickup> pickupClass;
+	local gbxMcGuffinPickup pickup;
+
+	pickupClass = McGuffinClass.default.PickupClass;
+
+	pickup = gbxMcGuffinPickup(spawn(pickupClass,,McGuffinTag,loc.Location,));
+
+	log(self $ " gbxMcGuffinVictoryCondition::SpawnMcGuffinAtLocation() spawned " $ pickup $ " at location " $ loc, 'MP');
+
+	pickup.Beacon = loc.Beacon;
+	loc.McGuffinSpawned(pickup);
+
+	if (Level.Game.IsA('WargameSkirmish'))
+	{
+		pickup.bHidden = true;
+	}
+
+	return pickup;
+}
+
+function bool AllowPawnToPickupMcGuffin(gbxPawn gbxp)
+{
+	local bool result;
+	local int count;
+
+	if (gbxp.IsHumanControlled())
+	{
+		// Enforce the team rule
+		if (gbxp.PawnTeam == TEAM_US && AllowUSPickup)
+		{
+			result = true;
+		}
+		else if (gbxp.PawnTeam == TEAM_German && AllowGermanPickup)
+		{
+			result = true;
+		}
+		else
+		{
+			result = false;
+
+			// Notify the player he can't pick it up because he is on the wrong team
+			// Removed because we decided this message is not useful. 2004-09-28 JWS
+			//PlayerController(gbxp.Controller).ReceiveLocalizedMessage(class'gbxMcGuffinObjectMessage', 5, gbxp.Controller.PlayerReplicationInfo, None, McGuffinClass);
+		}
+
+		if (result)
+		{
+			// Enforce the maximum McGuffins rule
+			count = CountMcGuffinsInInventory(gbxp, McGuffinTag);
+			assert(count <= MaximumMcGuffinsPerPlayer);
+
+			if (count < MaximumMcGuffinsPerPlayer)
+			{
+				result = true;
+			}
+			else
+			{
+				result = false;
+
+				// Notify the player he can't pick it up because he has too many
+				PlayerController(gbxp.Controller).ReceiveLocalizedMessage(class'gbxMcGuffinObjectMessage', 6, gbxp.Controller.PlayerReplicationInfo, None, McGuffinClass);
+			}
+		}
+	}
+	else
+	{
+		result = false;
+	}
+
+	return result;
+}
+
+function McGuffinFound(Pawn p)
+{
+	local int count;
+
+	Log(self $ " gbxMcGuffinVictoryCondition::McGuffinFound() by " $ p, 'MP');
+
+	McGuffinsFound++;
+	count = iNumMcGuffins; 
+
+	assert(McGuffinsFound <= count);
+
+	if (McGuffinsFound == count)
+	{
+		AllMcGuffinsFound(p);
+	}
+	else
+	{	
+		// Announce that a McGuffin was found
+		PlayerController(p.Controller).ReceiveLocalizedMessage(class'gbxMcGuffinObjectMessage', 0, p.Controller.PlayerReplicationInfo, None, McGuffinClass);
+	}
+}
+
+function AllMcGuffinsFound(Pawn LastFinder)
+{
+	local gbxMcGuffinLocation loc;
+
+	Log(self $ " gbxMcGuffinVictoryCondition::McGuffinFound() all McGuffins found, notifying locations", 'MP');
+
+	foreach DynamicActors(class'gbxMcGuffinLocation', loc, McGuffinLocationTag)
+	{
+		loc.AllMcGuffinsFound();
+	}
+
+	// Tell everyone that all McGuffins have been found
+	BroadcastLocalizedMessage(class'gbxMcGuffinObjectMessage', 4, LastFinder.Controller.PlayerReplicationInfo, None, McGuffinClass);
+}
+
+function McGuffinPickedUp(Pawn p)
+{
+	assert(McGuffinOwners[ETeamIdentifier.TEAM_None] >= 0);
+	McGuffinOwners[ETeamIdentifier.TEAM_None]--;
+	assert(McGuffinOwners[ETeamIdentifier.TEAM_None] >= 0);
+
+	assert(McGuffinOwners[p.PawnTeam] >= 0);
+	McGuffinOwners[p.PawnTeam]++;
+	assert(McGuffinOwners[p.PawnTeam] >= 0);
+
+	Log(self $ " gbxMcGuffinVictoryCondition::McGuffinPickedUp() by " $ p $ ", Orphaned = " $ McGuffinOwners[ETeamIdentifier.TEAM_None] $ " US = " $ McGuffinOwners[ETeamIdentifier.TEAM_US] $ " German = " $ McGuffinOwners[ETeamIdentifier.TEAM_German], 'MP');
+
+	// Announce the pickup
+	BroadcastLocalizedMessage(class'gbxMcGuffinObjectMessage', 2, p.Controller.PlayerReplicationInfo, None, McGuffinClass);
+
+	// TODO: Battle Dialog
+	EmitBattleDialogToUnits(p, '', '', McGuffinClass.default.EnemyHasGroupName);
+
+	if (McGuffinOwners[ETeamIdentifier.TEAM_None] == 0)
+	{
+		// GBX:naj - TESTnaj
+		//StopMcGuffinOnGroundTimer();
+	}
+
+	bAnnounceMcGuffinDrop=true;
+}
+
+function McGuffinDropped(Pawn p)
+{
+	assert(McGuffinOwners[ETeamIdentifier.TEAM_None] >= 0);
+	McGuffinOwners[ETeamIdentifier.TEAM_None]++;
+	assert(McGuffinOwners[ETeamIdentifier.TEAM_None] >= 0);
+
+	assert(McGuffinOwners[p.PawnTeam] >= 0);
+	McGuffinOwners[p.PawnTeam]--;
+	assert(McGuffinOwners[p.PawnTeam] >= 0);
+
+	Log(self $ " gbxMcGuffinVictoryCondition::McGuffinDropped() by " $ p $ ", Orphaned = " $ McGuffinOwners[ETeamIdentifier.TEAM_None] $ " US = " $ McGuffinOwners[ETeamIdentifier.TEAM_US] $ " German = " $ McGuffinOwners[ETeamIdentifier.TEAM_German], 'MP');
+
+	// Only announce this if there are bomb locations that haven't been planted on yet
+	if ( bAnnounceMcGuffinDrop )
+	{
+		// Announce the drop
+		BroadcastLocalizedMessage(class'gbxMcGuffinObjectMessage', 1, p.Controller.PlayerReplicationInfo, None, McGuffinClass);
+
+		// TODO: Battle Dialog
+		EmitBattleDialogToUnits(p, McGuffinClass.default.DroppedGroupName, McGuffinClass.default.DroppedGroupName, McGuffinClass.default.EnemyDroppedGroupName);
+		bAnnounceMcGuffinDrop=false;
+	}
+	else
+	{
+		//Log(self $ " gbxMcGuffinVictoryCondition::McGuffinDropped() NOT ANNOUNCING MCGUFFIN DROP SINCE THEY HAVE ALL BEEN PLANTED!", 'MP');
+	}
+
+	// GBX:naj - TESTnaj
+	//StartMcGuffinOnGroundTimer();
+}
+
+/* GBX:naj - TESTnaj
+function StartMcGuffinOnGroundTimer()
+{
+	SetTimer(BattleDialogOnGroundDelay, true);
+}
+*/
+
+/* GBX:naj - TESTnaj
+function StopMcGuffinOnGroundTimer()
+{
+	SetTimer(0.0, false);
+}
+*/
+
+/* GBX:naj - TESTnaj
+event Timer()
+{
+	if (bDoMcGuffinOnGroundDialogue)
+	{
+		if (AllowUsPickup)
+		{
+			// TODO: Battle Dialog
+			EmitBattleDialogToTeamUnits(TEAM_US, McGuffinClass.default.OnGroundGroupName);
+		}
+
+		if (AllowGermanPickup)
+		{
+			// TODO: Battle Dialog
+			EmitBattleDialogToTeamUnits(TEAM_German, McGuffinClass.default.OnGroundGroupName);
+		}
+	}
+}
+*/
+
+function EndGame(ETeamIdentifier WinningTeam, int reason)
+{
+	// TODO: Battle Dialog
+	EmitBattleDialogToTeamUnits(WinningTeam, McGuffinClass.default.VictoryGroupName);
+
+	Super.EndGame(WinningTeam, reason);
+}
+
+// this only runs the first time to spawn the McGuffins the first time gameon happens
+// We also use this to start the "hey pickup the mcguffin" battle dialog timer
+function SetGameOn(bool gameOn)
+{
+	Super.SetGameOn(gameOn);
+
+	log( "gbxMCGVC::SetGameOn("$gameOn$")", 'MP' );
+	
+	if (gameOn)
+	{
+		PlaceMcGuffinsInWorld();
+
+		// GBX:naj - TESTnaj
+		//bDoMcGuffinOnGroundDialogue = true;
+		// GBX:naj - TESTnaj
+		//StartMcGuffinOnGroundTimer();
+
+		GotoState('McGuffinsSpawned');
+	}
+}
+
+state McGuffinsSpawned
+{
+	// GBX:naj - TESTnaj
+	function BeginState()
+	{
+		GotoState( 'McGuffinOnGround' );
+	}
+	// GBX:naj - TESTnaj
+
+	function SetGameOn(bool gameOn)
+	{
+		if (!gameOn)
+		{
+			SetTimer(0.0, false);
+			// GBX:naj - TESTnaj
+			//StopMcGuffinOnGroundTimer();
+		}
+
+		Super.SetGameOn(gameOn);
+	}
+
+}
+
+state McGuffinOnGround extends McGuffinsSpawned
+{
+	function BeginState()
+	{
+		SetTimer( BattleDialogOnGroundDelay, true );
+	}
+
+	function EndState()
+	{
+		SetTimer( 0.0f, false );
+	}
+
+	function McGuffinPickedUp(Pawn P) 
+	{
+		Global.McGuffinPickedUp( P );
+		GotoState( 'McGuffinInHand' );
+	}
+
+	function Timer()
+	{
+		if (AllowUsPickup)
+		{
+			// TODO: Battle Dialog
+			EmitBattleDialogToTeamUnits(TEAM_US, McGuffinClass.default.OnGroundGroupName);
+		}
+
+		if (AllowGermanPickup)
+		{
+			// TODO: Battle Dialog
+			EmitBattleDialogToTeamUnits(TEAM_German, McGuffinClass.default.OnGroundGroupName);
+		}
+	}
+}
+
+state McGuffinInHand extends McGuffinsSpawned
+{
+	function BeginState()
+	{
+		// Set a timer here if you want lines to play regularly in this state.
+		//SetTimer( X, true );
+	}
+
+	function McGuffinDropped(Pawn p) 
+	{
+		Global.McGuffinDropped( P );
+
+		if ( McGuffinOwners[ P.PawnTeam ] == 0 )
+		{
+			GotoState( 'McGuffinOnGround' );
+		}
+	}
+
+	function Timer()
+	{
+		// TODO: Play reminder lines for the team that doesn't have the McG?
+	}
+}
+
+function Trigger(Actor Other, Pawn EventInstigator)
+{
+	if (victorTeam == TEAM_None)
+	{
+		victorTeam = EventInstigator.PawnTeam;
+	}
+}
+
+function bool HasATeamWon(out ETeamIdentifier WinningTeam, out int reason)
+{
+	local bool result;
+
+	if (victorTeam != TEAM_None)
+	{
+		WinningTeam = victorTeam;
+		reason = GetVictoryReason();
+		result = true;
+
+		Log(self $ " gbxMcGuffinVictoryCondition::HasATeamWon() noticed that " $ victorTeam $ " won", 'MP');
+	}
+	else
+	{
+		result = Super.HasATeamWon(WinningTeam, reason);
+	}
+
+	return result;
+}
+
+simulated function DrawCustom(canvas Canvas, gbxHud Hud, FontInfo Fonts, int nPass);
+
+// Draw McGuffin status for each McGuffin starting from just above the compass
+// and moving up with each McGuffin
+simulated function DrawGBXHud(canvas Canvas, gbxHud Hud, FontInfo Fonts, int nPass)
+{
+	local int i, j, iMcGuffin, iNumTriggersActive;//, iNumTriggersToDraw;
+	local Vector vLocation;
+	local float fGap;
+	local PlayerController P;
+	//Log( " gbxMcGuffinVictoryCondition::DrawGBXHud()", 'MP' );
+	
+	P = Canvas.Viewport.Actor;
+	
+	fGap = 5;
+
+	iMcGuffin = 0;
+	iNumTriggersActive = 0;
+
+	Canvas.Font = Hud.WargameFont2;
+
+	vLocation.Z = 0;
+
+	if ( nPass == 0 )
+	{
+		if ( (P.GameReplicationInfo != None) && (P.GameReplicationInfo.GameType != GT_SKIRMISH) )
+		{
+		// Draw McGuffin data
+		if ( ArrayCount(McGuffinOwners) > 0 )
+		{
+			// Draw McGuffin background grime
+			if ( !Hud.bIsSplitScreen )
+			{
+				vLocation.X = McGuffinBackgroundX;
+				vLocation.Y = McGuffinBackgroundY;
+			}
+			else
+			{
+				vLocation.X = McGuffinBackgroundSplitscreenX;
+				vLocation.Y = McGuffinBackgroundSplitscreenY;
+			}
+			GrimeIcon.ScaleX = default.GrimeIcon.ScaleX;
+			if ( !Hud.bIsSplitScreen )
+				GrimeIcon.ScaleY = ((float(iNumMcGuffins)*float(McGuffinIcon.VL)*McGuffinIcon.ScaleY*Hud.flMinScaleY)+
+									(fGap*(float(iNumMcGuffins+1))*Hud.ScaleY)) / (float(default.GrimeIcon.VL)*Hud.flMinScaleY);
+			else
+				GrimeIcon.ScaleY = ((float(iNumMcGuffins)*float(McGuffinIcon.VL)*McGuffinIcon.ScaleY*Hud.flSplitScreenScale)+
+								(fGap*(float(iNumMcGuffins+1))*Hud.flSplitScreenScale)) / (float(default.GrimeIcon.VL)*Hud.flSplitScreenScale);
+			DrawIconTile( GrimeIcon, vLocation, Canvas, Hud );
+		}
+		
+		vLocation.X = 0;
+		if ( !Hud.bIsSplitscreen )
+			vLocation.Y = McGuffinBackgroundY + fGap;
+		
+		for ( i=0; i<ArrayCount(McGuffinOwners); i++ )
+		{
+			for ( j=0; j<McGuffinOwners[i]; j++ )
+			{
+				// Draw McGuffin Icon
+				if ( !Hud.bIsSplitscreen )
+					vLocation.X = FirstMcGuffinX;
+				else
+				{
+					vLocation.X = McGuffinBackgroundSplitscreenX+3;
+					vLocation.Y = McGuffinBackgroundSplitscreenY + fGap + ((fGap/2) * float(iMcGuffin)) + 
+									((float(McGuffinIcon.VL)*McGuffinIcon.ScaleY) * float(iMcGuffin));
+				}
+				//Log( self$ " Drawing McGuffin owner for team # " $i$ " McGuffin # " $j, 'PSV');
+				DrawIconTile( McGuffinIcon, vLocation, Canvas, Hud );
+				
+				// Draw McGuffin Owner...if there is one
+				if ( i == 1 )
+				{
+					BackGroundIcon.DrawColor = BackgroundUSColor;
+					BackGroundIcon.DrawColor.A = 175;
+
+					if ( !Hud.bIsSplitscreen )
+					{
+						vLocation.X += TeamIconOffsetX;
+						vLocation.Y += TeamIconOffsetY;
+					}
+					else
+					{
+						vLocation.X += TeamIconOffsetSplitScreenX;
+						vLocation.Y += TeamIconOffsetSplitScreenY;
+					}
+					DrawIconComposite( USIcon, BackgroundIcon, vLocation , Canvas, Hud );
+				}
+				else if ( i == 2 )
+				{
+					BackGroundIcon.DrawColor = BackgroundGermanColor;
+					BackGroundIcon.DrawColor.A = 175;
+
+					vLocation.X += TeamIconOffsetX;
+					vLocation.Y += TeamIconOffsetY;
+					DrawIconComposite( GermanIcon, BackgroundIcon, vLocation , Canvas, Hud );
+				}
+				
+				++iMcGuffin;
+
+				if ( !Hud.bIsSplitScreen )
+					vLocation.Y = McGuffinBackgroundY + fGap + (fGap * float(iMcGuffin)) + ((float(McGuffinIcon.VL)*McGuffinIcon.ScaleY) * float(iMcGuffin));
+			}
+		}
+
+		// Draw objective data
+
+		// Quickly figure out how many triggers are active so the grime can draw before everything else
+			/*for ( i = 0; i < MAX_MCGUFFIN_TRIGGERS; i++ )
+		{
+			if ( McGuffinTriggers[i] != None )
+			{ 
+				if ( McGuffinTriggers[i].bActive )
+				iNumTriggersActive++;
+
+                if ( McGuffinTriggers[i].bActive && !McGuffinTriggers[i].bHideObjectiveIcon )
+					iNumTriggersToDraw++;
+		}
+		}
+
+                if ( P.GameReplicationInfo.GameType == GT_SKIRMISH )
+		{
+            // Skirmish guys only want one objective to draw at once *shrug*    
+			iNumTriggersActive = min( 1, iNumTriggersToDraw );
+			}*/
+
+		//Log( " gbxMcGuffinVictoryCondition::DrawGBXHud() iNumTriggersToDraw: "$iNumTriggersToDraw, 'MP' );
+
+		// Draw background grime for objectives
+		if ( !Hud.bIsSplitscreen )
+		{
+			//Log( " gbxMcGuffinVictoryCondition::DrawGBXHud() Drawing background grime for objectives.", 'MP' );
+			
+			vLocation.X = FirstObjectiveX;
+			vLocation.Y = FirstObjectiveY;
+			GrimeIcon.ScaleX = ((float(iNumTriggersActive)*34.0*Hud.flMinScaleX)+
+									(fGap*(float(iNumTriggersActive+1))*Hud.flMinScaleX)) / (float(default.GrimeIcon.UL)*Hud.flMinScaleX);
+			GrimeIcon.ScaleY = ((34.0*Hud.flMinScaleY)+ (3*2*Hud.flMinScaleY)) / (float(default.GrimeIcon.VL)*Hud.flMinScaleY);
+		}
+		else
+		{
+			vLocation.X = FirstObjectiveSplitscreenX;
+			vLocation.Y = FirstObjectiveSplitscreenY;
+			GrimeIcon.ScaleX = ((float(iNumTriggersActive)*34.0*Hud.flSplitScreenScale)+
+									(fGap*(float(iNumTriggersActive+1))*Hud.flSplitScreenScale)) / (float(default.GrimeIcon.UL)*Hud.flSplitScreenScale);
+			GrimeIcon.ScaleY = ((34.0*Hud.flSplitScreenScale)+ (3*2*Hud.flSplitScreenScale)) / (float(default.GrimeIcon.VL)*Hud.flSplitScreenScale);
+		}
+
+			DrawIconTile( GrimeIcon, vLocation, Canvas, Hud );
+		}
+	
+		DrawCustom( Canvas, Hud, Fonts, nPass );
+
+		if ( (P.GameReplicationInfo != None) && (P.GameReplicationInfo.GameType != GT_SKIRMISH) )
+		{
+		for ( i = 0; i < MAX_MCGUFFIN_TRIGGERS; i++ )
+		{
+			if ( McGuffinTriggers[i] != None && McGuffinTriggers[i].bActive )
+			{
+					//Log( " gbxMcGuffinVictoryCondition::DrawGBXHud() McGuffinTriggers[i].bHideObjectiveIcon: "$McGuffinTriggers[i].bHideObjectiveIcon, 'MP' );
+					
+				// Draw objective icon
+				if ( !Hud.bIsSplitscreen )
+				{
+					vLocation.X = FirstObjectiveX + fGap + (fGap * iNumTriggersActive) + (34.0 * iNumTriggersActive);
+					vLocation.Y = FirstObjectiveY + ObjectiveOffsetY;
+				}
+				else
+				{
+					vLocation.X = FirstObjectiveSplitscreenX + fGap + ((fGap/2) * iNumTriggersActive) + (34.0 * iNumTriggersActive);
+					vLocation.Y = FirstObjectiveSplitscreenY + ObjectiveOffsetY;
+				}
+	
+				if ( !McGuffinTriggers[i].bHideObjectiveIcon )
+				{
+					if ( Hud.PlayerOwner.PlayerReplicationInfo.Team.TeamIndex == McGuffinTriggers[i].DefendingTeam || McGuffinTriggers[i].bSameHUDIcon )
+					{
+						DrawIconTile( McGuffinTriggers[i].DefendingIcon, vLocation, Canvas, Hud );
+					}
+					else
+					{
+						DrawIconTile( McGuffinTriggers[i].AttackingIcon, vLocation, Canvas, Hud );
+					}
+				}
+
+				// Draw beacon info circle background
+				vLocation.X += 20;
+				vLocation.Y += 20;
+
+				if (!McGuffinTriggers[i].Beacon.bDrawReservoirTip)
+				{
+					BackgroundIcon.DrawColor = McGuffinTriggers[i].Beacon.GetMarkerColorForPlayer(Hud.PlayerOwner);
+					DrawIconTile( BackgroundIcon, vLocation, Canvas, Hud );
+				}
+				else
+				{
+					BackgroundIconPrime.DrawColor = McGuffinTriggers[i].Beacon.GetMarkerColorForPlayer(Hud.PlayerOwner);
+					DrawIconTile( BackgroundIconPrime, vLocation, Canvas, Hud );
+				}
+
+				iNumTriggersActive++;
+			}
+		}
+
+		// Draw McGuffin in player's inventory if they are carrying one
+		if ( CountMcGuffinsInInventory(Hud.PlayerOwner.Pawn, McGuffinTag) > 0 )
+		{
+			// Draw ring
+			if ( !Hud.bIsSplitScreen )
+			{
+				vLocation.X = (Canvas.SafeOffX + Canvas.SafeSizeX) - ((RingIcon.UL + 7) * Hud.flMinScaleX);
+				vLocation.Y = (Canvas.SafeOffY + Canvas.SafeSizeY) - ((100 + RingIcon.VL + 7) * Hud.flMinScaleY);
+			}
+			else
+			{
+				vLocation.X = (Canvas.SafeOffX + Canvas.SafeSizeX) - ((RingIcon.UL + 7) * Hud.flSplitscreenScale);
+				vLocation.Y = (Canvas.SafeOffY + Canvas.SafeSizeY) - ((100 + RingIcon.VL + 7) * Hud.flSplitscreenScale);
+			}
+
+			DrawIconTile( RingIcon, vLocation, Canvas, Hud, true );
+
+			// Draw McGuffin icon
+			if ( !Hud.bIsSplitScreen )
+			{
+				vLocation.X += (((RingIcon.UL - McGuffinIcon.UL) / 2) * Hud.flMinScaleX);
+				vLocation.Y += (((RingIcon.VL - McGuffinIcon.VL) / 2) * Hud.flMinScaleY);
+			}
+			else
+			{
+				vLocation.X += (((RingIcon.UL - McGuffinIcon.UL) / 2) * Hud.flSplitscreenScale);
+				vLocation.Y += (((RingIcon.VL - McGuffinIcon.VL) / 2) * Hud.flSplitscreenScale);
+			}
+			DrawIconTile( McGuffinIcon, vLocation, Canvas, Hud, true );
+		}
+	}
+}
+}
+
+simulated function DrawIconTile( Canvas.CanvasIcon Icon, Vector vLocation, Canvas aCanvas, Hud aHud, optional bool bAbsCoord )
+{
+	aCanvas.SetDrawColor( Icon.DrawColor.R, Icon.DrawColor.G, Icon.DrawColor.B, Icon.DrawColor.A );
+
+	//Log( self$ " aHud.ScaleX: " $aHud.ScaleX$ " aHud.ScaleY: " $aHud.ScaleY, 'PSV');
+
+	if (bAbsCoord)
+	{
+		aCanvas.SetPos( vLocation.X, vLocation.Y );
+	}
+	else
+	{
+		if ( !aHud.bIsSplitScreen )
+			aCanvas.SetPos( (aCanvas.SafeOffX + (vLocation.X * aHud.flMinScaleX)), (aCanvas.SafeOffY + (vLocation.Y * aHud.flMinScaleY)) );
+		else
+			aCanvas.SetPos( (aCanvas.SafeOffX + (vLocation.X * aHud.flSplitscreenScale)), (aCanvas.SafeOffY + (vLocation.Y * aHud.flSplitscreenScale)) );
+	}
+
+	if ( !aHud.bIsSplitScreen )
+	{
+		aCanvas.DrawTile( Icon.Icon, (Icon.UL * Icon.ScaleX * aHud.flMinScaleX), (Icon.VL * Icon.ScaleY * aHud.flMinScaleY), 
+							Icon.U, Icon.V, Icon.UL, Icon.VL );
+	}
+	else
+	{
+		aCanvas.DrawTile( Icon.Icon, (Icon.UL * Icon.ScaleX * aHud.flSplitScreenScale), (Icon.VL * Icon.ScaleY * aHud.flSplitScreenScale), 
+							Icon.U, Icon.V, Icon.UL, Icon.VL );
+	}
+}
+
+simulated function DrawIconComposite( Canvas.CanvasIcon FrontIcon, Canvas.CanvasIcon BackIcon, Vector vLocation, Canvas aCanvas, Hud aHud )
+{
+	if ( !aHud.bIsSplitScreen )
+	{
+		aCanvas.DrawCanvasIconComposite( (aCanvas.SafeOffX + (vLocation.X * aHud.flMinScaleX)), (aCanvas.SafeOffY + (vLocation.Y * aHud.flMinScaleY)), aHud.flMinScaleX, aHud.flMinScaleY, FrontIcon, BackIcon );	
+	}
+	else
+	{
+		aCanvas.DrawCanvasIconComposite( (aCanvas.SafeOffX + (vLocation.X * aHud.flSplitScreenScale)), (aCanvas.SafeOffY + (vLocation.Y * aHud.flSplitScreenScale)), aHud.flSplitscreenScale, aHud.flSplitscreenScale, FrontIcon, BackIcon );
+	}
+}
+
+defaultproperties
+{
+	McGuffinCount1P = 1
+	McGuffinCount2P = 1
+	McGuffinCount3PUSUnderdog = 1
+	McGuffinCount3PGermanUnderdog = 1
+	McGuffinCount4P = 1
+	MaximumMcGuffinsPerPlayer = 1
+	AllowUSPickup = false
+	AllowGermanPickup = false
+	McGuffinClass = class'gbxMP.gbxMcGuffin'
+	McGuffinTag = McGuffin
+	McGuffinLocationTag = gbxMcGuffinLocation
+	Tag = McGuffinVC
+    
+	VisibleToEnemyDropped = true
+	VisibleToEnemyHeld = true
+	EmptyLocationVisibleUS = true
+	EmptyLocationVisibleGerman = true
+	UnfoundVisibleUS = true
+	UnfoundVisibleGerman = true
+	McGuffinTypeIcon = McGuffin_Book;
+	BattleDialogOnGroundDelay = 30.0f;
+
+	IconSpacing = 5
+	IconSpacingY = 2
+	FirstMcGuffinX = 8
+	FirstMcGuffinY = 68
+	McGuffinBackgroundX = 5
+	McGuffinBackgroundY = 65
+	McGuffinBackgroundSplitscreenX = 5
+	McGuffinBackgroundSplitscreenY = 65
+	FirstMcGuffinYSplitScreen = 68
+	TeamIconOffsetX = 24
+	TeamIconOffsetY = 24
+	TeamIconOffsetSplitScreenX = 24
+	TeamIconOffsetSplitScreenY = 24
+
+	ObjectiveIconSpacing = 3
+	ObjectiveOffsetY = 3
+	FirstObjectiveX = 68
+	FirstObjectiveY = 8
+	FirstObjectiveSplitScreenX = 58
+	FirstObjectiveSplitScreenY = 8
+
+	GrimeIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=412,V=205,UL=65,VL=31,DrawColor=(R=26,G=20,B=14,A=96),ScaleX=0.61,ScaleY=1.29,PivotU=1.0,PivotV=1.0)
+	RingIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=94,V=129,UL=48,VL=48,DrawColor=(R=26,G=20,B=14,A=196),ScaleX=1.0,ScaleY=1.0,PivotU=1.0,PivotV=1.0)
+	USIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=276,V=99,UL=29,VL=29,DrawColor=(R=255,G=255,B=255,A=175),ScaleX=0.45,ScaleY=0.45,PivotU=0.5,PivotV=0.5)	
+	GermanIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=305,V=99,UL=29,VL=29,DrawColor=(R=0,G=0,B=0,A=175),ScaleX=0.45,ScaleY=0.45,PivotU=0.5,PivotV=0.5)
+	BackgroundIcon=(Icon=Texture't_interface_mb.hud.interface_comp',U=52,V=208,UL=21,VL=14,DrawColor=(R=255,G=255,B=255,A=255),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+	BackgroundIconPrime=(Icon=Texture't_interface_mb.hud.interface_comp',U=73,V=208,UL=21,VL=14,DrawColor=(R=255,G=255,B=255,A=255),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+	BackgroundUSColor=(R=88,G=108,B=47,A=255)
+	BackgroundGermanColor=(R=181,G=56,B=41,A=255)
+
+	McGuffinRingU=94
+	McGuffinRingV=129
+	McGuffinRingWidth=48
+	McGuffinRingHeight=48
+	McGuffinRingScale=1.0
+	McGuffinRingX=553
+	McGuffinRingY=305
+	McGuffinRingSplitscreenX=80
+	McGuffinRingSplitscreenY=150
+
+	VictoryReason=300
+	MessageSectionName="McGuffinVictoryCondition"
+
+	bAnnounceMcGuffinDrop=true
+}// This is the bomb object that is in the world for player's to target in explosive mcguffin missions
+class gbxMPGammonBomb extends gbxGammonBomb
+	placeable;
+
+#exec OBJ LOAD FILE=..\staticmesh\s_npc_item_us.usx
+
+// properties
+var() ETeamIdentifier BombingTeam;
+
+var Material  PlaceableMaterial;
+var Material  DefusableMaterial;
+
+// internal state
+var PlayerController BombingPlayer;
+var Trigger TriggerToNotify;
+var bool bDisarmed, bExploded;
+
+var byte  GlowAlphaMin; // Minimum alpha value
+var byte  GlowAlphaMax; // Maximum alpha value
+var float GlowFreq;     // Multiply time by this before calling cosine on it to get alpha
+
+var HUDClockIcon Clock;
+
+// network replication
+replication
+{
+	reliable if( bNetInitial && (Role==ROLE_Authority) )
+		TriggerToNotify, Clock;
+}
+
+simulated function PostNetBeginPlay()
+{
+	Super.PostNetBeginPlay();
+
+	if( Clock == None )
+	{
+		//Log( self$ " gbxExplosive::PostBeginPlay() Setting up Clock", 'PSV');
+		Clock = Spawn( class'gbxBase.HUDClockIcon' );
+
+		if ( Clock == None )
+			Log( self$ " gbxExplosive::PostBeginPlay() Could not spawn explosive clock!", 'PSV');
+		else
+		{
+			// resize the explosive clock HUD icon
+			Clock.IconClock.ScaleX = 0.55;
+			Clock.IconClock.ScaleY = 0.55;
+			Clock.IconBack.ScaleX = 0.704;
+			Clock.IconBack.ScaleY = 0.704;
+			// Set the number of segments
+			Clock.iSegments = max(Clock.default.iSegments, int(FuseTimeMax));
+		}
+	}
+
+	SetStaticMesh(StaticMesh(DynamicLoadObject("S_military_us.weapon.explosive_charge", class'StaticMesh')));
+	SetDrawType( DT_StaticMesh );
+    Skins.Length = 1;
+	Skins[0] = PlaceableMaterial;
+}
+
+// Do nothing if exploded
+simulated state Exploded
+{
+	simulated function Tick( float DeltaTime )
+	{
+	}
+}
+
+simulated function Tick( float DeltaTime )
+{
+    local float funcos;
+    local float funalpha;
+    
+	Super.Tick( DeltaTime );
+
+	//NAC: if there is less than five seconds to go, notify your squad so they get the hell out of there
+	if (BombingPlayer != None)
+	{
+		if (self.flFuseTime < 5.0 && flFuseTime > 0.0)
+		{
+			gbxPawn(BombingPlayer.Pawn).MyUnit.MyUnitController.DoFleeTNT(self);  
+		}
+	}
+
+	funcos = (cos(Level.TimeSeconds * GlowFreq) * 0.5) + 0.5;
+	funalpha = funcos * (GlowAlphaMax - GlowAlphaMin) + GlowAlphaMin;
+	AmbientAlpha = FClamp(funalpha, 0, 255);
+	
+	if (bActivated)
+	{
+	    AmbientHue = 0;
+	    Skins[0] = DefusableMaterial;
+	}
+	else
+	{
+    	AmbientHue = 25;
+	}
+	
+	//IncRenderRevision();      // Not necessary if using bUnlit and bUseAmbientForUnlit
+	
+	if ( bShouldExplode )
+	{
+		if ( Level.NetMode == NM_CLIENT )
+		{
+			Explosion( Location );
+			GotoState('Exploded');
+		}
+		else
+		{
+			// Turn off Beacon associated with this bomb
+			gbxMcGuffinExplosiveTrigger(TriggerToNotify).Beacon.bEnabled = false;
+		}
+		bExploded = true;	
+	}
+}
+
+// Called by player controller when animations have finished...
+function bool ActivateBomb( Pawn User )
+{
+	assert( gbxMcGuffinExplosiveTrigger(TriggerToNotify) != None );
+	//Log( self$ " gbxMPGammonBomb::ActivateBomb() User: " $User$ " TriggerToNotify: " $TriggerToNotify, 'MP');
+
+	// Notify the Explosion trigger that we're officially planted now (all checks passed and animation finished)
+	gbxMcGuffinExplosiveTrigger(TriggerToNotify).bExplosivePlanted = true;
+	gbxMcGuffinExplosiveTrigger(TriggerToNotify).bExplosiveDisarmed = false;
+	bDisarmed = false;
+
+	// Let the timer begin...
+	Super.ActivateBomb( User );
+	BombingPlayer = PlayerController(User.Controller);
+
+	return true;
+}
+
+// Bomb is planted and disarmed, but bombing team has just "used" it to reactivate it
+function bool ReactivateBomb( Pawn User )
+{
+	assert( gbxMcGuffinExplosiveTrigger(TriggerToNotify) != None );
+	//Log( self$ " gbxMPGammonBomb::ReactivateBomb() User: " $User, 'PSV');
+	
+	gbxMcGuffinExplosiveTrigger(TriggerToNotify).bExplosiveDisarmed = false;
+	// Restart timer
+	bActivated = true;
+	bDisarmed = false;
+		
+	// Pause the HUD explosive clock
+	Clock.RestartClock();
+	BombingPlayer = PlayerController(User.Controller);
+
+	return true;
+}
+
+// Bomb is planted and armed, but defending team has just "used" it to deactivate it
+function bool DeactivateBomb( Pawn User )
+{
+	assert( gbxMcGuffinExplosiveTrigger(TriggerToNotify) != None );
+	//Log( self$ " gbxMPGammonBomb::DeactivateBomb() User: " $User, 'PSV');
+
+	gbxMcGuffinExplosiveTrigger(TriggerToNotify).bExplosiveDisarmed = true;
+	// Stop timer
+	bActivated = false;
+	bDisarmed = true;
+
+	// Pause the HUD explosive clock
+	Clock.PauseClock();
+	BombingPlayer = None;
+	
+	return true;
+}
+
+function Plant( Pawn User )
+{
+	local gbxPlayerController	aController;
+	
+	//Log( self$ " gbxMPGammonBomb::Trigger() User: " $User, 'MP');
+
+	aController = gbxPlayerController(User.Controller);
+	if (aController != None)
+	{
+		if ( aController.Pawn != None )
+		{
+			// Plant the bomb
+			if (gbxWeapon(User.Weapon) != None)
+			{
+				aController.PlantBombOnTarget( self );
+			}
+		}
+	}
+}
+
+simulated function Explosion(vector HitLocation)
+{
+	Super.Explosion(HitLocation);
+
+	gbxMcGuffinExplosiveTrigger(TriggerToNotify).BombExploded(BombingPlayer);
+}
+
+function bool DisplayContextMessage(gbxPlayerController PlayerController)
+{
+	local bool rslt;
+
+	if ( PlayerController.Pawn != None )
+	{
+		if ( PlayerController.Pawn.PawnTeam == BombingTeam )
+		{
+			if ( gbxMcGuffinExplosiveTrigger(TriggerToNotify).bExplosivePlanted &&
+				 gbxMcGuffinExplosiveTrigger(TriggerToNotify).bExplosiveDisarmed )
+			{
+				PlayerController.ReceiveLocalizedMessage(class'gbxContextUseHUDMessage', 13, PlayerController.PlayerReplicationInfo);
+				rslt = true;
+			}
+			else if ( !gbxMcGuffinExplosiveTrigger(TriggerToNotify).bExplosivePlanted )
+			{
+				PlayerController.ReceiveLocalizedMessage(class'gbxContextUseHUDMessage', 11, PlayerController.PlayerReplicationInfo);
+				rslt = true;
+			}
+		}
+		else if ( PlayerController.Pawn.PawnTeam != BombingTeam &&
+				  gbxMcGuffinExplosiveTrigger(TriggerToNotify).bExplosivePlanted &&
+				  !gbxMcGuffinExplosiveTrigger(TriggerToNotify).bExplosiveDisarmed )
+		{
+			PlayerController.ReceiveLocalizedMessage(class'gbxContextUseHUDMessage', 12, PlayerController.PlayerReplicationInfo);
+			rslt = true;
+		}
+	}
+
+	return rslt;
+}
+
+function ClearContextMessage(gbxPlayerController PlayerController)
+{
+	PlayerController.ReceiveLocalizedMessage(class'gbxContextUseHUDMessage', -1);
+}
+
+defaultproperties
+{
+	ExplosionDecal=class'BlastMark'
+	MyDamageType=class'DamageGammonBomb'
+	speed=1000.000000
+	MaxSpeed=1500.000000
+	Damage=500.000000
+	DamageRadius=375.000000	// GBX:naj - modified 4/5/04
+	MomentumTransfer=50000
+	Physics=PHYS_None
+//	StaticMesh=StaticMesh'S_military_us.weapon.explosive_charge'
+	DrawScale=1.00000
+	bBounce=True
+	bFixedRotationDir=True
+	DesiredRotation=(Pitch=12000,Yaw=5666,Roll=2334)
+//	DrawType=DT_STATICMESH
+	Style=STY_Modulated
+
+	DrawType=DT_Sprite
+	Texture=Texture'Engine.S_Weapon'
+	
+    ShakeRadius=2000.000000
+	ViewRollTime=0.200000
+	RollMag=20.000000
+	RollRate=100.000000
+	OffsetMagVertical=20.000000
+	OffsetRateVertical=800.000000
+	OffsetMagHorizontal=20.000000
+	OffsetRateHorizontal=800.000000
+	OffsetIterations=10.000000
+
+	bBlowingUp=false
+
+	FuseTimeMin=5.0
+	FuseTimeMax=5.0
+
+	HeavyTraumaRadius=384.0
+
+    CollisionRadius=+005.000000
+	CollisionHeight=+020.000000
+	bCollideWhenPlacing=false
+
+	LifeSpan=+0.000000
+
+	BombingTeam = TEAM_US
+	bHideAfterExplosion=true // VERY IMPORTANT THAT THIS STAYS TRUE!!!!!!!!!!!!! 2005-01-13 JWS
+	bDisarmed=false
+	bExploded=false
+
+	RemoteRole=ROLE_SimulatedProxy
+	bAlwaysRelevant = true
+	bNetTemporary=false
+
+    // Use old name until t_military_us can be updated
+	PlaceableMaterial=GbxShaderMaterial't_military_us.equipment.explosive_charge_placeable'
+	DefusableMaterial=GbxShaderMaterial't_military_us.equipment.explosive_charge_defusable'
+
+    GlowAlphaMin = 64
+    GlowAlphaMax = 255
+    GlowFreq = 5
+	bIgnoreZoneAmbient=true
+	AmbientGlow=0
+	AmbientHue=192
+	AmbientSaturation=255
+	AmbientBrightness=255
+	bUnlit=true
+	bUseAmbientForUnlit=true
+}
+// GEARBOX 2004-05-06 JWS created
+//
+// usage: specify the duration of the timer, and when it is triggered, it will count down
+class gbxTimerVictoryCondition extends gbxSecondaryVictoryCondition
+	placeable;
+
+#exec OBJ LOAD FILE=..\texture\t_interface_mb.utx
+
+// properties
+var() float TimeInSeconds;				// duration of the timer
+var() float SkirmishTimeInSecondsSolo[4];	// Skill level based skirmish timed assault times.
+var() float SkirmishTimeInSecondsCoop[4];	// Skill level based skirmish timed assault times.
+var() Name VictoryConditionForWinner;	// when the timer expires, asks the first victory condition found with this Tag for a winner. if none found, uses the default of WinsWhenTimerExpires
+var() bool bWaitForTrigger;				// If false, Timer begins ticking immediately.Otherwise, the timer waits to be triggered.
+var() bool bResetTimeOnTrigger;			// If true, time remaining on the timer will be reset back to TimeInSeconds.
+var() bool bDigitalClock;
+var   bool bShouldFlashClock;
+var   bool bInitializedClock;
+var   bool bDoTimeLowDialogue;
+var   bool bAIKillFlash;
+var   bool bPlayerKillFlash;
+
+var   float NextTimeLowBattleDialogue;
+var() float	flPlayerKillTimeToAdd;			// Time to add when an AI enemy is killed
+var() float	flAIKillTimeToAdd;			// Time to add when an AI enemy is killed
+
+var	  float TimeRemaining;
+var	  int ReplicatedTimeRemaining;
+
+// hud related
+var	  float TimerScale;
+var   int   TimerWidth;
+var   int   TimerHeight;
+var   int   TimerPosX;
+var   int   TimerPosY;
+var   int   TimerIconTimeSpacing;
+var   int   SplitScreenTimerPosX;
+var   int   SplitScreenTimerPosY;
+
+var HUDClockIcon Clock;
+var string MyHUDClockIconClass;
+
+var	Color	CurrentClockColor;
+var Color	FlashColor;
+var Color	AIAddColor;
+var Color	PlayerAddColor;
+var float	FlashLerpAlpha;
+
+// battle dialogue
+var Name TimeLowGroupName;
+
+//--------------------------------------------------------------------------
+// Network replication.
+
+replication
+{
+	unreliable if ( bNetDirty && Role == ROLE_Authority )
+		TimeInSeconds, ReplicatedTimeRemaining, bDigitalClock, bShouldFlashClock, bAIKillFlash, bPlayerKillFlash;
+
+	reliable if ( bNetInitial && Role == ROLE_Authority )
+		FlashColor, AIAddColor, PlayerAddColor;
+}
+
+simulated function PostBeginPlay()
+{
+	local class<HUDClockIcon> HUDClockIconClass;
+	local Vector pos;
+	
+	Super.PostBeginPlay();
+
+	pos.x = 0;
+	pos.y = 0;
+	pos.z = 0;
+
+	if( Clock == None )
+	{
+		//Log( self$ " gbxTimerVictoryCondition::PostBeginPlay() Setting up Clock: TimeInSeconds="$TimeInSeconds, 'MP');
+		HUDClockIconClass = class<HUDClockIcon>( DynamicLoadObject( MyHUDClockIconClass, class'Class' ));
+		Clock = Spawn( HUDClockIconClass,,, pos );
+		if ( Clock == None )
+			Log( self$ " gbxTimerVictoryCondition::PostBeginPlay() Could not spawn explosive clock!", 'MP');
+		else
+		{
+			Clock.fRadius = 90;
+			// Set the number of segments
+			Clock.iSegments = TimeInSeconds / 10;
+		}
+	}
+}
+
+function PostNetBeginPlay()
+{
+	local	int		nSkillLevel;
+	
+	Super.PostNetBeginPlay();
+
+	// Initialize time
+	TimeRemaining = TimeInSeconds;
+	ReplicatedTimeRemaining = TimeRemaining;
+
+	// Register for killed notify with game info
+	if ( Level.Game.IsA('WargameSkirmish') && (WargameSkirmish(Level.Game).GameType == SGT_TimeChallenge))
+	{
+		//Log( " gbxSurvivalVictoryCondition::PostNetBeginPlay() Registering self with WargameSkirmish for killed notify.", 'MP' );
+		WargameSkirmish(Level.Game).RegisterForKilledNotify( self );
+		if (bDigitalClock)
+		{
+			nSkillLevel = WargameSkirmish(Level.Game).GetSkillLevel();
+			if ((nSkillLevel >= 0) && (nSkillLevel < 4))
+			{
+				if (Level.Game.NumPlayers > 1)
+				{
+					if (SkirmishTimeInSecondsCoop[nSkillLevel] > 0)
+					{
+						TimeInSeconds = SkirmishTimeInSecondsCoop[nSkillLevel];
+					}
+				}
+				else
+				{
+					if (SkirmishTimeInSecondsSolo[nSkillLevel] > 0)
+					{
+						TimeInSeconds = SkirmishTimeInSecondsSolo[nSkillLevel];
+					}
+				}
+			}
+		}
+	}
+}
+
+function NotifyAICasualty( Pawn AIPawn, Pawn Killer )
+{
+	Super.NotifyAICasualty( AIPawn, Killer );
+	if (flAIKillTimeToAdd > 0.0f)
+	{
+		if ( !(Level.Game.IsPawnOnSameTeamAsPlayer( AIPawn )) )
+		{
+			if ( (Killer != None) && Killer.IsHumanControlled() )
+			{
+				TimeRemaining = TimeRemaining + flPlayerKillTimeToAdd;
+				bPlayerKillFlash = true;					
+			}
+			else
+			{
+				TimeRemaining = TimeRemaining + flAIKillTimeToAdd;
+				bAIKillFlash = true;					
+			}
+			ReplicatedTimeRemaining = TimeRemaining;
+		}
+	}
+}
+
+auto state TimerDisabled
+{
+	function Trigger(Actor Other, Pawn EventInstigator)
+	{
+		Log(self $ " state TimerDisabled Triggered: going to enabled state", 'PSV');
+		GotoState('TimerEnabled');
+	}
+
+Begin:
+	// If everyone is killed, this state is entered, but the current time is not updated.
+	if (Level.Game.IsA('WargameSkirmish'))
+	{
+		WargameSkirmish(Level.Game).TimeRemaining = TimeRemaining;
+	}
+}
+
+state TimerEnabled
+{
+	function Trigger(Actor Other, Pawn EventInstigator)
+	{
+		Log(self $ " state TimerEnabled Triggered: going to disabled state", 'PSV');
+		GotoState('TimerDisabled');
+	}
+
+	function Tick( float DeltaTime )
+	{
+		if (!gameEnded)
+		{
+			// Decrement time
+			if ( TimeRemaining > 0.0f )
+			{
+				TimeRemaining -= DeltaTime;
+
+				if (!bDoTimeLowDialogue) 
+				{
+					if ( (TimeRemaining / TimeInSeconds) <= 0.25f)
+					{			
+						StartTimeLowTimer();
+						EmitTimeLowBattleDialogue();
+					}
+				}
+				else if (Level.TimeSeconds >= NextTimeLowBattleDialogue)
+				{
+					StartTimeLowTimer();
+					EmitTimeLowBattleDialogue();
+				}
+			}
+			else
+			{
+				TimeRemaining = 0.0f;
+				GotoState('TimerFinished');
+			}
+
+			if (int(TimeRemaining) != ReplicatedTimeRemaining)
+			{
+				ReplicatedTimeRemaining = TimeRemaining;
+				if (Level.Game.IsA('WargameSkirmish'))
+				{
+					WargameSkirmish(Level.Game).TimeRemaining = TimeRemaining;
+				}
+			}
+		}
+
+		Super.Tick( DeltaTime );
+	}
+
+	function StartTimeLowTimer()
+	{
+		local float percentage;
+		local float interval;
+
+		percentage = (TimeRemaining / TimeInSeconds);
+
+		// Do time low dialogue at 25%, 20%, 15%, 10%, 7.5%, 5%, 2.5%
+		if (percentage > 0.10f)
+		{
+			interval = 0.05f * TimeInSeconds;
+		}
+		else
+		{
+			interval = 0.025f * TimeInSeconds;
+		}
+
+		NextTimeLowBattleDialogue = Level.TimeSeconds + interval;
+		bDoTimeLowDialogue = true;
+
+		Log(self $ " gbxTimerVictoryCondition::StartTimeLowTimer() current time " $ Level.TimeSeconds $ " interval " $ interval $ " next time = " $ NextTimeLowBattleDialogue, 'MPBattleDialogue');
+	}
+
+	function EmitTimeLowBattleDialogue()
+	{
+		local ETeamIdentifier BurdenOfVictoryTeam;
+
+		if (WinsWhenTimerExpires == TEAM_US)
+		{
+			BurdenOfVictoryTeam = TEAM_German;
+		}
+		else if (WinsWhenTimerExpires == TEAM_German)
+		{
+			BurdenOfVictoryTeam = TEAM_US;
+		}
+
+		EmitBattleDialogToTeamUnits(BurdenOfVictoryTeam, TimeLowGroupName);
+	}
+
+Begin:
+	// Check to see if we should reset time
+	if ( bResetTimeOnTrigger )
+	{
+		TimeRemaining = TimeInSeconds;
+	}
+	ReplicatedTimeRemaining = TimeRemaining;
+}
+
+state TimerFinished
+{
+	function bool HasATeamWon(out ETeamIdentifier WinningTeam, out int reason)
+	{
+		local gbxVictoryCondition vc;
+
+		// default winner, override with the tagged victory condition if needed
+		WinningTeam = WinsWhenTimerExpires;
+
+		foreach AllActors(class'gbxVictoryCondition', vc, VictoryConditionForWinner)
+		{
+			WinningTeam = vc.WhoIsAhead();
+			break;
+		}
+
+		reason = GetVictoryReason();
+		Log(self $ " gbxTimerVictoryCondition::HasATeamWon()[TimerFinished]: found winning team " $ WinningTeam, 'JWS');
+
+		return true;
+	}
+Begin:
+	assert(IsGameOn == true);
+	Log(self $ " state TimerFinished state code: next call to HasATeamWon will find the winner", 'JWS');
+}
+
+function SetGameOn(bool gameOn)
+{
+	Log( " gbxTimerVictoryCondition::SetGameOn()", 'MP' );
+
+	// In a skirmish game, only turn this on if we're playing a time challenge game
+	if ( Level.Game.GameReplicationInfo.GameType != GT_SKIRMISH || 
+		(Level.Game.GameReplicationInfo.GameType == GT_SKIRMISH && WargameSkirmish(Level.Game).GameType == SGT_TimeChallenge) )
+	{
+		if (gameOn && !bWaitForTrigger)
+		{
+			//Log( " gbxTimerVictoryCondition::SetGameOn() Timer enabled", 'MP' );
+			GotoState('TimerEnabled');
+		}
+		else
+		{
+			//Log( " gbxTimerVictoryCondition::SetGameOn() Timer disabled", 'MP' );
+			GotoState('TimerDisabled');
+		}
+
+		if (Level.Game.GameReplicationInfo.GameType == GT_SKIRMISH)
+		{
+			bDigitalClock = true;
+		}
+		Super.SetGameOn(gameOn);
+	}
+	else
+	{
+		// Destroy ourself
+		Destroy();
+	}
+}
+
+// PSV: 5/11/2004 Allow each victory condition to draw something to the hud if needed
+simulated function DrawGBXHud(canvas Canvas, gbxHud Hud, FontInfo Fonts, int nPass)
+{
+	local float XL, YL, offY;
+	local string remainingTime;
+	local Vector Location;
+	local float  ClockPercentage;
+	//Log( " gbxTimerVictoryCondition::DrawGBXHud() TimeInSeconds="$TimeInSeconds$" ReplicatedTimeRemaining="$ReplicatedTimeRemaining, 'MP' );
+	
+	// GBX:PAD: This isn't positioned right, and I don't have the right time or equipment to make it work out,
+	// so just get rid of the clock in spectating.
+	if (Hud.bSpectatingHUD)
+	{
+		return;
+	}
+	
+	if ( !bInitializedClock )
+	{
+		bInitializedClock = true;
+		
+		Clock.IconClock.ScaleX = 1.0;
+		Clock.IconClock.ScaleY = 1.0;
+		Clock.IconBack.ScaleX = 1.28;
+		Clock.IconBack.ScaleY = 1.28;
+
+		if ( Hud.bIsSplitScreen )
+		{
+			Clock.IconClock.ScaleX *= 0.75;
+			Clock.IconClock.ScaleY *= 0.75;
+			Clock.IconBack.ScaleX *= 0.75;
+			Clock.IconBack.ScaleY *= 0.75;
+		}
+	}
+
+	// Draw time
+	if ( !bDigitalClock && (nPass == 0) )
+	{
+		if (!Hud.bSpectatingHUD)
+		{
+			if ( !Hud.bIsSplitScreen )
+			{
+				Location.X = TimerPosX;
+				Location.Y = TimerPosY;
+			}
+			else
+			{
+				Location.X = SplitScreenTimerPosX;
+				Location.Y = SplitScreenTimerPosY;
+			}
+		}
+		else
+		{
+			Location.X = Canvas.ClipX * 0.5;
+			Location.Y = Canvas.ClipY * 0.7;
+  	    }
+		
+		Location.Z = 0;
+
+		Clock.ClockPercentage = float(ReplicatedTimeRemaining) / TimeInSeconds;
+		Clock.SetLocation( Location );
+		Clock.DrawGBXHud( Canvas, Hud, Fonts, nPass ); 
+	}
+	if ( bDigitalClock )
+	{
+		if (Hud.ViewedInfo.bIsSpectator)
+		{
+			offY = 40 * Hud.flMinScaleY;
+		}
+		remainingTime = class'ScoreBoard'.Static.FormatTime(ReplicatedTimeRemaining);
+		
+		if (nPass == 0)
+		{
+			Canvas.SetDrawColor( 26, 20, 14, 192 );
+			Canvas.Font = Hud.WargameFontNumbers;
+			Canvas.StrLen( remainingTime, XL, YL, Hud.ScaleX, Hud.ScaleY );
+			Canvas.SetPos( Canvas.SafeOffX + ((Canvas.SafeSizeX - (XL + (20 * Hud.ScaleX))) / 2), Canvas.SafeOffY + (8 * Hud.ScaleY) + offY);
+			Canvas.DrawTile( Hud.matCurHudComposite, XL + (20 * Hud.ScaleX), (YL / 2) + (10 * Hud.ScaleY), 412, 205, 65, 31);
+		}
+		else if (nPass == 1)
+		{
+			ClockPercentage = float(ReplicatedTimeRemaining) / TimeInSeconds;
+			if ( (ClockPercentage < 0.25) && !bShouldFlashClock )
+			{
+				bShouldFlashClock = true;
+				CurrentClockColor = FlashColor;
+				SetTimer( 1.0f, false );
+			}
+							
+			if (bPlayerKillFlash)
+			{
+				CurrentClockColor = PlayerAddColor;
+				bPlayerKillFlash = false;
+			}
+			if (bAIKillFlash)
+			{
+				CurrentClockColor = AIAddColor;
+				bAIKillFlash = false;
+			}
+
+			// Render the clock.
+			CurrentClockColor.R = Lerp( FlashLerpAlpha, CurrentClockColor.R, Hud.WhiteColor.R );
+			CurrentClockColor.G = Lerp( FlashLerpAlpha, CurrentClockColor.G, Hud.WhiteColor.G );
+			CurrentClockColor.B = Lerp( FlashLerpAlpha, CurrentClockColor.B, Hud.WhiteColor.B );
+			CurrentClockColor.A = 255;
+
+			Canvas.Font = Hud.WargameFontNumbers;
+			Canvas.Style = ERenderStyle.STY_Alpha;
+			Canvas.DrawColor = CurrentClockColor;
+
+			Canvas.StrLen( remainingTime, XL, YL, Hud.ScaleX, Hud.ScaleY );
+			Canvas.SetPos(Canvas.SafeOffX + ((Canvas.SafeSizeX - XL) / 2),Canvas.SafeOffY + offY);
+			Canvas.DrawText( remainingTime, false, Hud.ScaleX, Hud.ScaleY );
+		}		
+	}
+}
+
+simulated function Timer()
+{
+	Super.Timer();
+	bShouldFlashClock = false;
+}
+
+defaultproperties
+{
+	bWaitForTrigger=false
+	TimeInSeconds = 600.0	// 10 minute default
+	TimerScale = 0.5
+	TimerWidth = 46
+	TimerHeight = 46
+	TimerPosX = 30
+	TimerPosY = 30
+	SplitScreenTimerPosX = 30
+	SplitScreenTimerPosY = 30
+	TimerIconTimeSpacing = 2
+	bResetTimeOnTrigger = true
+	bDoTimeLowDialogue = false
+	bInitializedClock = false
+	bDigitalClock = false;
+
+	NextTimeLowBattleDialogue = 1000000.0f
+
+	VictoryReason=200;
+	MessageSectionName="TimerVictoryCondition"
+
+	MyHUDClockIconClass="gbxBase.HUDClockIcon"
+
+	TimeLowGroupName=TimeLow
+
+	FlashColor=(R=255,B=16,G=16,A=255)
+	AIAddColor=(R=16,B=255,G=16,A=255)
+	PlayerAddColor=(R=16,B=16,G=255,A=255)
+	CurrentClockColor=(R=181,G=181,B=153,A=255)
+	FlashLerpAlpha=0.1
+	bShouldFlashClock=false
+
+	flPlayerKillTimeToAdd=5.0f
+	flAIKillTimeToAdd=10.0f
+}// GEARBOX 2004-10-11 JWS created
+// This stole a lot of things from WargameScoreboard.
+// However, I didn't base it on that class because there is
+// a lot of stuff I don't want, and there isn't time for a
+// proper refactoring...
+class WargameMultiplayerScoreboard extends Scoreboard;
+
+var Font ScoreboardFont;
+var() float FontScaleX;
+var() float FontScaleY;
+var() float LineIndentX;
+var() float LineSpacingY;
+
+// stuff I got from WargameScoreboard
+const MAXPLAYERS=4;
+var() localized string      PlayerText;
+var() localized string      PointsText;
+var() localized string      PingText;
+var() localized string		NetText;
+var() localized string      FooterText;
+var() localized string		AssaultText;
+var() localized string		BaseText;
+var() localized string		PlayerTotalText;
+var() localized string		AlliesTotalText;
+var() localized string		GermanTotalText;
+var() localized string		NameText;
+var() localized string		KillsText;
+
+var localized string		OutText;
+
+// gamestats
+var() localized String		MapName, Spacer;
+
+var() Color TextColor;
+var() Color BoxColor;
+var() Color OwnerColor;
+var Color					PlayerColors[5];
+
+var Canvas.CanvasIcon		IconUSA;
+var Canvas.CanvasIcon		IconGerman;
+var Canvas.CanvasIcon		IconBackUSA;
+var Canvas.CanvasIcon		IconBackGerman;
+
+var Material BoxMaterial;
+var float BoxU, BoxV, BoxUL, BoxVL, BoxBU, BoxBV;
+
+var() float TeamBoxHeightPercentage;
+var() float TeamBoxXEdgeOffsetPercentage;
+var() float TeamBoxXCenterOffsetPercentage;
+var() float TeamBoxYOffsetPercentage;
+
+simulated function UpdatePrecacheMaterials()
+{
+ 	if ( BoxMaterial != None )
+	{
+		Level.AddPrecacheMaterial( BoxMaterial );
+	}
+}
+
+simulated function SortPRIArray()
+{
+	// do nothing, since we aren't drawing a normal sorted scoreboard...
+}
+
+simulated event UpdateScoreBoard(Canvas Canvas, float ScaleX, float ScaleY, optional bool bSimplified)
+{
+	DrawMPTeam(Canvas, ScaleX, ScaleY, ETeamIdentifier.TEAM_US);
+	DrawMPTeam(Canvas, ScaleX, ScaleY, ETeamIdentifier.TEAM_German);
+}
+
+// bDisplayType:
+// 0 -- default value (to draw one team appropriately for both to be displayed e.g. end game scoreboard.
+// 1 -- draw just that team, in non-splitscreen mode.
+// 2 -- draw just that team, in horizontal splitscreen mode.
+// 3 -- draw just that team, in vertical splitscreen mode.
+
+simulated function DrawMPTeam(Canvas Canvas, float ScaleX, float ScaleY, ETeamIdentifier team, optional int bDisplayType )
+{
+	local PlayerReplicationInfo PRI, Player1, Player2;
+	local bool bSplitSingleTeam;
+	local TeamInfo TeamInfo;
+	local float BoxXPos, BoxYPos, BoxSizeX, BoxSizeY;
+	local float BoxXPos2;
+//	local float TextX, TextY; // debug only
+	local float TextWidth, TextHeight;
+	local float TextScaleX, TextScaleY;
+	local float StartX, StartY, EndX, EndY;
+	local float TotalScore;
+	local string TotalString;
+	local color PrevColor;
+
+	PrevColor = Canvas.DrawColor;
+
+	if (team == ETeamIdentifier.TEAM_None)
+	{
+		return;
+	}
+
+	ForEach DynamicActors(class'PlayerReplicationInfo',PRI)
+	{
+		if ( PRI != None && !PRI.bBot && PRI.Team.TeamIndex == team )
+		{
+			if (PRI.TeamID == 0)
+			{
+				Player1 = PRI;
+			}
+			else
+			{
+				Player2 = PRI;
+			}
+		}
+	}
+
+	//======== begin debug code - draws left, center, and right bars
+//		Canvas.DrawColor = OwnerColor;
+//		Canvas.SetPos( 0, 0);
+//		Canvas.DrawVertical( (0.0375)*Canvas.ClipX, Canvas.ClipY);
+//		Canvas.SetPos( 0, 0);
+//		Canvas.DrawVertical( (1.0 - 0.0375)*Canvas.ClipX, Canvas.ClipY);
+//		Canvas.SetPos( 0, 0);
+//		Canvas.DrawVertical( 0.5*Canvas.ClipX, Canvas.ClipY);
+	//======== end debug code
+
+	// Draw the background for the team
+	BoxXPos  = -3;	// drop off screen to the edges
+	BoxYPos  = Canvas.ClipY * TeamBoxYOffsetPercentage;
+	BoxSizeX = (Canvas.ClipX * 0.5) - BoxXPos - (Canvas.ClipX * (TeamBoxXCenterOffsetPercentage / 2));
+	BoxSizeY = Canvas.ClipY * TeamBoxHeightPercentage;
+
+	bSplitSingleTeam = false;
+	if (bDisplayType == 0)
+	{
+		// German team draws to the right of US team
+		if (team == ETeamIdentifier.TEAM_German)
+		{
+			BoxXPos = -BoxXPos + BoxSizeX + (Canvas.ClipX * TeamBoxXCenterOffsetPercentage);
+		}
+	}
+	else
+	{
+		if (bDisplayType == 2 && Player1 != None && Player2 != None)
+		{
+			// setup 2nd box for horizontal splitscreen 2-player case.
+			BoxXPos2 = -BoxXPos + BoxSizeX + (Canvas.ClipX * TeamBoxXCenterOffsetPercentage);
+			bSplitSingleTeam = true;
+		}
+		else
+		{
+			// when displaying just one scoreboard
+			// average the german and american boxes
+			BoxXPos = (BoxXPos + -BoxXPos + BoxSizeX + (Canvas.ClipX * TeamBoxXCenterOffsetPercentage))/2;
+		}
+	}
+
+	if (bDisplayType == 3)
+	{
+		// the vertical case needs the width for displaying text.
+		BoxXPos -= BoxSizeX * 0.2;
+		BoxSizeX *= 1.4;
+	}
+
+	Canvas.Style = ERenderStyle.STY_Alpha;
+
+	if (bDisplayType != 0)
+		Canvas.DrawColor.A = 0.5 * Canvas.DrawColor.A;
+
+	// draw team icons behind the backdrop
+	StartX = (BoxXPos + 0.5*BoxSizeX);
+	StartY = (BoxYPos + 0.5*BoxSizeY);
+
+	if (bDisplayType == 0)
+	{
+		if (team == ETeamIdentifier.TEAM_German)
+		{
+			Canvas.DrawCanvasIconComposite(	StartX, StartY,
+								5.0*ScaleX, 5.0*ScaleY,
+								IconGerman, IconBackGerman );
+		}
+		else
+		{
+			Canvas.DrawCanvasIconComposite(	StartX, StartY,
+								5.0*ScaleX, 5.0*ScaleY,
+								IconUSA, IconBackUSA );
+		}
+	}
+
+	// draw the backdrop
+	Canvas.DrawColor = BoxColor ;
+	if (bDisplayType != 0)
+		Canvas.DrawColor.A = 0.5 * Canvas.DrawColor.A;
+
+	Canvas.SetPos(BoxXPos, BoxYPos);
+	Canvas.DrawTileTiledClip( BoxMaterial, BoxSizeX, BoxSizeY, BoxU, BoxV, BoxUL, BoxVL, BoxBU, BoxBV);
+
+	if (bSplitSingleTeam)
+	{
+		Canvas.SetPos(BoxXPos2, BoxYPos);
+		Canvas.DrawTileTiledClip( BoxMaterial, BoxSizeX, BoxSizeY, BoxU, BoxV, BoxUL, BoxVL, BoxBU, BoxBV);
+	}
+
+	// calculate scales, sizes
+	Canvas.Font = ScoreboardFont;
+	TextScaleX = FontScaleX*ScaleX;
+	TextScaleY = FontScaleY*ScaleY;
+	Canvas.StrLen("Test", TextWidth, TextHeight, TextScaleX, TextScaleY);
+
+	// draw the thin brown line technology separator.
+	if (bDisplayType == 0)
+		Canvas.DrawColor.A = 255;
+	
+	Canvas.SetPos(BoxXPos, BoxYPos + 1.25*LineSpacingY*Canvas.ClipY + TextHeight);
+	Canvas.DrawTileTiledClip(	BoxMaterial, 
+							BoxSizeX, 6 * ScaleY, 
+							BoxU, BoxV, BoxUL, BoxVL,
+							BoxBU, BoxBV);
+
+	if (bSplitSingleTeam)
+	{
+		Canvas.SetPos(BoxXPos2, BoxYPos + 1.25*LineSpacingY*Canvas.ClipY + TextHeight);
+		Canvas.DrawTileTiledClip(	BoxMaterial, 
+								BoxSizeX, 6 * ScaleY, 
+								BoxU, BoxV, BoxUL, BoxVL,
+								BoxBU, BoxBV);	
+	}
+
+	if (bDisplayType != 0)
+		Canvas.DrawColor.A = 255;
+
+	// Setup for drawing the player and fireteam data
+	BoxXPos  = Canvas.ClipX * TeamBoxXEdgeOffsetPercentage;
+	BoxSizeX = (Canvas.ClipX * 0.5) - BoxXPos - (Canvas.ClipX * (TeamBoxXCenterOffsetPercentage / 2));
+
+	if (bDisplayType == 0)
+	{
+		if (team == ETeamIdentifier.TEAM_German)
+		{
+			BoxXPos = BoxXPos + BoxSizeX + (Canvas.ClipX * TeamBoxXCenterOffsetPercentage);
+		}
+	}
+	else
+	{
+		if (bSplitSingleTeam)
+		{
+			BoxXPos2 = BoxXPos + BoxSizeX + (Canvas.ClipX * TeamBoxXCenterOffsetPercentage);
+		}
+		else
+		{
+			// when displaying just one scoreboard
+			// average the german and american boxes
+			BoxXPos = (BoxXPos + BoxXPos + BoxSizeX + (Canvas.ClipX * TeamBoxXCenterOffsetPercentage))/2;
+		}
+	}
+
+	if (bDisplayType == 3)
+	{
+		// the vertical case needs the width for displaying text.
+		BoxXPos -= BoxSizeX * 0.2;
+		BoxSizeX *= 1.4;
+	}
+
+	Canvas.DrawColor = TextColor;
+
+	//======== begin debug code - draws filler lines of text
+//		TextX = BoxXPos + LineIndentX*Canvas.ClipX;
+//		TextY = BoxYPos + LineSpacingY*Canvas.ClipY;
+//		
+//		Canvas.SetPos(TextX, TextY);
+//		Canvas.DrawText("Header", false, TextScaleX, TextScaleY);
+//
+//		TextY += 1.5*(LineSpacingY*Canvas.ClipY) + TextHeight;
+//		Canvas.SetPos(TextX, TextY);
+//		Canvas.DrawText("WWWWWWWWWWWWWWW", false, TextScaleX, TextScaleY);
+//
+//		TextY += LineSpacingY*Canvas.ClipY + TextHeight;
+//		Canvas.SetPos(TextX, TextY);
+//		Canvas.DrawText("TestTestTestTest", false, TextScaleX, TextScaleY);
+//
+//		TextY += LineSpacingY*Canvas.ClipY + TextHeight;
+//		Canvas.SetPos(TextX, TextY);
+//		Canvas.DrawText("TestTestTestTest", false, TextScaleX, TextScaleY);
+//
+//		TextY += LineSpacingY*Canvas.ClipY + TextHeight;
+//		Canvas.SetPos(TextX, TextY);
+//		Canvas.DrawText("TestTestTestTest", false, TextScaleX, TextScaleY);
+//
+//		TextY += LineSpacingY*Canvas.ClipY + TextHeight;
+//		Canvas.SetPos(TextX, TextY);
+//		Canvas.DrawText("TestTestTestTest", false, TextScaleX, TextScaleY);
+//
+//		TextY += LineSpacingY*Canvas.ClipY + TextHeight;
+//		Canvas.SetPos(TextX, TextY);
+//		Canvas.DrawText("TestTestTestTest", false, TextScaleX, TextScaleY);
+//
+//		TextY += LineSpacingY*Canvas.ClipY + TextHeight;
+//		Canvas.SetPos(TextX, TextY);
+//		Canvas.DrawText("TestTestTestTest", false, TextScaleX, TextScaleY);
+	//======== end debug code
+
+	StartX = BoxXPos + LineIndentX*Canvas.ClipX;
+	StartY = BoxYPos + LineSpacingY*Canvas.ClipY;
+	EndX = BoxXPos + BoxSizeX - LineIndentX*Canvas.ClipX;
+	EndY = BoxYPos + BoxSizeY - LineSpacingY*Canvas.ClipY;
+
+	StartY = DrawHeader(Canvas, StartX, StartY, EndX, EndY, TextScaleX, TextScaleY, TextWidth, TextHeight);
+
+	if (Player1 != None)
+	{
+		StartY = DrawPlayer(Canvas, StartX, StartY, EndX, EndY, TextScaleX, TextScaleY, TextWidth, TextHeight, Player1, Player2 != None, bDisplayType != 0);
+	}
+
+	if (Player2 != None)
+	{
+		if (bSplitSingleTeam)
+		{
+			// reset the stuff for the other box.
+			StartX = BoxXPos2 + LineIndentX*Canvas.ClipX;
+			StartY = BoxYPos + LineSpacingY*Canvas.ClipY;
+			EndX = BoxXPos2 + BoxSizeX - LineIndentX*Canvas.ClipX;
+			EndY = BoxYPos + BoxSizeY - LineSpacingY*Canvas.ClipY;
+			StartY = DrawHeader(Canvas, StartX, StartY, EndX, EndY, TextScaleX, TextScaleY, TextWidth, TextHeight);
+		}
+
+		StartY = DrawPlayer(Canvas, StartX, StartY, EndX, EndY, TextScaleX, TextScaleY, TextWidth, TextHeight, Player2, Player1 != None, bDisplayType != 0);
+	}
+
+	if (team == ETeamIdentifier.TEAM_US)
+	{
+		TotalString = AlliesTotalText;
+	}
+	else if (team == ETeamIdentifier.TEAM_GERMAN)
+	{
+		TotalString = GermanTotalText;
+	}
+
+	ForEach DynamicActors(class'TeamInfo',TeamInfo)
+	{
+		if (TeamInfo.TeamIndex == team)
+		{
+			TotalScore = TeamInfo.Score;
+			break;
+		}
+	}
+
+	Canvas.DrawColor = TextColor;
+	StartY = EndY - (LineSpacingY*Canvas.ClipY + TextHeight);
+	StartY = DrawTotalScore(Canvas, StartX, StartY, EndX, EndY, TextScaleX, TextScaleY, TextWidth, TextHeight, TotalString, TotalScore);
+
+	Canvas.DrawColor = PrevColor;
+}
+
+simulated function float DrawPlayer(Canvas Canvas, float StartX, float StartY, float EndX, float EndY, float TextScaleX, float TextScaleY, float TextWidth, float TextHeight, PlayerReplicationInfo PRI, bool bShowTotal, optional bool bShowHealth)
+{
+	local string name;
+	local float score, PlayerTotalScore;
+	local UnitReplicationInfo URI;
+	local int PlayerHealth;
+	local gbxPawn remotePawn;
+	local int	nHealth;
+	local ETeamIdentifier MyTeam;
+	
+	if (PRI != None)
+	{
+		Canvas.DrawColor = PlayerColors[pri.LobbyClientNum - 1];
+		Canvas.DrawColor.A = 255;
+
+		// Display health/alive status in complex leaderboard.
+		if (bShowHealth)
+		{
+			if (Controller(PRI.Owner) != None && Controller(PRI.Owner).Pawn != None)
+				PlayerHealth = Controller(PRI.Owner).Pawn.Health;
+			else
+				PlayerHealth = 0;
+
+			if (PlayerHealth <= 0)
+				Canvas.SetDrawColor(92, 92, 92);
+			else if (PlayerHealth < 30)
+				Canvas.SetDrawColor(185, 48, 38);
+			else if (PlayerHealth < 50)
+				Canvas.SetDrawColor(231,144,30);
+			else if (PlayerHealth < 80)
+				Canvas.SetDrawColor(144,231,30);
+			else
+				Canvas.SetDrawColor(21,217,11);
+
+			Canvas.SetPos(EndX - 40 + 17/2 - 25/6, StartY);
+			Canvas.DrawTile(material't_interface_mb.hud.interface_comp',25/3,48/3,142,129,25,48);
+		}
+
+		name = PRI.GetHumanReadableName() /* "Guest: WWWWWWWWWWWWWWW"*/;
+		score = PRI.Score     /* 100.0 */;
+		StartY = DrawNameScore(Canvas, StartX, StartY, EndX, EndY, TextScaleX, TextScaleY, TextWidth, TextHeight, name, score);
+
+		StartX += 2*LineIndentX*Canvas.ClipX;
+		PlayerTotalScore = PRI.Score;
+
+		ForEach DynamicActors(class'UnitReplicationInfo',URI)
+		{
+			if ( URI != None && URI.BelongsToPlayer(PRI) )
+			{
+				// Display health/alive status in complex leaderboard.
+				if (bShowHealth)
+				{
+					MyTeam = ETeamIdentifier(PRI.Team.TeamIndex);
+					nHealth = -1;
+
+					foreach DynamicActors( class'gbxPawn', remotePawn )
+					{
+						if ( remotePawn.MyUnit != None )
+						{
+							if ( URI.Type == remotePawn.MyUnit.UnitType && 
+								 MyTeam == remotePawn.PawnTeam )
+							{
+								nHealth = remotePawn.MyUnit.GetUnitEffectiveness();
+								break;
+							}
+						}
+					}
+
+					switch (nHealth)
+					{
+						// case -1 occurs when the entire unit is dead.
+					case -1:
+						Canvas.SetDrawColor(92, 92, 92);
+						break;
+						
+						// cases 0-3 are consistent colors with other representations of GetUnitEffectiveness
+						// but it might want to be abstracted somewhere.
+					case 0:
+						Canvas.SetDrawColor(185,48,38);
+						break;
+					case 1:
+						Canvas.SetDrawColor(244,95,28);
+						break;
+					case 2:
+						Canvas.SetDrawColor(193,188,44);
+						break;
+					case 3:
+						Canvas.SetDrawColor(107,147,28);
+						break;
+					}
+
+					Canvas.SetPos(EndX - 40, StartY);
+
+					switch (URI.Type)
+					{
+						case EUnitType.UnitType_Assault:
+							Canvas.DrawTile(material't_interface_mb.hud.interface_comp',17, 17, 35, 221, 17, 17);
+							break;
+						case EUnitType.UnitType_Base:
+							Canvas.DrawTile(material't_interface_mb.hud.interface_comp',17, 17, 35, 204, 17, 17);
+							break;
+						case EUnitType.UnitType_Vehicle:
+							Canvas.DrawTile(material't_interface_mb.hud.interface_comp',17, 17, 35, 238, 17, 17);
+							break;
+					}
+				}
+
+				StartY = DrawFireTeam(Canvas, StartX, StartY, EndX, EndY, TextScaleX, TextScaleY, TextWidth, TextHeight, URI, PlayerTotalScore);
+			}
+		}
+
+		if (bShowTotal)
+		{
+			Canvas.DrawColor = TextColor;
+
+			StartY = DrawTotalScore(Canvas, StartX, StartY, EndX, EndY, TextScaleX, TextScaleY, TextWidth, TextHeight, PlayerTotalText, PlayerTotalScore);
+		}
+	}
+
+	return StartY;
+}
+
+simulated function float DrawFireTeam(Canvas Canvas, float StartX, float StartY, float EndX, float EndY, float TextScaleX, float TextScaleY, float TextWidth, float TextHeight, UnitReplicationInfo URI, out float PlayerTotalScore)
+{
+	local string UnitText;
+
+	switch (URI.Type)
+	{
+		case EUnitType.UnitType_Assault:
+			UnitText = AssaultText;
+			break;
+		case EUnitType.UnitType_Base:
+			UnitText = BaseText;
+			break;
+		case EUnitType.UnitType_Vehicle:
+		default:
+			UnitText = "";
+			break;
+	}
+
+	if (UnitText != "")
+	{
+		StartY = DrawNameScore(Canvas, StartX, StartY, EndX, EndY, TextScaleX, TextScaleY, TextWidth, TextHeight, UnitText, URI.Score);
+
+		PlayerTotalScore += URI.Score;
+	}
+
+	return StartY;
+}
+
+// force a float->int conversion here because DrawTextJustified draws the fractional part of the number, which is bad
+simulated function float DrawNameScore(Canvas Canvas, float StartX, float StartY, float EndX, float EndY, float TextScaleX, float TextScaleY, float TextWidth, float TextHeight, string NameToDraw, int ScoreToDraw)
+{
+	local float XL, YL, W;
+
+	Canvas.DrawTextJustified(ScoreToDraw, 2, StartX, StartY, EndX, StartY+TextHeight, TextScaleX, TextScaleY); // Right-justified score
+
+	// compute length used by score, roughly
+	Canvas.StrLen("XX", XL, YL, TextScaleX, TextScaleY);
+	EndX -= XL;
+	W = EndX - StartX;
+
+	// see if we need to compress it
+	Canvas.StrLen(NameToDraw, XL, YL, TextScaleX, TextScaleY);
+	if (XL > W)
+		TextScaleX *= W / (XL*1.035);
+
+	Canvas.DrawTextJustified(NameToDraw,  0, StartX, StartY, EndX, StartY+TextHeight, TextScaleX, TextScaleY); // Left-justified name
+	StartY += LineSpacingY*Canvas.ClipY + TextHeight;
+
+	return StartY;
+}
+
+// force a float->int conversion here because DrawTextJustified draws the fractional part of the number, which is bad
+simulated function float DrawHeader(Canvas Canvas, float StartX, float StartY, float EndX, float EndY, float TextScaleX, float TextScaleY, float TextWidth, float TextHeight)
+{
+	Canvas.DrawTextJustified(NameText,  0, StartX, StartY, EndX, StartY+TextHeight, TextScaleX, TextScaleY); // Left-justified name
+	Canvas.DrawTextJustified(KillsText, 2, StartX, StartY, EndX, StartY+TextHeight, TextScaleX, TextScaleY); // Right-justified score
+	StartY += 1.5*(LineSpacingY*Canvas.ClipY) + TextHeight;
+
+	return StartY;
+}
+
+// force a float->int conversion here because DrawTextJustified draws the fractional part of the number, which is bad
+simulated function float DrawTotalScore(Canvas Canvas, float StartX, float StartY, float EndX, float EndY, float TextScaleX, float TextScaleY, float TextWidth, float TextHeight, string Description, int ScoreToDraw)
+{
+	Canvas.DrawTextJustified(Description @ ScoreToDraw, 2, StartX, StartY, EndX, StartY+TextHeight, TextScaleX, TextScaleY); // Right-justified total
+	StartY += LineSpacingY*Canvas.ClipY + TextHeight;
+
+	return StartY;
+}
+
+defaultproperties
+{
+	TeamBoxHeightPercentage = 0.40
+	TeamBoxXEdgeOffsetPercentage = 0.05
+	TeamBoxXCenterOffsetPercentage = 0.005
+	TeamBoxYOffsetPercentage = 0.25
+
+	HUDClass=class'WargameHUD'
+
+	ScoreboardFont = Font't_gbxfonts.WargameFont'
+	FontScaleX = 0.8
+	FontScaleY = 0.8
+	LineIndentX = 0.025
+	LineSpacingY = 0.01
+
+	// Stuff from WargameScoreboard
+    PlayerText="PLAYER"
+    PointsText="SCORE"
+    PingText="PING:"
+	NetText="NET"
+	Spacer=" "
+	MapName=":   "
+    FooterText="Elapsed Time:"
+	AssaultText="Assault Team"
+	BaseText="Fire Team"
+	PlayerTotalText="Player Total"
+	AlliesTotalText="Americans Total"
+	GermanTotalText="Germans Total"
+	NameText="Name"
+	KillsText="Kills"
+
+	TextColor = (R=255,B=255,G=255,A=255)
+	OwnerColor = (R=255,B=000,G=255,A=255)
+	BoxColor = (R=13,G=5,B=8,A=220)
+	BoxMaterial=Material't_interface_mb.hud.interface_comp';
+	BoxU=284
+	BoxV=128
+	BoxUL=128
+	BoxVL=128
+	BoxBU=32
+	BoxBV=32
+	OutText="OUT"
+
+	PlayerColors(0)=(R=214,G=81,B=41,A=200)
+	PlayerColors(1)=(R=134,G=106,B=201,A=200)
+	PlayerColors(2)=(R=231,G=211,B=57,A=200)
+	PlayerColors(3)=(R=107,G=186,B=74,A=200)
+	PlayerColors(4)=(R=140,G=140,B=140,A=180)
+
+	IconUSA=(Icon=Texture't_interface_mb.hud.interface_comp',U=276,V=99,UL=29,VL=29,DrawColor=(R=128,G=128,B=128,A=200),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+	IconGerman=(Icon=Texture't_interface_mb.hud.interface_comp',U=305,V=99,UL=29,VL=29,DrawColor=(R=0,G=0,B=0,A=200),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+	IconBackUSA=(Icon=Texture't_interface_mb.hud.interface_comp',U=192,V=131,UL=46,VL=46,DrawColor=(R=44,G=52,B=24,A=200),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+	IconBackGerman=(Icon=Texture't_interface_mb.hud.interface_comp',U=192,V=131,UL=46,VL=46,DrawColor=(R=90,G=28,B=21,A=200),ScaleX=0.8,ScaleY=0.8,PivotU=0.5,PivotV=0.5)
+}
+

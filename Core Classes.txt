@@ -1,0 +1,1336 @@
+//=============================================================================
+/// UnrealScript Commandlet (command-line applet) class.
+///
+/// Commandlets are executed from the ucc.exe command line utility, using the
+/// following syntax:
+///
+///     UCC.exe package_name.commandlet_class_name [parm=value]...
+///
+/// for example:
+///
+///     UCC.exe Core.HelloWorldCommandlet
+///     UCC.exe Editor.MakeCommandlet
+///
+/// In addition, if you list your commandlet in the public section of your
+/// package's .int file (see Engine.int for example), then your commandlet
+/// can be executed without requiring a fully qualified name, for example:
+///
+///     UCC.exe MakeCommandlet
+///
+/// As a convenience, if a user tries to run a commandlet and the exact
+/// name he types isn't found, then ucc.exe appends the text "commandlet"
+/// onto the name and tries again.  Therefore, the following shortcuts
+/// perform identically to the above:
+///
+///     UCC.exe Core.HelloWorld
+///     UCC.exe Editor.Make
+///     UCC.exe Make
+///
+/// It is also perfectly valid to call the Main method of a
+/// commandlet class directly, for example from within the body
+/// of another commandlet.
+///
+/// Commandlets are executed in a "raw" UnrealScript environment, in which
+/// the game isn't loaded, the client code isn't loaded, no levels are
+/// loaded, and no actors exist.
+//=============================================================================
+class Commandlet
+	extends Object
+	abstract
+	transient
+	noexport
+	native;
+
+
+
+/// Command name to show for "ucc help".
+var localized string HelpCmd;
+
+/// Command description to show for "ucc help".
+var localized string HelpOneLiner;
+
+/// Usage template to show for "ucc help".
+var localized string HelpUsage;
+
+/// Hyperlink for more info.
+var localized string HelpWebLink;
+
+/// Parameters and descriptions for "ucc help <this command>".
+var localized string HelpParm[16];
+var localized string HelpDesc[16];
+
+/// Whether to redirect log output to console stdout.
+var bool LogToStdout;
+
+/// Whether to load objects required in server, client, and editor context.
+var bool IsServer, IsClient, IsEditor;
+
+/// Whether to load objects immediately, or only on demand.
+var bool LazyLoad;
+
+/// Whether to show standard error and warning count on exit.
+var bool ShowErrorCount;
+
+/// Whether to show Unreal banner on startup.
+var bool ShowBanner;
+
+/// Entry point.
+native event int Main( string Parms );
+
+defaultproperties
+{
+	LogToStdout=true
+	IsServer=true
+	IsClient=true
+	IsEditor=true
+	LazyLoad=true
+	ShowErrorCount=false
+	ShowBanner=true
+}
+//=============================================================================
+/// UnrealScript "hello world" sample Commandlet.
+///
+/// Usage:
+///     ucc.exe HelloWorld
+//=============================================================================
+class HelloWorldCommandlet
+	extends Commandlet;
+
+
+
+var int intparm;
+var string strparm;
+
+function int Main( string Parms )
+{
+	log( "Hello, world!" );
+	if( Parms!="" )
+		log( "Command line parameters=" $ Parms );
+	if( intparm!=0 )
+		log( "You specified intparm=" $ intparm );
+	if( strparm!="" )
+		log( "You specified strparm=" $ strparm );
+	return 0;
+}
+
+defaultproperties
+{
+	HelpCmd="HelloWorld"
+	HelpOneLiner="Sample 'hello world' commandlet"
+	HelpUsage="HelloWorld (no parameters)"
+	HelpWebLink=""
+	LogToStdout=true
+	HelpParm(0)="IntParm"
+	HelpDesc(0)="An integer parameter"
+	HelpParm(1)="StrParm"
+	HelpDesc(1)="A string parameter"
+}
+//=============================================================================
+/// Locale: Locale management class.
+/// Not yet implemented.
+/// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class Locale
+	extends Object
+	transient;
+
+
+
+/*
+//
+// Information about this locale.
+//
+
+//!!System.GetLocale( language, variant, local )
+///@reference: !!look at java getISO3Language for std 3-char language abbreviations
+var const string ISO3Language;
+var const localized string DisplayLanguage;
+
+//
+// Locale language support.
+//
+
+/// Returns the currently active language's ISO 3 language code.
+native function string GetLanguage();
+
+/// Returns the localized, human-readable display name of the ISO 3 language code Language.
+native function string GetDisplayLanguage( string Language );
+
+/// Set the current ISO 3 language. Causes all class' and objects' localized variables to be reloaded.
+native function bool SetLanguage( string NewLanguage );
+
+//
+// Locale string processing.
+//
+
+/// Convert to locale-specific uppercase.
+function string ToUpper( string S );
+
+/// Convert to locale-specific lowercase.
+function string ToLower( string S );
+
+/// Compare two strings using locale-specific sorting.
+function int Compare( string A, string B );
+
+//
+// Locale number and currency handling.
+//
+
+/// Leading and trailing percentage symbols.
+var const localized string PrePercent, PostPercent;
+
+/// Leading and trailing currency symbols.
+var const localized string PreCurrencySymbol, PostCurrencySymbol;
+
+/// Percentage scale, i.e. 100 for 100%.
+var const localized int PercentScaler;
+
+/// Number of digits between "thousands" delimitor.
+var const localized int ThousandsCount, ThousandsCountCurrency;
+
+/// Positive and negative currency indicators.
+var const localized string
+	PrePositiveCurrency, PostPositiveCurrency,
+	PreNegativeCurrency, PostNegativeCurrency;
+
+// Thousands delimitor.
+var const localized string ThousandsDelimitor, ThousandsDelimitorCurrency;
+
+// Decimal point.
+var const localized string Decimal, DecimalCurrency;
+
+// Decimal count.
+var const localized int DecimalCount;
+
+/// Convert a float number to a string using the locale's formatting instructions.
+function string NumberToString( float Number );
+
+/// Convert a float number to a currency string using the locale's formatting instructions.
+function string CurrencyToString( float Currency );
+
+/// Convert a fraction from 0.0-1.0 to a percentage string.
+function string PercentToString( float Fraction )
+{
+	return PrePercent $ int(Fraction * PercentScaler) $ PostPercent;
+}
+
+//
+// Locale date and time support.
+//
+
+/// Human readable names of months.
+var const localized string Months[12];
+
+/// Human readable names of days-of-week.
+var const localized string DaysOfWeek[7];
+
+/// Human-readable AM/PM.
+var const localized string AMPM[2];
+
+/// Whether to display AM/PM, otherwise uses 24-hour notation.
+var const localized ShowAMPM;
+
+/// List of TimeToMap fields which should be exposed for editing in this locale.
+var const localized array<string> EditableTimeFields;
+
+/// Format string for generating human-readable time in AM/PM and 24-hour formats;
+/// may be ignored by Locale subclasses who display times using a different calendar,
+/// for example Chinese.
+var const localized string
+	TimeFormatAMPM, TimeFormat24Hour,
+	BriefTimeFormatAMPM, BriefTimeFormat24Hour,
+	CountdownTimeFormat;
+
+/// Format string for generating human-readable dates.
+var const localized string DateFormat;
+
+/// Return a map containing time parameters suitable for formatting.
+function map<string,string> DateTimeToMap( long T )
+{
+	local map<string,string> M;
+	M.Set("Year",       Time.GetYear(T));
+	M.Set("Month",      Time.GetMonth(T));
+	M.Set("MonthName",  Months(Time.GetMonth(T)));
+	M.Set("Day",        Time.GetDay(T));
+	M.Set("DayName",    DaysOfWeek(Time.GetDay(T)));
+	M.Set("Hour24",     Time.GetHour(T));
+	M.Set("Hour12",     Time.GetHour(T)%12);
+	M.Set("AMPM",       AMPM(Time.GetHour(T)/12);
+	M.Set("Minute",     Time.GetMinute(T));
+	M.Set("Second",     Time.GetSecond(T));
+	M.Set("MSec",       Time.GetMSec(T));
+	M.Set("USec",       Time.GetUSec(T));
+	M.Set("NSec",       Time.GetNSec(T));
+	return M;
+}
+
+/// Convert a map of TimeToMap key-values to a time; returns true if successful.
+function bool MapToDateTime( map<string,string> Map, out long T )
+{
+	//!!
+}
+
+/// Converts the time to a human-readable string, depending on the current locale.
+function string TimeToString( long T, bool Brief, bool Countdown )
+{
+	local string S;
+	if( Brief )
+	{
+		if( ShowAMPM ) S = BriefTimeFormatAMPM;
+		else           S = BriefTimeFormat24Hour,
+	}
+	else if( !Countdown )
+	{
+		if( ShowAMPM ) S = TimeFormatAMPM;
+		else           S = TimeFormat24Hour,
+	}
+	else
+	{
+		S = CountdownTimeFormat;
+	}
+	return string.Format( S, DateTimeToMap(T) );
+}
+
+// Convert the date to a human-readable string, depending on the current locale.
+function string DateToString( long T )
+{
+	return string.Format( DateFormat, DateTimeToMap(T) );
+}
+
+_defaultproperties
+{
+	Months(0)=January
+	Months(1)=February
+	Months(2)=March
+	Months(3)=April
+	Months(4)=May
+	Months(5)=June
+	Months(6)=July
+	Months(7)=August
+	Months(8)=September
+	Months(9)=October
+	Months(10)=November
+	Months(11)=December
+	DaysOfWeek(0)=Sunday
+	DaysOfWeek(1)=Monday
+	DaysOfWeek(2)=Tuesday
+	DaysOfWeek(3)=Wednesday
+	DaysOfWeek(4)=Thursday
+	DaysOfWeek(5)=Friday
+	DaysOfWeek(6)=Saturday
+	AMPM(0)=AM
+	AMPM(1)=PM
+	TimeFormatAMPM=%Hour12:02%.%Minute:02%.%Seconds:02% %AMPM%
+	TimeFormat24Hour=%Hour24:02%.%Minute:02%.%Seconds:02%
+	BriefTimeFormatAMPM=%Hour12:02%.%Minute:02% %AMPM%
+	BriefTimeFormat24Hour=%Hour24:02%.%Minute:02%
+	CountdownTimeFormat=%Hour24:02%.%Minute:02%.%Seconds:02%
+	DateFormat=%DayName% %MonthName% %Day%, %Year%
+	EditableTimeFields(0)=Year
+	EditableTimeFields(1)=Month
+	EditableTimeFields(2)=Day
+	EditableTimeFields(3)=Hour12
+	EditableTimeFields(4)=AMPM
+	EditableTimeFields(5)=Minute
+	EditableTimeFields(6)=Second
+	PreCurrencySymbol=$
+	PostCurrencySymbol=
+	PrePercent=
+	PostPercent=%
+	PercentScaler=100
+	ThousandsCount=1000
+	ThousandsCountCurrency=1000
+	ThousandsDelimitor=","
+	ThousandsDelimitorCurrency=","
+	Decimal="."
+	DecimalCurrency="."
+	PrePositiveCurrency=
+	PostPositiveCurrency=
+	PreNegativeCurrency=-
+	PostNegativeCurrency=
+	DecimalCount=2
+}
+*/
+//=============================================================================
+// Object: The base class all objects.
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class Object
+	native
+	noexport;
+
+
+
+//=============================================================================
+// UObject variables.
+
+// Internal variables.
+var native private const int ObjectInternal[7];
+var native const object Outer;
+var native const int ObjectFlags;
+var(Object) native const editconst name Name;
+var native const editconst class Class;
+
+//=============================================================================
+// Unreal base structures.
+
+// Object flags.
+const RF_Transactional	= 0x00000001; // Supports editor undo/redo.
+const RF_Public         = 0x00000004; // Can be referenced by external package files.
+const RF_Transient      = 0x00004000; // Can't be saved or loaded.
+const RF_NotForClient	= 0x00100000; // Don't load for game client.
+const RF_NotForServer	= 0x00200000; // Don't load for game server.
+const RF_NotForEdit		= 0x00400000; // Don't load for editor.
+const RF_Destroyed		= 0x00800000; // Object Destroy has already been called.
+
+// A globally unique identifier.
+struct Guid
+{
+	var int A, B, C, D;
+};
+
+// A point or direction vector in 3d space.
+struct Vector
+{
+	var() config float X, Y, Z;
+};
+
+// A plane definition in 3d space.
+struct Plane extends Vector
+{
+	var() config float W;
+};
+
+// An orthogonal rotation in 3d space.
+struct Rotator
+{
+	var() config int Pitch, Yaw, Roll;
+};
+
+// An arbitrary coordinate system in 3d space.
+struct Coords
+{
+	var() config vector Origin, XAxis, YAxis, ZAxis;
+};
+
+// Quaternion
+struct Quat
+{
+	var() config float X, Y, Z, W;
+};
+
+// Used to generate random values between Min and Max
+struct Range
+{
+	var() config float Min;
+	var() config float Max;
+};
+
+// Vector of Ranges
+struct RangeVector
+{
+	var() config range X;
+	var() config range Y;
+	var() config range Z;
+};
+
+// A scale and sheering.
+struct Scale
+{
+	var() config vector Scale;
+	var() config float SheerRate;
+	var() config enum ESheerAxis
+	{
+		SHEER_None,
+		SHEER_XY,
+		SHEER_XZ,
+		SHEER_YX,
+		SHEER_YZ,
+		SHEER_ZX,
+		SHEER_ZY,
+	} SheerAxis;
+};
+
+// Camera orientations for Matinee
+enum ECamOrientation
+{
+	CAMORIENT_None,
+	CAMORIENT_LookAtActor,
+	CAMORIENT_FacePath,
+	CAMORIENT_Interpolate,
+	CAMORIENT_Dolly,
+};
+
+// Generic axis enum.
+enum EAxis
+{
+	AXIS_X,
+	AXIS_Y,
+	AXIS_Z
+};
+
+enum EObjectiveComplete
+{
+	OI_Inactive,
+	OI_Active,
+	OI_Complete,
+	OI_Failed
+};
+
+enum EWeaponAimedStateTypes
+{
+	WAS_Relaxed,
+	WAS_CombatRelaxed,
+	WAS_AimedHip,
+	WAS_Sighted
+};
+
+// This enumeration is used for jeep turret-gunning directions.
+enum NinePointDir
+{
+   NPD_UpLeft,
+   NPD_UpCenter,
+   NPD_UpRight,
+
+   NPD_MidLeft,
+   NPD_MidCenter,
+   NPD_MidRight,
+
+   NPD_LowLeft,
+   NPD_LowCenter,
+   NPD_LowRight,
+};
+
+// Each gbxWeapon is rated as one of these categories, and this info is used with the
+// material-type of the surface struck to determine what type of impact effect to spawn.
+enum EWeaponCategory
+{
+	WC_None,
+	WC_Rifle,
+	WC_MachineGun,
+	WC_Grenade,
+	WC_LightExplosive,
+	WC_HeavyExplosive,
+	WC_Mortar,
+	WC_Bazooka,
+	WC_TankShell,
+};
+
+enum EWeaponName
+{
+	WN_USM1,
+	WN_USM1Carbine,
+	WN_USBAR,
+	WN_USThompson,
+	WN_USColt1911,
+	WN_USBazooka,
+	WN_USSpringfield,
+	WN_DEK98,
+	WN_DEK98Sniper,
+	WN_DEMP40,
+	WN_DEMG42,
+	WN_DEP38,
+	WN_DESTG44,
+	WN_DEPanzerfaust,
+	WN_DEFG42,
+	WN_DEFG42SNIPER,
+	WN_USM3A1,
+	WN_None
+};
+
+enum EAmmoName
+{
+	AM_US45Cal,
+	AM_US306Cal,
+	AM_US30Cal,
+	AM_Nothing,
+};
+
+enum EVehicleType
+{
+	ENTER_JeepDriver,
+	ENTER_JeepPassenger,
+	ENTER_JeepRearPassenger
+};
+
+enum ESurfaceTypes
+{
+	EST_Default,		// produces generic dust emitter.
+	EST_Metal,
+	EST_Stone,
+	EST_Brick,			// maps to Stone.
+	EST_Plaster,
+	EST_Wood_Thin,		
+	EST_Wood_Thick,		// maps to Wood_Thin.
+	EST_Glass,			// not used
+	EST_Water_Clean,
+	EST_Water_Muddy,
+	EST_Grassy_Field,
+	EST_Dirt,
+	EST_Mud,			// not used
+	EST_Gravel,			// not used
+	EST_Shrubbery,
+	EST_Flesh,				// not used
+	EST_Flesh_With_Cloth,	// not used
+	EST_Hay,
+	EST_None,			// produces no emitter.
+};
+
+enum ECoverType
+{
+	Cover_Low,
+	Cover_Crouched,
+	Cover_Standing
+};
+
+enum ESuppressionLevel
+{
+	SL_UNSUPPRESSED,
+	SL_SUPPRESSED
+};
+
+enum EUnitFormationType
+{
+	Formation_None,  // unspecified, just group near the leader
+	Formation_Line,  // side by side (left and right)
+	Formation_Column,  // one behind the other (front to back)
+	Formation_Wedge,  // leader up front, members to left and right behind leader in inverted 'V'
+    Formation_Vee  // leader at rear, members to left and right in front of leader in 'V' shape
+};
+
+enum EFacingPolicy
+{
+	FACE_NoChange,
+	FACE_Destination,
+	FACE_Vector,
+	FACE_Actor,
+	FACE_Enemy
+};
+
+enum ECornerDir
+{
+	CDIR_Left,
+	CDIR_Right
+};
+
+enum EMountAction
+{
+	Mount_None,
+	Mount_MountCornerCrouched,
+	Mount_MountCornerStanding,
+	Mount_MountCoverLow,
+	Mount_MountCoverCrouched,
+	Mount_MountCoverStanding,
+	Mount_Mount30CalGunner,
+	Mount_MountMG42Gunner,
+	Mount_MountPak88Gunner,
+	Mount_MountPak88Loader,
+	Mount_MountPak88FuseSetter,
+	Mount_MountPak88Spotter,
+	Mount_MountFlakVGunner,
+	Mount_MountFlakVLoader,
+	Mount_MountPak36Gunner,
+	Mount_MountPak36Loader,
+	Mount_MountMortarGunner,
+	Mount_MountMortarLoader,
+
+	Mount_DismountCorner,
+	Mount_DismountCornerNoRootMotion,
+	Mount_DismountMG42Gunner,
+	Mount_DismountMG42GunnerTurn,
+	Mount_DismountFlakVGunner,
+	Mount_DismountFlakVLoader,
+	Mount_DismountPak88Gunner,
+	Mount_DismountPak88FuseSetter,
+	Mount_DismountPak88Loader,
+	Mount_DismountPak88Spotter,
+	Mount_DismountPak36Gunner,
+	Mount_DismountPak36Loader,
+	Mount_DismountMortarGunner,
+	Mount_DismountMortarLoader,
+
+	Mount_ChangeToCombatReady,
+	Mount_ChangeToRelaxed,
+	Mount_NavigationWallClimb,
+	Mount_NavigationClimbThroughWindow,
+
+	Mount_MountTankStuart30cal,
+	Mount_DismountTankStuart30cal,
+	Mount_MountTankSherman50cal,
+	Mount_DismountTankSherman50cal,
+	Mount_MountTankM10_50cal,
+	Mount_DismountTankM10_50cal,
+
+	Mount_DismountHalftrackMG42Gunner,
+	Mount_DismountHalftrackPassenger,
+
+};
+
+enum EJobType
+{
+	Job_None,
+	Job_MG42_Gunner,
+	Job_MG42_Feeder,
+	Job_MG42_Spotter,
+	Job_MG42_AmmoRunner,
+	Job_Flakv_Gunner,
+	Job_Flakv_LeftLoader,
+	Job_Flakv_RightLoader,
+	Job_Pak36_Gunner,
+	Job_Pak36_Loader,
+	Job_PAK88_Gunner,
+	Job_PAK88_FuseSetter,
+	Job_PAK88_Loader,
+	Job_PAK88_Spotter,
+	Job_Mortar_Gunner,
+	Job_Mortar_LeftLoader,
+	Job_Mortar_RightLoader,
+	Job_Placing_TNT,
+};
+
+enum ETargetFailure
+{
+	FAIL_None,
+	FAIL_FriendlyInWay,
+	FAIL_MuzzleBlocked,
+	FAIL_TargetDead,
+	FAIL_OutOfAmmo,
+	FAIL_NoVantage,
+	FAIL_CantMelee,
+	FAIL_CantClaimMelee,
+};
+
+enum ESkillLevel
+{
+	SKILL_Novice,
+	SKILL_Intermediate,
+	SKILL_Advanced,
+	SKILL_Veteran,
+	SKILL_Invincible	// Used for U.S. units only (in single-player)
+};
+
+enum EDifficulty
+{
+	DIFF_Easy,
+	DIFF_Normal,
+	DIFF_Hard,
+	DIFF_Authentic
+};
+
+enum ETeamIdentifier
+{
+	TEAM_None,		// neutral, like civilians, animals, the Swiss, etc.
+	TEAM_US,		// U.S.A.!  U.S.A.!  U.S.A.!
+	TEAM_German,	// Ich Ben Ein Berliner
+	TEAM_Animal
+};
+
+enum ETeamMemberID
+{
+	MEMBER_One,
+	MEMBER_Two
+};
+
+enum EContextUseType
+{
+	DoorUse,
+	TalkToCharacterUse,
+	GammonBomb,	
+	ReadSign,
+	UseMG42,	
+	UseBrowning,
+	UseColt45,
+	PickupItem,
+	UseTankMachineGun,
+	UsePak36,
+	RestockWeapons,
+	PlantExplosive,
+	DisarmExplosive,
+	RearmExplosive,
+	TNT,
+	ReloadWeaponButton,
+	UseTankGrenade,
+	RestockUsable,
+	UsePlunger,
+	TalkToPawn,
+	PawnRestock,
+	UseFlareCrate,
+	UseReinforcement
+};
+
+enum EMoveReason
+{
+	ReasonMove_Unknown,
+	ReasonMove_FleeGrenade,
+	ReasonMove_MoveOrder,
+	ReasonMove_NoVantage,
+	ReasonMove_MuzzleBlocked,
+	ReasonMove_FriendlyFire,
+	ReasonMove_VehicleApproaching,
+	ReasonMove_Assaulting,
+	ReasonMove_CoverPointStolen,
+	ReasonMove_TakingFire,
+	ReasonMove_Exposed,
+	ReasonMove_Antsy,
+	ReasonMove_NewTargetOrder,
+	ReasonMove_TargetFailureUnknown,	// TEMP
+	ReasonMove_DesireCover,
+	ReasonMove_IgnoreCover,
+	ReasonMove_DesireVantage,
+	ReasonMove_MoveFailed,
+	ReasonMove_Flanked,
+	ReasonMove_InsufficientCover,
+};
+
+enum EMortarFire
+{
+	MortarFire_Marching,
+	MortarFire_Effect,
+	MortarFire_Bracketing,
+	MortarFire_Bounded,
+	MortarFire_Marching_Random,
+};
+
+enum CameraMode
+{
+    CAM_None,
+    CAM_Default,
+    CAM_MotionBlur,
+    CAM_Desaturation,
+    CAM_HighDynamicRange,
+    CAM_Blur,
+    CAM_SituationalAwareness,
+    CAM_Overlay,
+    CAM_OverlayCustom,
+	CAM_OldMovie,
+};
+
+enum ETankType
+{
+	US_StuartTank,
+	German_PanzerIV,
+	US_ShermanTank,
+	German_Stug,
+	German_StugLongGun,
+	US_M10,
+	German_MarderIII,
+	German_PanzerIVLongGun,
+};
+
+	
+// A color.
+struct Color
+{
+	var() config byte B, G, R, A;
+};
+
+// A bounding box.
+struct Box
+{
+	var vector Min, Max;
+	var byte IsValid;
+};
+
+// A bounding box sphere together.
+struct BoundingVolume extends Box
+{
+	var plane Sphere;
+};
+
+// a 4x4 matrix
+struct Matrix
+{
+	var() Plane XPlane;
+	var() Plane YPlane;
+	var() Plane ZPlane;
+	var() Plane WPlane;
+};
+
+// A interpolated function
+struct InterpCurvePoint
+{
+	var() float InVal;
+	var() float OutVal;
+};
+
+struct InterpCurve
+{
+	var() array<InterpCurvePoint>	Points;
+};
+
+struct CompressedPosition
+{
+	var vector Location;
+	var rotator Rotation;
+	var vector Velocity;
+};
+
+struct Gamer
+{
+    var() String UID;
+    var() String Gamertag;
+    var() String NickName;
+    var() String GameTitle;
+    var() int bIsInDifferentTitle;
+    var() int bInviteAccepted;
+    var() int bInviteRejected;
+    var() int bJoinable;
+    var() int bInvitable;
+    var() int bOnline;
+    var() int bReceivedRequest;
+	var() int bReceivedRequestHasVoiceAttachment;
+    var() int bSentRequest;
+    var() int bPlaying;
+    var() int bReceivedInvite;
+	var() int bReceivedInviteHasVoiceAttachment;
+    var() int bSentInvite;
+    var() int bHasVoice;
+    var() int bIsFriend;
+    var() int bIsMuted;
+    var() int bIsGuest;
+    var() int bIsTalking;
+    var() int bIsActivePlayer;		// new flag.  If true, this player is in the current game, relevant to the players list
+	var() int iPlayerListIndex;		// index into the m_RecentPlayers array
+	var() int iSortKey;
+};
+
+//=============================================================================
+// Constants.
+
+const MaxInt = 0x7fffffff;
+const Pi     = 3.1415926535897932;
+
+//=============================================================================
+// Basic native operators and functions.
+
+// NOTE: Use the console command "DUMPNATIVES" to get a list of unused native function numbers
+// (using native function number indexes speeds up the lookup of native functions.) - jlb
+
+// Bool operators.
+native(129) static final preoperator  bool  !  ( bool A );
+native(242) static final operator(24) bool  == ( bool A, bool B );
+native(243) static final operator(26) bool  != ( bool A, bool B );
+native(130) static final operator(30) bool  && ( bool A, skip bool B );
+native(131) static final operator(30) bool  ^^ ( bool A, bool B );
+native(132) static final operator(32) bool  || ( bool A, skip bool B );
+
+// Byte operators.
+native(133) static final operator(34) byte *= ( out byte A, byte B );
+native(134) static final operator(34) byte /= ( out byte A, byte B );
+native(135) static final operator(34) byte += ( out byte A, byte B );
+native(136) static final operator(34) byte -= ( out byte A, byte B );
+native(137) static final preoperator  byte ++ ( out byte A );
+native(138) static final preoperator  byte -- ( out byte A );
+native(139) static final postoperator byte ++ ( out byte A );
+native(140) static final postoperator byte -- ( out byte A );
+
+// Integer operators.
+native(141) static final preoperator  int  ~  ( int A );
+native(143) static final preoperator  int  -  ( int A );
+native(144) static final operator(16) int  *  ( int A, int B );
+native(145) static final operator(16) int  /  ( int A, int B );
+native(146) static final operator(20) int  +  ( int A, int B );
+native(147) static final operator(20) int  -  ( int A, int B );
+native(148) static final operator(22) int  << ( int A, int B );
+native(149) static final operator(22) int  >> ( int A, int B );
+native(196) static final operator(22) int  >>>( int A, int B );
+native(150) static final operator(24) bool <  ( int A, int B );
+native(151) static final operator(24) bool >  ( int A, int B );
+native(152) static final operator(24) bool <= ( int A, int B );
+native(153) static final operator(24) bool >= ( int A, int B );
+native(154) static final operator(24) bool == ( int A, int B );
+native(155) static final operator(26) bool != ( int A, int B );
+native(156) static final operator(28) int  &  ( int A, int B );
+native(157) static final operator(28) int  ^  ( int A, int B );
+native(158) static final operator(28) int  |  ( int A, int B );
+native(159) static final operator(34) int  *= ( out int A, float B );
+native(160) static final operator(34) int  /= ( out int A, float B );
+native(161) static final operator(34) int  += ( out int A, int B );
+native(162) static final operator(34) int  -= ( out int A, int B );
+native(163) static final preoperator  int  ++ ( out int A );
+native(164) static final preoperator  int  -- ( out int A );
+native(165) static final postoperator int  ++ ( out int A );
+native(166) static final postoperator int  -- ( out int A );
+
+// Integer functions.
+native(167) static final Function     int  Rand  ( int Max );
+native(249) static final function     int  Min   ( int A, int B );
+native(250) static final function     int  Max   ( int A, int B );
+native(251) static final function     int  Clamp ( int V, int A, int B );
+// GBX:PAD: Added this to give native support for a function to calculate the difference between two angles.
+native		static final function     int  AngleDiff ( int SrcAng, int DestAng );
+
+// Float operators.
+native(169) static final preoperator  float -  ( float A );
+native(170) static final operator(12) float ** ( float A, float B );
+native(171) static final operator(16) float *  ( float A, float B );
+native(172) static final operator(16) float /  ( float A, float B );
+native(173) static final operator(18) float %  ( float A, float B );
+native(174) static final operator(20) float +  ( float A, float B );
+native(175) static final operator(20) float -  ( float A, float B );
+native(176) static final operator(24) bool  <  ( float A, float B );
+native(177) static final operator(24) bool  >  ( float A, float B );
+native(178) static final operator(24) bool  <= ( float A, float B );
+native(179) static final operator(24) bool  >= ( float A, float B );
+native(180) static final operator(24) bool  == ( float A, float B );
+native(210) static final operator(24) bool  ~= ( float A, float B );
+native(181) static final operator(26) bool  != ( float A, float B );
+native(182) static final operator(34) float *= ( out float A, float B );
+native(183) static final operator(34) float /= ( out float A, float B );
+native(184) static final operator(34) float += ( out float A, float B );
+native(185) static final operator(34) float -= ( out float A, float B );
+
+// Float functions.
+native(186) static final function     float Abs   ( float A );
+native(187) static final function     float Sin   ( float A );
+native      static final function	  float Asin  ( float A );
+native(188) static final function     float Cos   ( float A );
+native      static final function     float Acos  ( float A );
+native(189) static final function     float Tan   ( float A );
+native(190) static final function     float Atan  ( float A, float B );
+native(191) static final function     float Exp   ( float A );
+native(192) static final function     float Loge  ( float A );
+native(193) static final function     float Sqrt  ( float A );
+native(194) static final function     float Square( float A );
+native(195) static final function     float FRand ();
+native(244) static final function     float FMin  ( float A, float B );
+native(245) static final function     float FMax  ( float A, float B );
+native(246) static final function     float FClamp( float V, float A, float B );
+native(247) static final function     float Lerp  ( float Alpha, float A, float B );
+native(248) static final function     float Smerp ( float Alpha, float A, float B );
+
+// gam ---
+native(253) static final function     float Ceil  ( float A );
+native(257) static final function     float Round ( float A );
+// --- gam
+
+// Vector operators.
+native(211) static final preoperator  vector -     ( vector A );
+native(212) static final operator(16) vector *     ( vector A, float B );
+native(213) static final operator(16) vector *     ( float A, vector B );
+native(296) static final operator(16) vector *     ( vector A, vector B );
+native(214) static final operator(16) vector /     ( vector A, float B );
+native(215) static final operator(20) vector +     ( vector A, vector B );
+native(216) static final operator(20) vector -     ( vector A, vector B );
+native(275) static final operator(22) vector <<    ( vector A, rotator B );
+native(276) static final operator(22) vector >>    ( vector A, rotator B );
+native(217) static final operator(24) bool   ==    ( vector A, vector B );
+native(218) static final operator(26) bool   !=    ( vector A, vector B );
+native(219) static final operator(16) float  Dot   ( vector A, vector B );
+native(220) static final operator(16) vector Cross ( vector A, vector B );
+native(221) static final operator(34) vector *=    ( out vector A, float B );
+native(297) static final operator(34) vector *=    ( out vector A, vector B );
+native(222) static final operator(34) vector /=    ( out vector A, float B );
+native(223) static final operator(34) vector +=    ( out vector A, vector B );
+native(224) static final operator(34) vector -=    ( out vector A, vector B );
+
+// Vector functions.
+native(225) static final function float  VSize  ( vector A );
+native		static final function float	 VSizeSquared( vector A );
+native		static final function float  VSizeSquared2D ( vector A );	// GBX:naj - added 2/19/04
+native		static final function float  VSizeIgnoreZ  ( vector A );	// GBX:naj - added 9/19/03 - for doing vector-distance calculations without taking the z-distance into account.
+native(226) static final function vector Normal ( vector A );
+native(227) static final function        Invert ( out vector X, out vector Y, out vector Z );
+native(252) static final function vector VRand  ( );
+native(300) static final function vector MirrorVectorByNormal( vector Vect, vector Normal );
+
+// Rotator operators and functions.
+native(142) static final operator(24) bool ==     ( rotator A, rotator B );
+native(203) static final operator(26) bool !=     ( rotator A, rotator B );
+native(287) static final operator(16) rotator *   ( rotator A, float    B );
+native(288) static final operator(16) rotator *   ( float    A, rotator B );
+native(289) static final operator(16) rotator /   ( rotator A, float    B );
+native(290) static final operator(34) rotator *=  ( out rotator A, float B  );
+native(291) static final operator(34) rotator /=  ( out rotator A, float B  );
+native(316) static final operator(20) rotator +   ( rotator A, rotator B );
+native(317) static final operator(20) rotator -   ( rotator A, rotator B );
+native(318) static final operator(34) rotator +=  ( out rotator A, rotator B );
+native(319) static final operator(34) rotator -=  ( out rotator A, rotator B );
+native(229) static final function GetAxes         ( rotator A, out vector X, out vector Y, out vector Z );
+native(230) static final function GetUnAxes       ( rotator A, out vector X, out vector Y, out vector Z );
+native(320) static final function rotator RotRand ( optional bool bRoll );
+native      static final function rotator OrthoRotation( vector X, vector Y, vector Z );
+native      static final function rotator Normalize( rotator Rot );
+native		static final operator(24) bool ClockwiseFrom( int A, int B );
+
+// String operators.
+native(112) static final operator(40) string $  ( coerce string A, coerce string B );
+native(168) static final operator(40) string @  ( coerce string A, coerce string B );
+native(115) static final operator(24) bool   <  ( string A, string B );
+native(116) static final operator(24) bool   >  ( string A, string B );
+native(120) static final operator(24) bool   <= ( string A, string B );
+native(121) static final operator(24) bool   >= ( string A, string B );
+native(122) static final operator(24) bool   == ( string A, string B );
+native(123) static final operator(26) bool   != ( string A, string B );
+native(124) static final operator(24) bool   ~= ( string A, string B );
+
+// String functions.
+native(125) static final function int    Len    ( coerce string S );
+native(126) static final function int    InStr  ( coerce string S, coerce string t, optional bool ignorecase );
+native(127) static final function string Mid    ( coerce string S, int i, optional int j );
+native(128) static final function string Left   ( coerce string S, int i );
+native(234) static final function string Right  ( coerce string S, int i );
+native(235) static final function string Caps   ( coerce string S );
+native(236) static final function string Chr    ( int i );
+native(237) static final function int    Asc    ( string S );
+native		static final function string CapsL  ( coerce string S );
+
+// Object operators.
+native(114) static final operator(24) bool == ( Object A, Object B );
+native(119) static final operator(26) bool != ( Object A, Object B );
+
+// Name operators.
+native(254) static final operator(24) bool == ( name A, name B );
+native(255) static final operator(26) bool != ( name A, name B );
+
+// InterpCurve operator
+native		static final function float InterpCurveEval( InterpCurve curve, float input );
+native		static final function InterpCurveGetOutputRange( InterpCurve curve, out float min, out float max );
+native		static final function InterpCurveGetInputDomain( InterpCurve curve, out float min, out float max );
+
+// Quaternion functions
+native		static final function Quat QuatProduct( Quat A, Quat B );
+native		static final function Quat QuatSlerp( Quat A, Quat B, float alpha );
+native		static final function Quat QuatInvert( Quat A );
+native		static final function vector QuatRotateVector( Quat A, vector B );
+native		static final function Quat QuatFindBetween( Vector A, Vector B );
+native		static final function Quat QuatFromAxisAndAngle( Vector Axis, Float Angle );
+native		static final function Quat QuatFromRotator( rotator A );
+native		static final function rotator QuatToRotator( Quat A );
+
+//=============================================================================
+// General functions.
+
+// Logging.
+native(231) final static NotInShip function Log( coerce string S, optional name Tag );
+native(232) final static function Warn( coerce string S );
+// rss: added ModLog cause ship build removes debugf 
+native(238) final static function ModLog( coerce string S, optional name Tag );
+native(239) final static function string Localize( string SectionName, string KeyName, string PackageName );
+
+// Goto state and label.
+native(113) final function GotoState( optional name NewState, optional name Label );
+native(281) final function bool IsInState( name TestState );
+native(284) final function name GetStateName();
+
+// Objects.
+native(258) static final function bool ClassIsChildOf( class TestClass, class ParentClass );
+native(303) final function bool IsA( name ClassName );
+
+// Probe messages.
+native(117) final function Enable( name ProbeFunc );
+native(118) final function Disable( name ProbeFunc );
+
+// Properties.
+native final function string GetPropertyText( string PropName );
+native final function SetPropertyText( string PropName, string PropValue );
+native static final function name GetEnum( object E, int i );
+native static final function object DynamicLoadObject( string ObjectName, class ObjectClass, optional bool MayFail );
+native static final function object FindObject( string ObjectName, class ObjectClass );
+native static final function name FindNameFromString( string NameString );
+
+// Configuration.
+native(536) final function SaveConfig();
+native static final function StaticSaveConfig();
+native static final function ResetConfig();
+
+native static final function float GetPixelAspect();
+native static final function Color InterpolateColor( float Pct, Color StartColor, Color EndColor );
+
+native static final function bool ShouldSpawnObject( class<Object> objectType, int ceilingSize );
+
+// Return a random number within the given range.
+final function float RandRange( float Min, float Max )
+{
+    return Min + (Max - Min) * FRand();
+}
+
+native final function PrintScriptStack();
+
+
+NotInShip function IsNotShipBuild(out int bIsNotShipBuild)
+{
+	bIsNotShipBuild = 1;  // is this a Debug or Release build (and not a Ship build)?
+}
+
+
+//=============================================================================
+// Engine notification functions.
+
+//
+// Called immediately when entering a state, while within
+// the GotoState call that caused the state change.
+//
+event BeginState();
+
+//
+// Called immediately before going out of the current state,
+// while within the GotoState call that caused the state change.
+//
+event EndState();
+
+/* scion ======================================================================
+ * ::delete
+ * Author: jg
+ * 
+ * Deletes an object that was allocated previously using new(). You may only
+ * new/delete objects with the poolable flag set on them. Do NOT delete actors.
+ * That's what Actor::DestroyActor() is for.
+ *
+ * input:	pDeleteMe -- The object to delete
+ *
+ * ============================================================================
+ */
+native final function delete(Object pDeleteMe);
+
+defaultproperties
+{
+}
+class SimpleCommandlet extends Commandlet;
+
+
+
+var int intparm;
+
+function int TestFunction()
+{
+	return 666;
+}
+
+function int Main( string Parms )
+{
+	local int temp;
+	local float floattemp;
+	local string textstring;
+	local string otherstring;
+
+	log("Simple commandlet says hi.");
+	log("Testing function calling.");
+	temp = TestFunction();
+	log("Function call returned" @ temp);
+	log("Testing cast to int.");
+	floattemp = 3.0;
+	temp = int(floattemp);
+	log("Temp is cast from "$floattemp$" to "$temp);
+	log("Testing min()");
+	temp = Min(32, TestFunction());
+	log("Temp is min(32, 666): "$Temp);
+	textstring = "wookie";
+	log("3 is a "$Left(textstring, 3));
+	otherstring = "skywalker";
+	otherstring = Mid( otherstring, InStr( otherstring, "a" ) );
+	log("otherstring:" @ otherstring);
+	return 0;
+}
+
+defaultproperties
+{
+	HelpCmd="Simple"
+	HelpOneLiner="Simple test commandlet"
+	HelpUsage="Simple (no parameters)"
+	HelpWebLink=""
+	LogToStdout=true
+}
+//=============================================================================
+// Subsystem: The base class all subsystems. Subsystems usually
+// correspond to large C++ classes. The benefit of defining a C++ class as
+// a subsystem is that you can make some of its variables script-accessible,
+// and you can make some of its properties automatically saveable as part
+// of the configuration.
+//
+// This is a built-in Unreal class and it shouldn't be modified.
+//=============================================================================
+class Subsystem extends Object
+	native
+	noexport;
+
+
+
+// Internal.
+var private native const int ExecVtbl;
+
+defaultproperties
+{
+}
+//=============================================================================
+/// Time-management class.
+/// Not yet implemented.
+/// This is a built-in Unreal class and it shouldn't be modified.
+///
+/// Coordinated Universal Time or UCT is the world standard time
+/// representation which is independent of time zone and daylight
+/// savings time.  The UCT standard supercedes the obsolete Grenwich
+/// Mean Time (GMT).
+///
+/// UCT is technically the time on the zeroth meridian plus 12 hours.
+/// For example, to convert UCT to EST (Eastern Standard Time), subtract
+/// 5 hours from UCT and then (??if dst).
+///
+/// By definition, UCT experiences a discontinuity when a leap second
+/// is reached. However, this discontinuity is never exposed while Unreal is
+/// running, as UCT is determined at startup time, and UCT is updated
+/// continuously during gameplay according to the CPU clock.
+///
+/// Unreal time is exposed as a long (a 64-bit signed quantity) and
+/// is defined as nanoseconds elapsed since
+/// midnight (00:00:00), January 1, 1970.
+///
+/// For more information about UCT and time, see
+///  http://www.bldrdoc.gov/timefreq/faq/faq.htm
+///  http://www.boulder.nist.gov/timefreq/glossary.htm
+///  http://www.jat.org/jtt/datetime.html
+///  http://www.eunet.pt/ano2000/gen_8601.htm
+//=============================================================================
+class Time
+	extends Object
+	transient;
+
+
+
+/*
+/// Returns current globally-consistent Coordinated Universal Time.
+static final function long GetGlobalTime();
+
+/// Converts global time to local time, taking into account the
+/// local timezone and daylight savings time.
+static final function long GlobalToLocal();
+
+/// Converts local time to global time, taking into account the
+/// local timezone and daylight savings time.
+static final function long LocalToGlobal();
+
+/// Return nanoseconds part of Time, 0-999.
+static final invariant function long GetNSecs( long Time );
+
+/// Returns microseconds part of Time, 0-999.
+static final invariant function long GetUSecs( long Time );
+
+/// Returns milliseconds part of Time, 0-999.
+static final invariant function long GetMSecs( long Time );
+
+/// Returns seconds part of Time, 0-59.
+static final invariant function long GetSeconds( long Time );
+
+/// Returns minutes part of Time, 0-59.
+static final invariant function long GetMinutes( long Time );
+
+/// Returns hours part of Time, 0-23.
+static final invariant function long GetHours( long Time );
+
+/// Returns days part of Time, 0 (first day of month)-31 (or last day, depends on month)
+static final invariant function long GetDays( long Time );
+
+/// Return day of week, 0 (Sunday)-6 (Saturday)
+static final invariant function long DayOfWeek( long Time );
+
+/// Return months part of Time, 0 (January) - 11 (December)
+static final invariant function long GetMonths( long Time );
+
+/// Return year.
+static final invariant function long GetYears( long Time );
+
+/// Convert the difference between times Later and Earlier to
+/// a floating point value expressed in seconds.
+static final invariant function float SpanSeconds( long Later, long Earlier );
+*/
+

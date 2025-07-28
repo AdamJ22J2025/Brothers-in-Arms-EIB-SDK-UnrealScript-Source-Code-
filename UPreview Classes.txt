@@ -1,0 +1,395 @@
+//=============================================================================
+// TeamLogonClient.
+//=============================================================================
+class UPreviewMapListClient extends UPreviewSkinnedDialogClientWindow;
+
+
+
+
+#exec Texture Import File=Textures\UTechLogo.tga Name=iUTechLogo Group=Menu Flags=2 COMPRESS=DXT1
+#exec Texture Import File=Textures\MapListSkin.tga Name=iMapListSkin Group=Menu MIPS=OFF COMPRESS=DXT1
+#exec Texture Import File=Textures\MapListBk.tga Name=iMapListBk Group=Menu Flags=2 COMPRESS=DXT1
+//#exec AUDIO IMPORT FILE=Sounds\Click.wav Name=mnuClick
+
+var UWindowLabelControl WindowTitle;	// The title of the menu
+var UWindowListBox MyMaps;
+var int GoCount;
+
+
+function Created()
+{
+	local PlayerController PC;
+
+	Super.Created();
+
+	PC = GetPlayerOwner();
+
+
+	WindowTitle = UWindowLabelControl(CreateControl(class'UWindowLabelControl',110,3,290,20));
+	WindowTitle.Font = 1;
+	WindowTitle.Text = "Select Map to Preview...";
+	WindowTitle.Align = TA_Center;
+	WindowTitle.TextColor = class'canvas'.static.MakeColor(0,0,0);
+
+	MyMaps = UWindowListBox(CreateControl(class'UwindowListBox',35,120, WinWidth-70, WinHeight-120));
+	MyMaps.ItemHeight = 25;
+	MyMaps.Font=2;
+	MyMaps.Align=TA_Center;
+	MyMaps.TextColor=class'canvas'.static.MakeColor(255,255,255);
+	MyMaps.SelectionBkgColor=class'canvas'.static.MakeColor(0,0,0);
+	MyMaps.SelectionColor=class'canvas'.static.MakeColor(255,255,0);
+//	MyMaps.bNoSelectionBox = true;
+	MyMaps.VertSB.HideWindow();
+	MyMaps.Register(Self);
+
+	MyMaps.AddItem("AW-Junkyard");
+	MyMaps.AddItem("CTF-Coyote");
+	MyMaps.AddItem("CTF-Grotto");
+	MyMaps.AddItem("CTF-Nightfall");
+	MyMaps.AddItem("SC_Citytest");
+	MyMaps.AddItem("UW-BlackForest1");
+	MyMaps.AddItem("CP_CogTest3");
+	MyMaps.AddItem("CP_UnderGeist");
+	MyMaps.AddItem("CP_UWCog");
+	MyMaps.AddItem("CTF-Ravine");
+	MyMaps.AddItem("CTF-Echolon");
+
+}
+
+function BeforePaint(Canvas C, float X, float Y)
+{
+	WinLeft = (C.ClipX/2)-(WinWidth/2);
+//	WinTop  = (C.ClipY/2)-(WinHeight/2);
+	WinTop  = 0;
+
+	if (MyMaps.SelectedItem==None)
+		MyMaps.SetSelectedItem(UWindowListBoxItem(MyMaps.Items.Next));
+
+	Super.BeforePaint(c,x,y);
+}
+
+function Paint(Canvas C, float X, float Y)
+{
+	local int S;
+	local Color H;
+	local float xl,yl;
+	local string st;
+
+
+	H = C.DrawColor;
+	S = C.Style;
+
+	C.Style =1;
+	C.SetPos((WinWidth/2)-172,25);
+	C.DrawTile( texture 'iUTechLogo',343,82,0,0,343,82);
+
+	C.SetPos(0,0);
+
+	C.Style = 4;
+	C.DrawTile( texture 'iMapListBk',WinWidth,WinHeight,0,0,512,512);
+	C.Style = S;
+	C.DrawColor = H;
+
+	C.SetPos(0,0);
+
+	Super.Paint(C,X,Y);
+
+	if (GoCount>0)
+	{
+		MyMaps.HideWindow();
+		GoCount++;
+
+		C.Font = Root.Fonts[F_Bold];
+		C.SetDrawColor(255,255,0);
+
+		st = "Loading...";
+		C.StrLen(st,xl,yl);
+		xl = (C.ClipX/2)-(xl/2);
+
+		C.SetPos(xl,120);
+		C.DrawTextClipped(st);
+
+		st = MyMaps.SelectedItem.Caption;
+		C.SetDrawColor(255,0,255);
+
+		C.StrLen(st,xl,yl);
+		C.SetPos((WinWidth/2)-(xl/2),120+5+yl);
+		C.DrawTextClipped(st);
+
+		if (GoCount==10)
+		{
+			Root.ConsoleCommand("LAUNCHXBOXMAP "$MyMaps.SelectedItem.Caption);
+		}
+
+	}
+
+}
+
+function Notify(UwindowDialogControl C, byte E)
+{
+	if ( (c==MyMaps) && (E==DE_Change) )
+	{
+		GoCount=1;
+	}
+}
+
+defaultproperties
+{
+	WinWidth=512
+	WinHeight=480
+	DrawStyle=3
+	Skin=texture 'iMapListSkin'
+	bLeaveOnscreen=True
+	bBkIsFrame=False
+}
+// ====================================================================
+//  Class:  UPreview.UPreviewRootWindow
+//  Parent: UWindow.UWindowRootWindow
+//
+//  <Enter a description here>
+// ====================================================================
+
+class UPreviewRootWindow extends UWindowRootWindow;
+
+
+
+var UPreviewMapListClient MapWindow;
+
+function Created()
+{
+	Super.Created();
+
+	MapWindow = UPreviewMapListClient(CreateWindow(class'UPreviewMapListClient', 0, 0, 512, 480));
+	MapWindow.HideWindow();
+
+}
+
+function bool KeyEvent( out EInputKey Key, out EInputAction Action, FLOAT Delta )
+{
+	if ( (Action == IST_Press) && ( (Key == IK_Joy5) || (Key == IK_Space) ))
+	{
+		bAllowConsole=false;
+		GotoState('UWindows');
+		return true;
+	}
+
+	return Super.KeyEvent(Key,Action,Delta);
+}
+
+state UWindows
+{
+	function BeginState()
+	{
+		if (!bAllowConsole)
+			MapWindow.ShowWindow();
+
+		Super.BeginState();
+		ViewportOwner.Actor.SetPause( False );
+
+	}
+
+	function EndState()
+	{
+		MapWindow.HideWindow();
+		Super.EndState();
+	}
+
+}
+
+
+
+defaultproperties
+{
+	LookAndFeelClass="UDebugMenu.UDebugBlueLookAndFeel"
+}
+// ====================================================================
+//  This button is used for graphical menus.  It extends button to allow
+//  for different rendering styles and colors in the 4 different states
+//
+//  FixMe: In the future, convert his to use arrays for quicker setup
+// ====================================================================
+
+class UPreviewSkinnedButton extends UWindowButton;
+
+
+
+//#exec AUDIO IMPORT FILE=Sounds\Pick.wav Name=mnuPick
+
+
+var Color		UpHue, DownHue, DisabledHue, OverHue;
+var int			UpDrawStyle,  DownDrawStyle,  DisabledDrawStyle,  OverDrawStyle;
+
+// This just makes setting up the button easier.
+
+function SetRenderInfo(int Mode, texture T,Color C, int s)
+{
+	switch (mode)
+	{
+		case 0 :
+			UpTexture = T;
+			UpHue = C;
+			UpDrawStyle = S;
+			break;
+
+		case 1 :
+			DownTexture = T;
+			DownHue = C;
+			DownDrawStyle = S;
+			break;
+
+		case 2 :
+			DisabledTexture = T;
+			DisabledHue = C;
+			DisabledDrawStyle = S;
+			break;
+
+		case 3 :
+			OverTexture = T;
+			OverHue = C;
+			OverDrawStyle = S;
+			break;
+	}
+}
+
+
+// Overload paint to set the hue and style
+
+function Paint(Canvas C, float X, float Y)
+{
+	local color oldC;
+	local int oldS;
+
+	oldC = C.DrawColor;
+	oldS = C.Style;
+
+	if(bDisabled)
+	{
+		C.DrawColor =DisabledHue;
+		C.Style = DisabledDrawStyle;
+	}
+	else
+	{
+		if(bMouseDown)
+		{
+
+			C.DrawColor =DownHue;
+			C.Style = DownDrawStyle;
+		}
+		else
+		{
+
+			if(MouseIsOver())
+			{
+				C.DrawColor =OverHue;
+				C.Style = OverDrawStyle;
+			}
+			else
+			{
+				C.DrawColor=UpHue;
+				C.Style = UpDrawStyle;
+			}
+		}
+	}
+
+	Super.Paint(C,X,Y);
+
+	C.DrawColor = oldC;
+	C.Style = oldS;
+
+
+}
+
+
+defaultproperties
+{
+
+	UpHue=(r=255,g=255,b=255,A=255)
+	DownHue=(r=255,g=255,b=255,A=255)
+	DisabledHue=(r=255,g=255,b=255,A=255)
+	OverHue=(r=255,g=255,b=255,A=255)
+	UpDrawStyle=1
+	DownDrawStyle=1
+	DisabledDrawStyle=1
+	OverDrawStyle=1
+//	DownSound=Sound'mnuPick'
+}
+// ====================================================================
+
+class UPreviewSkinnedDialogClientWindow extends UWindowDialogClientWindow;
+
+
+
+
+var bool bStretched;	// Should we strech the texture or tile
+var int DrawStyle;		// The render style
+var Color Hue;			// Used to set the Tranparancy level in DrawStyle=3
+var Texture Skin;		// The Skin to use as the backgroun
+var bool bBkIsFrame;	// Set to TRUE to allow the background of the window to
+						// act as it's frame for movement.
+
+// used for moving the window
+
+var float					MoveX, MoveY;	// co-ordinates where the move was requested
+var bool					bMoving;		// We are moving
+
+// Before painting the controls, we paint the background.  In this case, we don't call the
+// super to avoid having the black background drawn.
+
+
+function Paint(Canvas C, float X, float Y)
+{
+	local int S;
+	local Color H;
+
+	H = C.DrawColor;
+	S = C.Style;
+
+	C.Style = DrawStyle;
+	C.DrawColor = Hue;
+
+	if (bStretched)
+		C.DrawTile( Skin, WinWidth, WinHeight, 0,0, Skin.USize, Skin.VSize );
+	else
+		C.DrawTile( Skin, Skin.USize, Skin.VSize, 0,0, Skin.USize, Skin.VSize);
+
+	C.Style = S;
+	C.DrawColor = H;
+
+}
+
+// Handle movement (taking from FrameWindow and all sizing code removed)
+
+function LMouseDown(float X, float Y)
+{
+
+	Super.LMouseDown(X, Y);
+	MoveX = X;
+	MoveY = Y;
+	bMoving = True;
+	Root.CaptureMouse();
+}
+
+
+function MouseMove(float X, float Y)
+{
+	if (!bBkIsFrame)
+		return;
+
+	if(bMoving && bMouseDown)
+	{
+		WinLeft = Int(WinLeft + X - MoveX);
+		WinTop = Int(WinTop + Y - MoveY);
+	}
+	else
+		bMoving = False;
+
+}
+
+
+defaultproperties
+{
+	bStretched=True
+	Hue=(r=255,g=255,b=255,a=255)
+	DrawStyle=1
+}
+

@@ -1,0 +1,1341 @@
+
+class gbx_DemoSellSheet extends gbx_ScreenABXY;
+
+#exec OBJ LOAD FILE=..\texture\t_sell_sheet.utx
+
+// TODO PARIS REMOVEME
+var() Automated GUILabel		lblMissionFailed;
+
+var() Automated GUIImage		picBack;
+var() Automated GUIImage		picLogo;
+var() Automated GUIImage		picGBXLogo;
+var() Automated GUIImage		picUBILogo;
+var() Automated GUIImage		picShot;
+var() Automated GUIImage		picShotBack;
+
+var float						NextTime;
+var float						FadeTime;
+var int							CurrentImage;
+const IMAGE_VIEW_TIME = 3.0;
+const IMAGE_FADE_TIME = 1.0;
+
+var array<Material> 			Images;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+
+	InitExecution();
+
+	SetupBButton();
+	SetupAButton();
+
+	OnAButtonEvent = OnReplay;
+	OnBButtonEvent = OnQuit;
+
+	NextTime = 0;
+	CurrentImage = -1;
+
+//	SetTimer(0.1, true);
+//	Timer();
+}
+
+function OnReplay()
+{
+	ConsoleCommand("open " $PlayerOwner().GetURLMap());
+	Controller.CloseAll(false);
+}
+
+function OnQuit()
+{
+	ConsoleCommand("open D0_0130_EAGLES_KIOSK");
+	Controller.CloseAll(false);
+}
+
+function bool ScreenOnDrawPre(Canvas C)
+{
+	return false;
+}
+
+function bool ScreenOnPreDraw(Canvas C)
+{
+	local float timeNow;
+
+	timeNow = PlayerOwner().Level.UniversalTimeSeconds;
+	if (NextTime < timeNow)
+	{
+		ChooseNextImage();
+		NextTime = timeNow + IMAGE_VIEW_TIME;
+		FadeTime = timeNow + IMAGE_FADE_TIME;
+	}
+	else if (FadeTime < timeNow)
+	{
+		if (picShotBack.Image != picShot.Image)
+		{
+			picShot.ImageColor.A = 255;
+			picShotBack.Image = picShot.Image;
+		}
+	}
+	else
+	{
+		picShot.ImageColor.A = Lerp( 1.0 - ((FadeTime - timeNow) / IMAGE_FADE_TIME), 0, 255);
+	}
+
+	return false;	// still do the other stuff
+}
+
+function ChooseNextImage()
+{
+	CurrentImage++;
+	if (CurrentImage >= Images.Length)
+	{
+		CurrentImage = 0;
+
+		// enable exit buttons
+		SetupBButton(StringQuit);
+		SetupAButton("Replay");
+	}
+
+	picShot.Image = Images[CurrentImage];
+	picShot.ImageColor.A = 0;
+}
+
+/*
+function Timer()
+{
+	local float timeNow;
+
+	timeNow = PlayerOwner().Level.UniversalTimeSeconds;
+	if (NextTime < timeNow)
+	{
+		ChooseNextImage();
+		NextTime = timeNow + IMAGE_VIEW_TIME;
+	}
+	else if ((NextTime - (IMAGE_VIEW_TIME - IMAGE_FADE_TIME)) < timeNow)
+	{
+		if (picShotBack.Image != picShot.Image)
+		{
+			picShot.ImageColor.A = 255;
+			picShotBack.Image = picShot.Image;
+		}
+	}
+	else
+	{
+		picShot.ImageColor.A = Lerp( (timeNow - NextTime - IMAGE_FADE_TIME) / (IMAGE_VIEW_TIME - IMAGE_FADE_TIME), 0, 255);
+	}
+}
+*/
+
+defaultproperties
+{
+	Begin Object Class=GUIImage Name=cpicBack
+		Image=Texture't_sell_sheet.sell_background'
+		ImageColor=(R=255,G=255,B=255,A=255)
+		ImageStyle=ISTY_Scaled
+		WinWidth=1.0
+		WinHeight=1.0
+		WinLeft=0.0
+		WinTop=0.0
+		X1=0
+		Y1=0
+		X2=512
+		Y2=381
+	End Object
+	picBack=cpicBack
+
+	Begin Object Class=GUIImage Name=cpicBIALogo
+		Image=Texture't_sell_sheet.sell_BiAlogo'
+		ImageColor=(R=255,G=255,B=255,A=255)
+		ImageStyle=ISTY_Scaled
+		WinWidth=0.5
+		WinHeight=0.1
+		WinLeft=0.25
+		WinTop=0.1
+		X1=0
+		Y1=1
+		X2=256
+		Y2=32
+		RenderWeight=0.4
+	End Object
+	picLogo=cpicBIALogo
+
+	Begin Object Class=GUIImage Name=cpicGBXLogo
+		Image=Texture't_sell_sheet.sell_gbxlogo'
+		ImageColor=(R=255,G=255,B=255,A=255)
+		ImageStyle=ISTY_Scaled
+		WinWidth=0.15
+		WinHeight=0.18
+		WinLeft=0.28
+		WinTop=0.75
+		X1=0
+		Y1=0
+		X2=127
+		Y2=127
+		RenderWeight=0.4
+	End Object
+	picGBXLogo=cpicGBXLogo
+
+	Begin Object Class=GUIImage Name=cpicUBILogo
+		Image=Texture't_sell_sheet.sell_UBIlogo'
+		ImageColor=(R=255,G=255,B=255,A=255)
+		ImageStyle=ISTY_Scaled
+		WinWidth=0.15
+		WinHeight=0.18
+		WinLeft=0.1
+		WinTop=0.74
+		X1=1
+		Y1=1
+		X2=127
+		Y2=127
+		RenderWeight=0.4
+	End Object
+	picUBILogo=cpicUBILogo
+
+	Begin Object Class=GUIImage Name=cpicShot
+		ImageColor=(R=255,G=255,B=255,A=0)
+		ImageStyle=ISTY_Scaled
+		WinWidth=0.45
+		WinHeight=0.45
+		WinLeft=0.275
+		WinTop=0.23
+		X1=0
+		Y1=0
+		X2=255
+		Y2=205
+		RenderWeight=0.4
+	End Object
+	picShot=cpicShot
+
+	Begin Object Class=GUIImage Name=cpicShotBack
+		ImageColor=(R=255,G=255,B=255,A=255)
+		ImageStyle=ISTY_Scaled
+		WinWidth=0.45
+		WinHeight=0.45
+		WinLeft=0.275
+		WinTop=0.23
+		X1=0
+		Y1=0
+		X2=255
+		Y2=205
+		RenderWeight=0.35
+	End Object
+	picShotBack=cpicShotBack
+
+
+	Begin Object Class=GUILabel Name=cMissionFailed
+		Caption="Buys teh BiA"
+		StyleName="LargeButton"
+		DrawMenuState=1
+		TextAlign=TXTA_Center
+		bAcceptsInput=false
+		bMultiLine=true
+		bTabStop=false
+		WinWidth=0.800000
+		WinHeight=0.30000
+		WinLeft=0.100000
+		WinTop=0.500000
+	End Object
+//	lblMissionFailed=cMissionFailed
+
+	Images(0)=Texture't_sell_sheet.sell_squad'
+	Images(1)=Texture't_sell_sheet.sell_story'
+	Images(2)=Texture't_sell_sheet.sell_events'
+	Images(3)=Texture't_sell_sheet.sell_sound'
+	Images(4)=Texture't_sell_sheet.sell_weapons'
+}
+class MontrealDemo_MenuMain extends gbx_MenuLayoutScreen
+	Config;
+
+var config string				DemoMapName;
+var localized string			StringPromptExit;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+
+ 	OnCanClose = MM_CanClose;
+	OnOpen = MM_OnOpen;
+
+	class'gbx_ProfileManager'.default.DefCameraView = '';	// PC version keeps the default
+	class'gbx_ProfileManager'.Static.SetupCameraView(self);
+}
+
+function bool MM_CanClose(optional Bool bCancelled)
+{
+	return false;
+}
+
+function MM_OnOpen()
+{
+	Controller.BindPlayerToController(0, -1);
+	Controller.BindPlayerToController(1, -1);
+}
+
+function bool FinishDemoExit(string answer)
+{
+	if (answer ~= "YES")
+	{
+		ConsoleCommand("XLIVE EXIT_DEMO");
+		return false;
+	}
+
+	return true;
+}
+
+function PromptDemoExit()
+{
+	local gbx_ScreenQuestion dlg;
+	dlg = LaunchQuestionDialog(Controller, StringPromptExit, "YESNO NONE");
+	dlg.OnAnswer = FinishDemoExit;
+}
+
+function bool OnComponentActivate(int button, GUIComponent Sender)
+{
+	switch (button)
+	{
+		case 0:	// Play Demo
+			Controller.BindPlayerToController(0, Controller.ControllerId);
+			Controller.ApplyControllersToViewports();
+			LoadSPMap(DemoMapName, EDifficulty.DIFF_Easy );
+			return true;
+
+		case 1:	// Options
+			return Controller.OpenMenu("GUIDemo.NDemo_Options" ); break;
+
+		case 3:	// Exit
+			PromptDemoExit();
+			return true;
+	}
+
+	return false;
+}
+
+function bool ShouldShowControllerInfo(int inPlayerIndex)
+{
+	return false;
+}
+
+defaultproperties
+{
+	LayoutSpacing=0.01
+	MyComponents(0)=cBlockMenuButton
+	MyComponents(1)=cBlockMenuButton
+
+	MyCaptions(0)="Play Single Player Demo"
+	MyCaptions(1)="Options"
+
+	bAllowedAsLast=true
+
+	ACaption="Continue"
+	BCaption=""
+	DemoMapName="D0_0130_EAGLES_DEMO"
+	StringPromptExit="You are about to exit the Brothers in Arms Demo.  Are you sure you want to quit?"
+}
+
+class MontrealDemo_SPMissionBriefing extends gbx_SPMissionOver;
+
+var localized string				StringCompleteCaption;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	local string thisMap;
+	InitExecution();
+	Super.InitComponent(MyController, MyOwner);
+
+	thisMap = PlayerOwner().Level.GetLevelFileName();
+	GUILog("thisMap=" $thisMap);
+
+
+	if (thisMap == "D0_1500_FOUCARVILLE")
+	{
+		// Last mission complete.
+		SetCaptions( "Brothers in Arms demo.", "You have completed the" );
+		GotoState('ShowVictory');
+	}
+	else
+	{
+		SetCaptions(StringCompleteCaption);
+		GotoState('ShowComplete');
+	}
+}
+
+event Timer();
+function OnAButton();
+
+state ShowComplete
+{
+	function OnAButton()
+	{
+		local string thisMap;
+		thisMap = PlayerOwner().Level.GetLevelFileName();
+
+		if( (thisMap == "D0_0130_EAGLES_DEMO") || (thisMap ~= "D0_0130_EAGLES"))
+		{
+			PlayerOwner().Level.MissionManager.LoadSPMap("D0_0700_Exit4", int(PlayerOwner().Level.DifficultyManager.GetDifficulty()));
+		}
+		else
+		{
+			// From Exit4 to Foucarville...
+			PlayerOwner().Level.MissionManager.LoadSPMap("D0_1500_FOUCARVILLE", int(PlayerOwner().Level.DifficultyManager.GetDifficulty()));
+		}
+
+		Controller.CloseAll(false);
+	}
+}
+
+state ShowVictory
+{
+	function OnAButton()
+	{
+		ConsoleCommand("disconnect");
+	}
+}
+
+/*
+state ShowPromo
+{
+	function BeginState()
+	{
+		SetTimer(0.3, true);
+	}
+
+	event Timer()
+	{
+		KillTimer();
+		ConsoleCommand("PLAYMOVIE ..\\media\\d_Promo.bik 0 1 0 0 0 640 480");
+		ConsoleCommand("disconnect");
+	}
+}
+*/
+defaultproperties
+{
+	ACaption="Continue"
+	bHideParent=true
+
+	StringCompleteCaption="Chapter Objectives Complete"
+}
+class NDemo_ControlsOverlay extends GUIPage;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+	OnXControllerEvent=MyOnXControllerEvent;
+}
+
+function bool MyOnXControllerEvent(byte Id, eXControllerCodes iCode)
+{
+	if ((iCode == XC_Start) || (iCode == XC_A))
+	{
+		Controller.CloseMenu(false);
+		return true;
+	}
+
+	return false;
+}
+
+defaultproperties
+{
+	Background=Texture't_interface_mb_30.hud.controller_xboxdemo'
+}
+class NDemo_MenuMain extends gbx_MenuLayoutScreen
+	Config;
+
+var config string				DemoMapName;
+var localized string			StringPromptExit;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+
+ 	OnCanClose = MM_CanClose;
+	OnOpen = MM_OnOpen;
+
+	class'gbx_ProfileManager'.Static.SetupCameraView(self);
+}
+
+function bool MM_CanClose(optional Bool bCancelled)
+{
+	return false;
+}
+
+function MM_OnOpen()
+{
+	Controller.BindPlayerToController(0, -1);
+	Controller.BindPlayerToController(1, -1);
+}
+
+function bool FinishDemoExit(string answer)
+{
+	if (answer ~= "YES")
+	{
+		ConsoleCommand("XLIVE EXIT_DEMO");
+		return false;
+	}
+
+	return true;
+}
+
+function PromptDemoExit()
+{
+	local gbx_ScreenQuestion dlg;
+	dlg = LaunchQuestionDialog(Controller, StringPromptExit, "YESNO NONE");
+	dlg.OnAnswer = FinishDemoExit;
+}
+
+function bool OnComponentActivate(int button, GUIComponent Sender)
+{
+	switch (button)
+	{
+		case 0:	// Play Demo
+			Controller.BindPlayerToController(0, Controller.ControllerId);
+			Controller.ApplyControllersToViewports();
+			LoadSPMap(DemoMapName, EDifficulty.DIFF_Easy );
+			return true;
+
+		case 1:	// View Tutorial
+			ConsoleCommand("PLAYMOVIE ..\\media\\d_Training.bik 0 1 0 0 0 640 480");
+			return true;
+
+		case 2:	// Options
+			return Controller.OpenMenu("GUIDemo.NDemo_Options" ); break;
+
+		case 3:	// Multiplayer
+			return Controller.OpenMenu("GUIDemo.NDemo_ScreenFeatureMP" ); break;
+
+		case 4:	// Extras
+			return Controller.OpenMenu("GUIDemo.NDemo_ScreenFeatureExtras" ); break;
+
+		case 5:	// Exit
+			PromptDemoExit();
+			return true;
+	}
+
+	return false;
+}
+
+function bool ShouldShowControllerInfo(int inPlayerIndex)
+{
+	return false;
+}
+
+defaultproperties
+{
+	LayoutSpacing=0.01
+	MyComponents(0)=cBlockMenuButton
+	MyComponents(1)=cBlockMenuButton
+	MyComponents(2)=cBlockMenuButton
+	MyComponents(3)=cBlockMenuButton
+	MyComponents(4)=cBlockMenuButton
+	MyComponents(5)=cBlockMenuButton
+
+	MyCaptions(0)="Play Single Player Demo"
+	MyCaptions(1)="View Tutorial"
+	MyCaptions(2)="Options"
+	MyCaptions(3)="Multiplayer"
+	MyCaptions(4)="Extras"
+	MyCaptions(5)="Exit Demo"
+
+	bAllowedAsLast=true
+
+	ACaption="Continue"
+	BCaption=""
+	DemoMapName="D0_0130_EAGLES_DEMO"
+	StringPromptExit="You are about to exit the Brothers in Arms Demo.  Are you sure you want to quit?"
+}
+class NDemo_Options extends gbx_MenuLayoutScreen;
+
+var moSpinListControl				spnInvert;
+var moSpinListControl				spnShowSuppression;
+
+var WargamePlayerController			EditPlayerController;
+var WargamePlayerInput				EditPlayerInput;
+
+var bool							bCurrentInvert;
+var bool							bCurrentShowSuppression;
+
+var localized array<string>			StringListVolume;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+
+	EditPlayerController = WargamePlayerController(PlayerOwner());
+	EditPlayerInput = WargamePlayerInput(EditPlayerController.GetPlayerInput());
+
+	OnAButtonEvent = OnApply;
+
+	spnInvert = moSpinListControl(MyComponents[0]);
+	spnShowSuppression = moSpinListControl(MyComponents[1]);
+
+	spnInvert.AddFromList(StringListNoYes);
+	spnShowSuppression.AddFromList(StringListNoYes);
+
+	bCurrentInvert = !EditPlayerInput.bInvertMouse;
+	bCurrentShowSuppression = !EditPlayerController.bNoSuppressionIcons;
+
+	SetNoYesOption(spnInvert, bCurrentInvert);
+	SetNoYesOption(spnShowSuppression, bCurrentShowSuppression);
+}
+
+function OnApply()
+{
+	if (PageOptionsChanged())
+	{
+		if (NoYesOptionChanged(spnInvert, bCurrentInvert))
+		{
+			EditPlayerInput.bInvertMouse = !GetNoYesOption(spnInvert);
+		}
+		if (NoYesOptionChanged(spnShowSuppression, bCurrentShowSuppression))
+		{
+			EditPlayerController.bNoSuppressionIcons = !GetNoYesOption(spnShowSuppression);
+		}
+
+		EditPlayerController.SaveConfig();
+		EditPlayerInput.SaveConfig();
+	}
+
+	BaseOnAButton();
+}
+
+function EnableApply(optional bool bDisabled)
+{
+	if (bDisabled)
+		SetupAButton();
+	else
+		SetupAButton(ACaption);
+}
+
+function OnComponentChanged(int button, GUIComponent Sender)
+{
+	EnableApply(!PageOptionsChanged());
+}
+
+function bool PageOptionsChanged()
+{
+	return NoYesOptionChanged(spnInvert, bCurrentInvert) || NoYesOptionChanged(spnShowSuppression, bCurrentShowSuppression);
+}
+
+static function SetNoYesOption(out moSpinListControl ctrl, bool bSetYes)
+{
+	if (bSetYes)
+		ctrl.SetIndex(1);
+	else
+		ctrl.SetIndex(0);
+}
+static function bool GetNoYesOption(out moSpinListControl ctrl)
+{
+	return ctrl.GetIndex() == 1;
+}
+static function bool NoYesOptionChanged(out moSpinListControl ctrl, bool bOldYes)
+{
+	return GetNoYesOption(ctrl) != bOldYes;
+}
+
+defaultproperties
+{
+	ScreenTitle="Demo Options"
+	ACaption="Apply"
+	PagePlayerIndex=-2;
+
+	MyComponents(0)=cSpinMenuOption
+	MyComponents(1)=cSpinMenuOption
+
+	MyCaptions(0)="Invert Vertical Axis"
+	MyCaptions(1)="Show Suppression Icons"
+}
+class NDemo_PopupMenuSP extends gbx_MenuLayoutScreen;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	local GameProfile gProfile;
+	local int LastMission, FirstIncomplete, LastDifficulty, SaveMissionDifficulty;
+	local string SaveMissionName;
+	
+	Super.InitComponent(MyController, MyOwner);
+
+	if (gbx_SPMissionOver(ParentPage) != None)
+	{
+		MyComponents[0].Hide();
+	}
+
+	// load the current profile's savegame and checkpoint data
+	gProfile = class'GameProfile'.Static.LoadCurrentGameProfile( PlayerOwner().Level );
+	if (gProfile != None)
+	{
+		LastMission = gProfile.LastMissionCompleted;
+		LastDifficulty = gProfile.LastDifficultyCompleted;
+		FirstIncomplete = gProfile.FindFirstIncompleteMission();
+		SaveMissionName = gProfile.SaveMissionName;
+		SaveMissionDifficulty = gProfile.SaveMissionDifficulty;
+		class'GameProfile'.Static.UnloadProfile( PlayerOwner().Level, gProfile );
+
+//		if ( ((PlayerOwner().Level.MissionManager.GetMissionName( LastMission ) != SaveMissionName) || (LastDifficulty != SaveMissionDifficulty)) && !bool(ConsoleCommand("SAVEGAMEEXISTS 1")))
+		if (SaveMissionName == "")
+		{
+			MyComponents[3].Hide();
+		}
+	}
+	else
+	{
+		if ( !bool(ConsoleCommand("SAVEGAMEEXISTS 1")) )	// do we have a saved checkpoint?
+		{
+			MyComponents[3].Hide();
+		}
+	}
+
+	DoComponentLayout();
+
+	OnClose = InternalOnClose;
+
+	// pause the game
+	if(PlayerOwner().Level.Pauser == None)
+		PlayerOwner().SetPause(true);
+}
+
+function InternalOnClose(optional Bool bCancelled)
+{
+	PlayerOwner().SetPause(false);
+}
+
+function bool OnComponentActivate(int button, GUIComponent Sender)
+{
+	switch (button)
+	{
+		case 0:	// Resume
+			Controller.CloseAll(false); return true; break;
+
+		case 1:	// Controls
+			return Controller.OpenMenu("GUIDemo.NDemo_ControlsOverlay" ); break;
+
+		case 2: // Restart Mission
+			return Controller.OpenMenu("GUI.gbx_DlgSPRestartMission", "RESTART"); break;
+
+		case 3: // Reload Chapter
+			return Controller.OpenMenu("GUI.gbx_DlgSPRestartMission", "CHECKPOINT"); break;
+
+		case 4:	// Options
+			return Controller.OpenMenu("GUIDemo.NDemo_Options" ); break;
+
+		case 5: // Quit Mission
+			return Controller.OpenMenu("GUI.gbx_DlgQuitToMenu"); break;
+	}
+
+	return false;
+}
+
+function bool ShouldShowControllerInfo(int inPlayerIndex)
+{
+	return false;
+}
+
+
+defaultproperties
+{
+	MyComponents(0)=cBlockMenuButton
+	MyComponents(1)=cBlockMenuButton
+	MyComponents(2)=cBlockMenuButton
+	MyComponents(3)=cBlockMenuButton
+	MyComponents(4)=cBlockMenuButton
+	MyComponents(5)=cBlockMenuButton
+
+	MyCaptions(0)="Resume Chapter"
+	MyCaptions(1)="Controls"
+	MyCaptions(2)="Restart Chapter"
+	MyCaptions(3)="Reload Checkpoint"
+	MyCaptions(4)="Options"
+	MyCaptions(5)="Quit Chapter"
+
+	bAllowedAsLast=true
+	ACaption="Continue"
+}
+class NDemo_ScreenFeatureExtras extends GUIPage;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+	OnXControllerEvent=MyOnXControllerEvent;
+}
+
+function bool MyOnXControllerEvent(byte Id, eXControllerCodes iCode)
+{
+	if ((iCode == XC_Start) || (iCode == XC_A))
+	{
+		Controller.CloseMenu(false);
+		return true;
+	}
+
+	return false;
+}
+
+defaultproperties
+{
+	Background=Texture't_interface_mb_30.hud.extras_promo_xboxdemo'
+}
+class NDemo_ScreenFeatureMP extends GUIPage;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+	OnXControllerEvent=MyOnXControllerEvent;
+}
+
+function bool MyOnXControllerEvent(byte Id, eXControllerCodes iCode)
+{
+	if ((iCode == XC_Start) || (iCode == XC_A))
+	{
+		Controller.CloseMenu(false);
+		return true;
+	}
+
+	return false;
+}
+
+defaultproperties
+{
+	Background=Texture't_interface_mb_30.hud.mp_promo_xboxdemo'
+}
+
+class NDemo_SPMissionBriefing extends gbx_SPMissionOver;
+
+var localized string				StringCompleteCaption;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	local string thisMap;
+	InitExecution();
+	Super.InitComponent(MyController, MyOwner);
+
+	SetCaptions(StringCompleteCaption);
+
+
+	thisMap = PlayerOwner().Level.GetLevelFileName();
+	GUILog("thisMap=" $thisMap);
+
+	if ((thisMap ~= "D0_0130_EAGLES_DEMO") || (thisMap ~= "D0_0130_EAGLES"))
+	{
+		GotoState('ShowComplete');
+	}
+	else
+	{
+		GotoState('ShowVictory');
+	}
+}
+
+event Timer();
+function OnAButton();
+
+state ShowComplete
+{
+	function OnAButton()
+	{
+		PlayerOwner().Level.MissionManager.LoadSPMap("D2_1000_FALLOFSTCOMEDUMONT_DEMO", int(PlayerOwner().Level.DifficultyManager.GetDifficulty()));
+		Controller.CloseAll(false);
+	}
+}
+
+state ShowVictory
+{
+	function BeginState()
+	{
+		SetTimer(5.0, true);
+	}
+	function EndState()
+	{
+		KillTimer();
+	}
+
+	event Timer()
+	{
+		GotoState('ShowPromo');
+	}
+
+	function OnAButton()
+	{
+		GotoState('ShowPromo');
+	}
+}
+
+state ShowPromo
+{
+	function BeginState()
+	{
+		SetTimer(0.3, true);
+	}
+
+	event Timer()
+	{
+		KillTimer();
+		ConsoleCommand("PLAYMOVIE ..\\media\\d_Promo.bik 0 1 0 0 0 640 480");
+		ConsoleCommand("disconnect");
+	}
+}
+
+defaultproperties
+{
+	ACaption="Continue"
+	bHideParent=true
+
+	StringCompleteCaption="Chapter Complete"
+}
+class PressPreview_CC extends gbx_SPMissionOver;
+
+var localized string				StringCompleteCaption;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+
+	SetCaptions(StringCompleteCaption);
+}
+
+function OnAButton()
+{
+	local string nextMap;
+	local GUIController C;
+
+	nextMap = class'PressPreview_Chapters'.static.GetContinueChapter(PlayerOwner().Level.GetLevelFileName());
+
+	C = Controller;
+	C.PlayClickSound(EClickSound.CS_Click);
+
+	if (nextMap == "")
+	{
+		ConsoleCommand("disconnect");
+	}
+	else
+	{
+		PlayerOwner().Level.MissionManager.LoadSPMap(nextMap, int(PlayerOwner().Level.DifficultyManager.GetDifficulty()));
+	}
+
+	C.CloseAll(false);
+}
+
+defaultproperties
+{
+	StringCompleteCaption="Chapter Complete"
+	ACaption="Continue"
+}
+class PressPreview_Chapters extends gbx_MenuSP
+	Config;
+
+var config array<string>				DemoMaps;
+var byte								ChapterEnabled[20];
+var color								colImgDisabled;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	local int i, ch;
+
+	Super.InitComponent(MyController, MyOwner);
+
+	Timeline.bCycleUnplayedChapters = true;
+
+	UnlockDemoMaps(self);
+
+	for (i=0; i<DemoMaps.Length; i++)
+	{
+		ch = MyController.ViewportOwner.Actor.Level.MissionManager.FindMission(DemoMaps[i]);
+		if ((ch < 0) || (ch >= 20))
+		{
+			GUILog("Unknown map " $DemoMaps[i] $", skipping...");
+			continue;
+		}
+
+		ChapterEnabled[ch] = 1;
+	}
+}
+
+function bool IsChapterEnabled(int index) { return ChapterEnabled[index] == 1; }
+
+function OnChooseChapter()
+{
+	if (IsChapterEnabled(CurrentSelection))
+		Super.OnChooseChapter();
+}
+
+function ChapterListOnChange(GUIComponent Sender)
+{
+	Super.ChapterListOnChange(Sender);
+
+	if (IsChapterEnabled(CurrentSelection))
+	{
+		imgChapter.ImageColor = default.imgChapter.ImageColor;
+		SetupAButton(ACaption);
+	}
+	else
+	{
+		imgChapter.ImageColor = colImgDisabled;
+		SetupAButton();
+	}
+}
+
+function bool ScreenOnDraw(Canvas C)
+{
+//	if (IsChapterEnabled(CurrentSelection))
+//		return Super.ScreenOnDraw(C);	// still do the other stuff
+//	else
+		return Super(gbx_ScreenABXY).ScreenOnDraw(C);
+}
+
+static function UnlockDemoMaps(GUIComponent caller)
+{
+	local int i, ch;
+	local GameProfile gProfile;
+	local bool bSave;
+
+	gProfile = class'GameProfile'.Static.LoadCurrentGameProfile( caller.PlayerOwner().Level );
+	if (gProfile != None)
+	{
+		for (i=0; i<default.DemoMaps.Length; i++)
+		{
+			ch = caller.PlayerOwner().Level.MissionManager.FindMission(default.DemoMaps[i]);
+			if (ch == -1)
+				continue;
+
+			if (!gProfile.CompletedMissionDifficulty(ch, DIFF_Authentic))
+				bSave = true;
+
+			gProfile.SetMissionComplete(ch, DIFF_Easy, 1);
+			gProfile.SetMissionComplete(ch, DIFF_Normal, 1);
+			gProfile.SetMissionComplete(ch, DIFF_Hard, 1);
+			gProfile.SetMissionComplete(ch, DIFF_Authentic, 1);
+		}
+
+		class'GameProfile'.Static.UnloadProfile( caller.PlayerOwner().Level, gProfile, bSave );
+	}
+}
+
+static function string GetContinueChapter(string CurrentChapter)
+{
+	local int i;
+	
+	for (i=0; i<default.DemoMaps.Length; i++)
+	{
+		if (CurrentChapter ~= default.DemoMaps[i])
+			break;
+	}
+
+	i++;
+	if (i >= default.DemoMaps.Length)
+		return "";
+
+	return default.DemoMaps[i];
+}
+
+defaultproperties
+{
+	DemoMaps(0)="D0_0130_EAGLES"
+	DemoMaps(1)="D0_0700_EXIT4"
+	DemoMaps(2)="D0_1500_FOUCARVILLE"
+	DemoMaps(3)="D1_0900_VIERVILLE"
+	DemoMaps(4)="D2_0630_CRACKOFDAWN"
+	DemoMaps(5)="D2_1000_FALLOFSTCOMEDUMONT"
+
+	colImgDisabled=(R=80,G=80,B=80,A=255)
+}
+class PressPreview_Extras extends gbx_MenuExtras
+	Config;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+
+	class'PressPreview_Chapters'.static.UnlockDemoMaps(self);
+}
+
+defaultproperties
+{
+}
+class PressPreview_MM extends gbx_MenuLayoutScreen;
+
+var string								strOnOpenTarget;	// if set, jump to this screen on open
+
+var localized string					StringStartGame;
+
+function InitComponent(GUIController MyController, GUIComponent MyOwner)
+{
+	Super.InitComponent(MyController, MyOwner);
+
+ 	OnCanClose = MM_CanClose;
+	OnOpen = MM_OnOpen;
+
+	// clear out disconnect class, just in case
+	class'GameEngine'.default.DisconnectMenuClass = "";
+	class'GameEngine'.static.StaticSaveConfig();
+
+	MyComponents[2].EnableControl( false );
+//	MyComponents[5].EnableControl( false );
+
+	class'gbx_ProfileManager'.Static.SetupCameraView(self);
+}
+
+function NewProfileDone(string currentString, bool bCancelled)
+{
+	local bool result;
+	GUILog("NewProfileDone " $currentString);
+
+	if (!bCancelled)
+	{
+		result = class'Engine.GameProfile'.Static.CreateDefaultGameProfile(PlayerOwner().Level, currentString);
+	}
+	else
+	{
+		currentString = "";
+	}
+
+	if (result)
+	{
+		class'gbx_ProfileManager'.Static.SetProfileForController(self, 0, currentString);
+	}
+	else
+	{
+		class'gbx_ProfileManager'.Static.WarnCreateProfileFailed(self, currentString, bCancelled);
+	}
+}
+
+function bool MM_CanClose(optional Bool bCancelled)
+{
+	return false;
+}
+
+function bool ScreenOnDraw(Canvas C)
+{
+	return Super.ScreenOnDraw(C);
+}
+
+function MM_OnOpen()
+{
+	local string S;
+	local gbx_ScreenTextEntry dlg;
+	local GameProfile gProfile;
+
+	// if we have no profiles, create our default here
+	if (class'Engine.GameProfile'.Static.GetProfileCount(PlayerOwner().Level) == 0)
+	{
+		dlg = class'gbx_ProfileManager'.Static.PromptNewProfile(self);
+		dlg.EntryFinished = NewProfileDone;
+		return;
+	}
+
+	// disable continue if we can't load the profile
+	if (!class'gbx_ProfileManager'.Static.ControllerProfileExists(self, 0))
+	{
+		Controller.OpenMenu("GUI.gbx_ProfileManager", "0");
+		MyComponents[0].EnableControl( false );
+		return;
+	}
+	else
+	{
+		if (!PlayerOwner().bIsDemo)
+		{
+			MyComponents[0].EnableControl( true );
+		}
+	}
+
+	if (strOnOpenTarget != "")
+	{
+		S = strOnOpenTarget;
+		strOnOpenTarget = "";
+
+		if (!ShouldBlockMenuOpen(S, false))
+		{
+			Controller.OpenMenu(S);
+			return;
+		}
+	}
+
+	// change the caption of the "continue" button if this is a fresh game
+	gProfile = class'GameProfile'.Static.LoadCurrentGameProfile( PlayerOwner().Level );
+	if (gProfile != None)
+	{
+		if (gProfile.LastMissionCompleted == -1)
+		{
+			MyComponents[0].SetCaption(StringStartGame);
+		}
+		else
+		{
+			MyComponents[0].SetCaption(MyCaptions[0]);
+		}
+
+		class'GameProfile'.Static.UnloadProfile( PlayerOwner().Level, gProfile );
+	}
+
+	Controller.BindPlayerToController(0, -1);
+	Controller.BindPlayerToController(1, -1);
+}
+
+function bool ShouldBlockMenuOpen(string target, bool bInitialEntry)
+{
+	// TODO PARIS REMOVEME
+	if (PlayerOwner().bIsDemo)
+		return false;
+
+	if (target == "GUI.gbx_MenuMP")
+	{
+		// always reject if no player 1 profile
+		if (!class'gbx_ProfileManager'.Static.ControllerProfileExists(self, 0))
+			return true;
+
+		// reject initially for player 2
+		if (bInitialEntry && Controller.bIsConsole)
+			return (Controller.LiveFunc.IsControllerConnected(1) && !class'gbx_ProfileManager'.Static.ControllerProfileExists(self, 1));
+	}
+	else if (target == "GUI.gbx_MenuSP")
+	{
+		// always reject if no player 1 profile
+		if (!class'gbx_ProfileManager'.Static.ControllerProfileExists(self, 0))
+			return true;
+	}
+
+	return false;
+}
+
+function OpenScreen(string menu)
+{
+	// prompt profiles if player 2 is connected but has no profile
+	// or if player 1 has no profile
+	if (ShouldBlockMenuOpen(menu, true))
+	{
+		// TODO: put bool in controller that remembers if we bugged this controller for profile/signin.
+		strOnOpenTarget = menu;
+		Controller.OpenMenu("GUI.gbx_ProfileManager");
+	}
+	else
+	{
+		Controller.OpenMenu(menu);
+	}
+}
+
+function OnContinue()
+{
+	local GameProfile gProfile;
+	local int LastMission, FirstIncomplete, LastDifficulty, SaveMissionDifficulty;
+	local string SaveMissionName;
+
+
+	// load the current profile's savegame and checkpoint data
+	gProfile = class'GameProfile'.Static.LoadCurrentGameProfile( PlayerOwner().Level );
+	if (gProfile == None)
+	{
+		GUILog("OnContinue - Unknown profile!");
+
+		// hmm TODO
+	}
+	else
+	{
+		LastMission = gProfile.LastMissionCompleted;
+		LastDifficulty = gProfile.LastDifficultyCompleted;
+		FirstIncomplete = gProfile.FindFirstIncompleteMission();
+		SaveMissionName = gProfile.SaveMissionName;
+		SaveMissionDifficulty = gProfile.SaveMissionDifficulty;
+		class'GameProfile'.Static.UnloadProfile( PlayerOwner().Level, gProfile );
+
+		Controller.BindPlayerToController(0, Controller.ControllerId);
+
+		if (SaveMissionName != "")
+		{
+			// apply the controllers
+			Controller.ApplyControllersToViewports();
+
+			LoadSPMap(SaveMissionName, SaveMissionDifficulty );
+			Controller.CloseAll(false);
+		}
+		else if ( bool(ConsoleCommand("SAVEGAMEEXISTS 1")) )	// do we have a saved checkpoint?
+		{
+			GUILog("OnContinue - loading savegame.");
+
+			// apply the controllers
+			Controller.ApplyControllersToViewports();
+
+			// Load it
+			PlayerOwner().ClientTravel( "?load=1", TRAVEL_Absolute, false); 
+		}
+		else
+		{
+			GUILog("OnContinue - no savegamee exists, choosing continue map.");
+
+			if (LastMission == -1) // havent started yet.. 
+			{
+				// start from the top, after asking for difficulty
+				Controller.OpenMenu("GUI.gbx_SPChooseDifficulty", class'PressPreview_Chapters'.default.DemoMaps[0]);
+			}
+			else if (FirstIncomplete == -1)	// the game has been finished.
+			{
+				// TODO: start from the next highest difficulty?  or start from the top?
+				Controller.OpenMenu("GUI.gbx_SPChooseDifficulty", class'PressPreview_Chapters'.default.DemoMaps[0]);
+			}
+			else // fire up the next mission in the list on the last used difficulty
+			{
+				// apply the controllers
+				Controller.ApplyControllersToViewports();
+
+				LoadSPMap(PlayerOwner().Level.MissionManager.GetContinueMission(LastMission), LastDifficulty );
+				Controller.CloseAll(false);
+			}
+		}
+	}
+}
+
+function bool OnComponentActivate(int button, GUIComponent Sender)
+{
+	switch (button)
+	{
+		case 0:	// Continue
+			OnContinue(); return true; break;
+
+		case 1:	// Chapters
+			Controller.BindPlayerToController(0, Controller.ControllerId);
+			OpenScreen("GUIDemo.PressPreview_Chapters"); return true; break;
+
+		case 2:	// Multiplayer
+			return true;
+
+		case 3: // Options
+			return Controller.OpenMenu("GUI.gbx_MenuOptions"); break;
+
+		case 4: // Profiles
+			return Controller.OpenMenu("GUI.gbx_ProfileManager"); break;
+
+		case 5:	// Extras
+			OpenScreen("GUIDemo.PressPreview_Extras"); return true; break;
+	}
+
+	return false;
+}
+
+static function PreloadMenu(GUIController C)
+{
+	Super.PreloadMenu(C);
+
+	C.PreloadMenu("GUIDemo.PressPreview_Chapters");
+	C.PreloadMenu("GUI.gbx_ProfileManager");
+	C.PreloadMenu("GUIDemo.PressPreview_Extras");
+	C.PreloadMenu("GUI.gbx_SPChooseDifficulty");
+	C.PreloadMenu("GUI.gbx_MenuOptions");
+}
+
+defaultproperties
+{
+	LayoutSpacing=0.01
+	MyComponents(0)=cBlockMenuButton
+	MyComponents(1)=cBlockMenuButton
+	MyComponents(2)=cBlockMenuButton
+	MyComponents(3)=cBlockMenuButton
+	MyComponents(4)=cBlockMenuButton
+	MyComponents(5)=cBlockMenuButton
+
+	MyCaptions(0)="Continue"
+	MyCaptions(1)="Chapters"
+	MyCaptions(2)="Multiplayer"
+	MyCaptions(3)="Options"
+	MyCaptions(4)="Profiles"
+	MyCaptions(5)="Extras"
+
+	bAllowedAsLast=true
+
+	ScreenTitle="Press Preview"
+	ACaption="Continue"
+	BCaption=""
+	StringStartGame="Begin Game"
+}
+

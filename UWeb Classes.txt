@@ -1,0 +1,995 @@
+class HelloWeb extends WebApplication;
+
+
+
+/* Usage:
+This is a sample web application, to demonstrate how to program for the web server.
+
+
+[UWeb.WebServer]
+Applications[0]="UWeb.HelloWeb"
+ApplicationPaths[0]="/hello"
+bEnabled=True
+
+http://server.ip.address/hello
+
+*/
+
+event Query(WebRequest Request, WebResponse Response)
+{
+	local int i;
+
+	if(Request.Username != "test" || Request.Password != "test")
+	{
+		Response.FailAuthentication("HelloWeb");
+		return;
+	}
+
+	switch(Request.URI)
+	{
+	case "/form.html":
+		Response.SendText("<form method=post action=submit.html>");
+		Response.SendText("<input type=edit name=TestEdit>");
+		Response.SendText("<p><select multiple name=selecter>");
+		Response.SendText("<option value=\"one\">Number One");
+		Response.SendText("<option value=\"two\">Number Two");
+		Response.SendText("<option value=\"three\">Number Three");
+		Response.SendText("<option value=\"four\">Number Four");
+		Response.SendText("</select><p>");
+		Response.SendText("<input type=submit name=Submit value=Submit>");
+		Response.SendText("</form>");
+		break;
+	case "/submit.html":
+		Response.SendText("Thanks for submitting the form.<br>");
+		Response.SendText("TestEdit was \""$Request.GetVariable("TestEdit")$"\"<p>");
+		Response.SendText("You selected these items:<br>");
+		for(i=Request.GetVariableCount("selecter")-1;i>=0;i--)
+			Response.SendText("\""$Request.GetVariableNumber("selecter", i)$"\"<br>");
+		break;
+	case "/include.html":
+		Response.Subst("variable1", "This is variable 1");
+		Response.Subst("variable2", "This is variable 2");
+		Response.Subst("variable3", "This is variable 3");
+		Response.IncludeUHTM("testinclude.html");
+		break;
+	default:
+		Response.SendText("Hello web!  The current level is "$Level.Title);
+		Response.SendText("<br>Click <a href=\"form.html\">this link</a> to go to a test form");
+		break;
+	}
+}
+
+class ImageServer extends WebApplication;
+
+
+
+/* Usage:
+[UWeb.WebServer]
+Applications[0]="UWeb.ImageServer"
+ApplicationPaths[0]="/images"
+bEnabled=True
+
+http://server.ip.address/images/test.jpg
+*/
+
+event Query(WebRequest Request, WebResponse Response)
+{
+	local string Image;
+
+	Image = Mid(Request.URI, 1);
+	if( Right(Caps(Image), 4) == ".JPG" || Right(Caps(Image), 5) == ".JPEG" )
+		Response.SendStandardHeaders("image/jpeg");
+	else
+	if( Right(Caps(Image), 4) == ".GIF" )
+		Response.SendStandardHeaders("image/gif");
+	else
+	if( Right(Caps(Image), 4) == ".BMP" )
+		Response.SendStandardHeaders("image/bmp");
+	else
+	{
+		Response.HTTPError(404);
+		return;
+	}
+	Response.IncludeBinaryFile( "images/"$Image );
+}
+
+class SimpleAdmin extends WebApplication;
+
+/*
+
+[UWeb.WebServer]
+Applications[0]="UWeb.SimpleAdmin"
+ApplicationPaths[0]="/Admin"
+bEnabled=True
+DefaultApplication=0
+bEnabled=True
+
+[UWeb.SimpleAdmin]
+AdminName="Admin"
+AdminPassword="secret"
+
+http://server.ip.address/Admin
+
+*/
+
+var config string AdminName;
+var config string AdminPassword;
+
+
+function string FormatString(string input, int width, optional int justify)
+{
+	local string output;
+
+	output = "";
+
+	if (Len(input) > width)
+	{
+		output = Left(input, width);
+		return output;
+	}
+
+	if (justify == 0)  // left justified
+	{
+		output = input;
+		while (Len(output) < width)
+			output = output $ " ";
+	}
+	else if (justify == 1)  // right justified
+	{
+		while (Len(output) < (width - Len(input)))
+			output = output $ " ";
+		output = output $ input;
+	}
+	else  // center justified
+	{
+		while (Len(output) < ((width - Len(input)) / 2))
+			output = output $ " ";
+		output = output $ input;
+		while (Len(output) < width)
+			output = output $ " ";
+	}
+
+	return output;
+}
+
+
+event Query(WebRequest Request, WebResponse Response)
+{
+	local PlayerReplicationInfo pri;
+	local int player_count;
+	local string PlayerName, Kills, Deaths, Ping;
+	local array<string> PlayerNames;
+	local int index;
+	local int num_maps;
+	local string MapName;
+	local string hostName;
+	local string authMode;
+	local string URLstring;
+//	local string message;
+	local string command;
+
+	if(Request.Username != AdminName || Request.Password != AdminPassword)
+	{
+		Response.FailAuthentication("SimpleAdmin");
+		return;
+	}
+
+	switch(Request.URI)
+	{
+		case "/kick.html":
+			PlayerName = Request.GetVariable("PlayerToKick");
+			if (PlayerName != "")
+			{
+				Response.SendText("Kick the following player from the server...<br><br>");
+				Response.SendText("<form method=post action=yes_kick.html>");
+				Response.SendText("<input type=text name=KickPlayer value=\"" $ PlayerName $ "\" readonly><br><br>");
+				Response.SendText("<input type=submit name=YesName value=Yes>");
+				Response.SendText("</form>");
+				Response.SendText("<form method=post action=refresh.html>");
+				Response.SendText("<input type=submit name=NoName value=No></form>");
+			}
+			else
+			{
+				Response.SendText("<form method=post action=refresh.html>");
+				Response.SendText("<input type=submit name=HomeName value=Home></form>");
+			}
+			break;
+
+		case "/yes_kick.html":
+			PlayerName = Request.GetVariable("KickPlayer");
+			if (PlayerName != "")
+			{
+				Level.Game.Kick(PlayerName);
+				Response.SendText("Player \"" $ PlayerName $ "\" was kicked!<br><br>");
+			}
+			Response.SendText("<form method=post action=refresh.html>");
+			Response.SendText("<input type=submit name=HomeName value=Home></form>");
+			break;
+
+		case "/mapchange.html":
+			MapName = Request.GetVariable("MapName");
+			if (MapName != "")
+			{
+				Response.SendText("The server will switch to the following map...<br><br>");
+				Response.SendText("<form method=post action=yes_map.html>");
+				Response.SendText("<input type=text name=SwitchMap value=\"" $ MapName $ "\" readonly><br><br>");
+				Response.SendText("<input type=submit name=YesName value=Yes>");
+				Response.SendText("</form>");
+				Response.SendText("<form method=post action=refresh.html>");
+				Response.SendText("<input type=submit name=NoName value=No></form>");
+			}
+			else
+			{
+				Response.SendText("<form method=post action=refresh.html>");
+				Response.SendText("<input type=submit name=HomeName value=Home></form>");
+			}
+			break;
+
+		case "/yes_map.html":
+			MapName = Request.GetVariable("SwitchMap");
+			if (MapName != "")
+			{
+				hostName = Level.ComputerName;
+
+				if (Level.AuthMode == AM_SystemLink)
+					authMode = "?SystemLink";
+				else if (Level.AuthMode == AM_SplitScreen)
+					authMode = "?SplitScreen";
+				else
+					hostName = class'GameService.GameService'.static.GetServerName();
+
+				Level.ReplaceText(hostName, " ", "_");
+				URLstring = MapName $ "?wascycle=1" $ authMode $ "?HostName=" $ hostName;
+
+				Level.ServerTravel(URLstring, false);
+				Response.SendText("Server is switching to \"" $ MapName $ "\"!<br><br>");
+			}
+			Response.SendText("<form method=post action=refresh.html>");
+			Response.SendText("<input type=submit name=HomeName value=Home></form>");
+			break;
+
+/* it would be really nice if this worked...
+		case "/broadcast.html":
+			message = Request.GetVariable("BroadcastMessage");
+			if (message != "")
+			{
+				Level.Game.Broadcast(Level, message);
+				Response.SendText("The message \"" $ message $ "\" was broadcast to all players.<br><br>");
+			}
+			Response.SendText("<form method=post action=refresh.html>");
+			Response.SendText("<input type=submit name=HomeName value=Home></form>");
+			break;
+*/
+
+		case "/console.html":
+			command = Request.GetVariable("ConsoleCommand");
+			if (command != "")
+			{
+				Level.ConsoleCommand(command);
+				Response.SendText("Console command \"" $ command $ "\" was executed.<br><br>");
+			}
+			Response.SendText("<form method=post action=refresh.html>");
+			Response.SendText("<input type=submit name=HomeName value=Home></form>");
+			break;
+
+		case "/refresh.html":
+		default:
+
+			// give server name and current map...
+			Response.SendText("<font size=3><center>Welcome to <b>" $ Level.Game.GameReplicationInfo.ServerName $ "</b></center></font><br><hr><br>");
+
+			Response.SendText("The current game mission is <b>"$Level.Title$"</b> (map = <b>" $ Level.GetLevelFileName() $ "</b>)<br>");
+
+			Response.SendText("MaxPlayers is <b>" $ Level.Game.MaxPlayers $ "</b><br><br>");
+
+			// display the list of players currently on the server...
+			Response.SendText("<pre><tt>Current players are:");
+			Response.SendText("");
+
+			player_count = 0;
+			ForEach Level.AllActors(class'PlayerReplicationInfo', pri)
+			{
+				if (pri.PlayerName != "")
+				{
+					if (player_count == 0)
+					{
+						Response.SendText("Name                           Score Deaths  Ping");
+						Response.SendText("------------------------------ ----- ------  ----");
+					}
+
+					PlayerNames.Length = player_count+1;  // add an entry in the array
+					PlayerNames[player_count] = pri.PlayerName;
+
+					PlayerName = FormatString(pri.PlayerName, 30, 0);  // left justify
+					Kills = FormatString(string(int(pri.Score)), 3, 1);  // right justify
+					Deaths = FormatString(string(int(pri.Deaths)), 3, 1);  // right justify
+					Ping = FormatString(string(pri.Ping), 5, 1);  // right justify
+
+					Response.SendText(PlayerName $ "   " $ Kills $ "    " $ Deaths $ " " $ Ping);
+
+					player_count++;
+				}
+			}
+
+			if (player_count == 0)  // no players found?
+			{
+				Response.SendText("No players are currently on this server");
+			}
+
+			Response.SendText("</tt></pre>");
+			Response.SendText("<br>");
+
+			Response.SendText("<form method=post action=refresh.html>");
+			Response.SendText("<input type=submit name=RefreshName value=Refresh></form><br>");
+
+			Response.SendText("<hr>");
+
+			// display a list of players that can be kicked off of the server...
+			if (player_count > 0)
+			{
+				Response.SendText("<br>Kick a Player list (select player to kick from server):<br><br>");
+
+				Response.SendText("<form method=post action=kick.html>");
+				Response.SendText("<select name=PlayerToKick>");
+				for (index = 0; index < PlayerNames.Length; index++)
+				{
+					if (index == 0)
+						Response.SendText("<option value=\"" $ PlayerNames[index] $ "\" selected>" $ PlayerNames[index]);
+					else
+						Response.SendText("<option value=\"" $ PlayerNames[index] $ "\">" $ PlayerNames[index]);
+				}
+				Response.SendText("</select><br><br>");
+				Response.SendText("<input type=submit name=KickName value=KickPlayer>");
+				Response.SendText("</form><br>");
+
+				Response.SendText("<hr>");
+			}
+
+			// display a list of missions/maps that can be switched to...
+			num_maps = class'Gameplay.gbxMPMissionList'.static.GetMissionCount();
+
+			Response.SendText("<br>Change to another mission (select mission/map to switch to):<br><br>");
+
+			Response.SendText("<form method=post action=mapchange.html>");
+			Response.SendText("<select name=MapName>");
+			for (index = 0; index < num_maps; index++)
+			{
+				if (index == 0)
+					Response.SendText("<option value=\"" $ class'Gameplay.gbxMPMissionList'.static.GetMap(index) $ "\" selected>" $ class'Gameplay.gbxMPMissionList'.static.GetMissionName(index) $ " (map=" $ class'Gameplay.gbxMPMissionList'.static.GetMap(index) $ ")");
+				else
+					Response.SendText("<option value=\"" $ class'Gameplay.gbxMPMissionList'.static.GetMap(index) $ "\">" $ class'Gameplay.gbxMPMissionList'.static.GetMissionName(index) $ " (map=" $ class'Gameplay.gbxMPMissionList'.static.GetMap(index) $ ")");
+			}
+			Response.SendText("</select><br><br>");
+			Response.SendText("<input type=submit name=MapChangeName value=ChangeToMap>");
+			Response.SendText("</form><br>");
+
+			Response.SendText("<hr>");
+
+
+/* it would be really nice if this worked...
+			// broadcast a message to all players...
+			Response.SendText("<br>Send a text message to all players:");
+
+			Response.SendText("<form method=post action=broadcast.html>");
+			Response.SendText("<input type=edit size=80 name=BroadcastMessage><br><br>");
+			Response.SendText("<input type=submit name=BroadcastName value=SendMessage>");
+			Response.SendText("</form>");
+
+			Response.SendText("<hr>");
+*/
+
+			// allow the server Admin to enter a console command...
+			Response.SendText("<br>Enter a Console Command:");
+
+			Response.SendText("<form method=post action=console.html>");
+			Response.SendText("<input type=edit size=80 name=ConsoleCommand><br><br>");
+			Response.SendText("<input type=submit name=ConsoleName value=Execute>");
+			Response.SendText("</form><br>");
+
+			Response.SendText("<br>");
+			break;
+	}
+}
+
+defaultproperties
+{
+	AdminName="Admin"
+	AdminPassword="secret"
+}
+class WebApplication extends Object;
+
+
+
+// Set by the webserver
+var LevelInfo Level;
+var WebServer WebServer;
+var string Path;
+
+function Init();
+function Cleanup();
+function Query(WebRequest Request, WebResponse Response);
+class WebConnection extends TcpLink;
+
+
+
+var WebServer WebServer;
+var string ReceivedData;
+
+var WebRequest Request;
+var WebResponse Response;
+var WebApplication Application;
+
+var int RawBytesExpecting;
+
+event Accepted()
+{
+	WebServer = WebServer(Owner);
+	SetTimer(30, False);
+}
+
+event Closed()
+{
+	Destroy();
+}
+
+event Timer()
+{
+	Close();
+}
+
+event ReceivedText( string Text )
+{
+	local int i;
+	local string S;
+
+	ReceivedData = ReceivedData $ Text;
+	if(RawBytesExpecting > 0)
+	{
+		RawBytesExpecting -= Len(Text);
+		CheckRawBytes();
+
+		return;
+	}
+
+	// remove a LF which arrived in a new packet
+	// and thus didn't get cleaned up by the code below
+	if(Left(ReceivedData, 1) == Chr(10))
+		ReceivedData = Mid(ReceivedData, 1);
+	i = InStr(ReceivedData, Chr(13));
+	while(i != -1)
+	{
+		S = Left(ReceivedData, i);
+		i++;
+		// check for any LF following the CR.
+		if(Mid(ReceivedData, i, 1) == Chr(10))
+			i++;
+
+		ReceivedData = Mid(ReceivedData, i);
+
+		ReceivedLine(S);
+
+		if(LinkState != STATE_Connected)
+			return;
+		if(RawBytesExpecting > 0)
+		{
+			CheckRawBytes();
+			return;
+		}
+
+		i = InStr(ReceivedData, Chr(13));
+	}
+}
+
+function ReceivedLine(string S)
+{
+	if(Left(S, 4) ~= "GET ")
+		ProcessGet(S);
+	else
+	if(Left(S, 5) ~= "POST ")
+		ProcessPost(S);
+	else
+	if(S == "")
+		EndOfHeaders();
+	else
+	if(Request != None)
+	{
+		Request.ProcessHeaderString(S);
+	}
+}
+
+function ProcessGet(string S)
+{
+	local int i;
+
+	if(Request == None)
+		CreateResponseObject();
+
+	Request.RequestType = Request_GET;
+	S = Mid(S, 4);
+	while(Left(S, 1) == " ")
+		S = Mid(S, 1);
+
+	i = InStr(S, " ");
+
+	if(i != -1)
+		S = Left(S, i);
+
+	i = InStr(S, "?");
+	if(i != -1)
+	{
+		Request.DecodeFormData(Mid(S, i+1));
+		S = Left(S, i);
+	}
+
+	Application = WebServer.GetApplication(S, Request.URI);
+	if(Application != None && Request.URI == "")
+	{
+		Response.Redirect(WebServer.ServerURL$S$"/");
+		Cleanup();
+	}
+	else
+	if(Application == None && Webserver.DefaultApplication != -1)
+	{
+		Response.Redirect(WebServer.ServerURL$Webserver.ApplicationPaths[Webserver.DefaultApplication]$"/");
+		Cleanup();
+	}
+}
+
+function ProcessPost(string S)
+{
+	local int i;
+
+	if(Request == None)
+		CreateResponseObject();
+
+	Request.RequestType = Request_POST;
+
+	S = Mid(S, 5);
+	while(Left(S, 1) == " ")
+		S = Mid(S, 1);
+
+	i = InStr(S, " ");
+
+	if(i != -1)
+		S = Left(S, i);
+
+	i = InStr(S, "?");
+	if(i != -1)
+	{
+		Request.DecodeFormData(Mid(S, i+1));
+		S = Left(S, i);
+	}
+	Application = WebServer.GetApplication(S, Request.URI);
+	if(Application != None && Request.URI == "")
+	{
+		Response.Redirect(WebServer.ServerURL$S$"/");
+		Cleanup();
+	}
+}
+
+function CreateResponseObject()
+{
+	Request = new( Level.Outer ) class'WebRequest'; // GBX:naj - modified 3/11/04
+
+	Response = new( Level.Outer ) class'WebResponse'; // GBX:naj - modified 3/11/04
+	Response.Connection = Self;
+}
+
+function EndOfHeaders()
+{
+	if(Response == None)
+	{
+		CreateResponseObject();
+		Response.HTTPError(400); // Bad Request
+		Cleanup();
+		return;
+	}
+
+	if(Application == None)
+	{
+		Response.HTTPError(404); // FNF
+		Cleanup();
+		return;
+	}
+
+	if(Request.ContentLength != 0 && Request.RequestType == Request_POST)
+	{
+		RawBytesExpecting = Request.ContentLength;
+		RawBytesExpecting -= Len(ReceivedData);
+		CheckRawBytes();
+	}
+	else
+	{
+		Application.Query(Request, Response);
+		Cleanup();
+	}
+}
+
+function CheckRawBytes()
+{
+	if(RawBytesExpecting <= 0)
+	{
+		if(!(Request.ContentType ~= "application/x-www-form-urlencoded"))
+		{
+			Log("WebConnection: Unknown form data content-type: "$Request.ContentType);
+			Response.HTTPError(400); // Can't deal with this type of form data
+		}
+		else
+		{
+			Request.DecodeFormData(ReceivedData);
+			Application.Query(Request, Response);
+			ReceivedData = "";
+		}
+		Cleanup();
+	}
+}
+
+function Cleanup()
+{
+	if(Request != None)
+		Request = None;
+
+	if(Response != None)
+	{
+		Response.Connection = None;
+		Response = None;
+	}
+
+	if(Application != None)
+		Application = None;
+
+	Close();
+}
+class WebRequest extends Object
+	native
+	noexport;
+
+
+
+enum ERequestType
+{
+	Request_GET,
+	Request_POST
+};
+
+var string URI;
+var string Username;
+var string Password;
+var int ContentLength;
+var string ContentType;
+var ERequestType RequestType;
+var private native const int VariableMap[5];	// TMultiMap<FString, FString>!
+
+native final function string DecodeBase64(string Encoded);
+native final function AddVariable(string VariableName, string Value);
+native final function string GetVariable(string VariableName, optional string DefaultValue);
+native final function int GetVariableCount(string VariableName);
+native final function string GetVariableNumber(string VariableName, int Number, optional string DefaultValue);
+
+function ProcessHeaderString(string S)
+{
+	local int i;
+
+	if(Left(S, 21) ~= "Authorization: Basic ")
+	{
+		S = DecodeBase64(Mid(S, 21));
+		i = InStr(S, ":");
+		if(i != -1)
+		{
+			Username = Left(S, i);
+			Password = Mid(S, i+1);
+		}
+	}
+	else
+	if(Left(S, 16) ~= "Content-Length: ")
+		ContentLength = Int(Mid(S, 16));
+	else
+	if(Left(S, 14) ~= "Content-Type: ")
+		ContentType = Mid(S, 14);
+}
+
+function DecodeFormData(string Data)
+{
+	local string Token[2], ch;
+	local int i;
+	local int t;
+
+	t = 0;
+	for(i=0;i<Len(Data);i++)
+	{
+		ch = mid(Data, i, 1);
+		switch(ch)
+		{
+		case "+":
+			Token[t] = Token[t]$" ";
+			break;
+		case "&":
+		case "?":
+			if(Token[0] != "")
+				AddVariable(Token[0], Token[1]);
+			Token[0] = "";
+			Token[1] = "";
+			t = 0;
+			break;
+		case "=":
+			if(t == 0)
+				t = 1;
+			else
+				Token[t] = Token[t]$"=";
+			break;
+		case "%":
+			Token[t] = Token[t]$Chr(16 * GetHexDigit(mid(Data, ++i, 1)) + GetHexDigit(mid(Data, ++i, 1)));
+			break;
+		default:
+			Token[t] = Token[t]$ch;
+		}
+	}
+
+	if(Token[0] != "")
+		AddVariable(Token[0], Token[1]);
+}
+
+function int GetHexDigit(string D)
+{
+	switch(caps(D))
+	{
+	case "0": return 0;
+	case "1": return 1;
+	case "2": return 2;
+	case "3": return 3;
+	case "4": return 4;
+	case "5": return 5;
+	case "6": return 6;
+	case "7": return 7;
+	case "8": return 8;
+	case "9": return 9;
+	case "A": return 10;
+	case "B": return 11;
+	case "C": return 12;
+	case "D": return 13;
+	case "E": return 14;
+	case "F": return 15;
+	}
+
+	return 0;
+}
+class WebResponse extends Object
+	native
+	noexport;
+
+
+
+var private native const int ReplacementMap[5];	// TMap<FString, FString>!
+var const config string IncludePath;
+var WebConnection Connection;
+var bool bSentText; // used to warn headers already sent
+var bool bSentResponse;
+
+// uhtm including
+native final function Subst(string Variable, string Value, optional bool bClear);
+native final function ClearSubst();
+native final function IncludeUHTM(string Filename);
+native final function IncludeBinaryFile(string Filename);
+
+event SendText(string Text, optional bool bNoCRLF)
+{
+	if(!bSentText)
+	{
+		SendStandardHeaders();
+		bSentText = True;
+	}
+
+	if(bNoCRLF)
+		Connection.SendText(Text);
+	else
+		Connection.SendText(Text$Chr(13)$Chr(10));
+}
+
+event SendBinary(int Count, byte B[255])
+{
+	Connection.SendBinary(Count, B);
+}
+
+function FailAuthentication(string Realm)
+{
+	HTTPError(401, Realm);
+}
+
+function HTTPResponse(string Header)
+{
+	HTTPHeader(Header);
+	bSentResponse = True;
+}
+
+function HTTPHeader(string Header)
+{
+	if(bSentText)
+		Log("Can't send headers - already called SendText()");
+
+	Connection.SendText(Header$Chr(13)$Chr(10));
+}
+
+function HTTPError(int ErrorNum, optional string Data)
+{
+	switch(ErrorNum)
+	{
+	case 400:
+		HTTPResponse("HTTP/1.1 400 Bad Request");
+		SendText("<TITLE>400 Bad Request</TITLE><H1>400 Bad Request</H1>If you got this error from a standard web browser, please mail jack@epicgames.com and submit a bug report.");
+		break;
+	case 401:
+		HTTPResponse("HTTP/1.1 401 Unauthorized");
+		HTTPHeader("WWW-authenticate: basic realm=\""$Data$"\"");
+		SendText("<TITLE>401 Unauthorized</TITLE><H1>401 Unauthorized</H1>");
+		break;
+	case 404:
+		HTTPResponse("HTTP/1.1 404 Object Not Found");
+		SendText("<TITLE>404 File Not Found</TITLE><H1>404 File Not Found</H1>The URL you requested was not found.");
+		break;
+	default:
+		break;
+	}
+}
+
+function SendStandardHeaders( optional string ContentType )
+{
+	if(ContentType == "")
+		ContentType = "text/html";
+	if(!bSentResponse)
+		HTTPResponse("HTTP/1.1 200 OK");
+	HTTPHeader("Server: UnrealEngine UWeb Web Server Build "$Connection.Level.EngineVersion);
+	HTTPHeader("Content-Type: "$ContentType);
+	HTTPHeader("");
+}
+
+function Redirect(string URL)
+{
+	HTTPResponse("HTTP/1.1 302 Document Moved");
+	HTTPHeader("Location: "$URL);
+	SendText("<head><title>Document Moved</title></head>");
+	SendText("<body><h1>Object Moved</h1>This document may be found <a HREF=\""$URL$"\">here</a>.");
+}
+
+defaultproperties
+{
+	IncludePath="../Web"
+}
+class WebServer extends TcpLink;
+
+
+
+var config string Applications[10];
+var config string ApplicationPaths[10];
+var config int ListenPort;
+var config int MaxConnections;
+var config string ServerName;
+var config bool bEnabled;
+var config int DefaultApplication;
+
+var string ServerURL;
+var WebApplication ApplicationObjects[10];
+
+var int ConnectionCount;
+
+function BeginPlay()
+{
+	local int i;
+	local class<WebApplication> ApplicationClass;
+	local IpAddr l;
+	local string s;
+
+	if(!bEnabled)
+	{
+		Log("Webserver is not enabled.  Set bEnabled to True in Advanced Options.");
+		Destroy();
+		return;
+	}
+
+	Super.BeginPlay();
+
+	for(i=0;i<10;i++)
+	{
+		if(Applications[i] == "")
+			break;
+
+		ApplicationClass = class<WebApplication>(DynamicLoadObject(Applications[i], class'Class'));
+		if(ApplicationClass != None)
+		{
+			ApplicationObjects[i] = new( Level.Outer ) ApplicationClass; // GBX:naj - modified 3/11/04
+			ApplicationObjects[i].Level = Level;
+			ApplicationObjects[i].WebServer = Self;
+			ApplicationObjects[i].Path = ApplicationPaths[i];
+			ApplicationObjects[i].Init();
+		}
+	}
+
+	if(ServerName == "")
+	{
+		GetLocalIP(l);
+		s = IpAddrToString(l);
+		i = InStr(s, ":");
+		if(i != -1)
+			s = Left(s, i);
+		ServerURL = "http://"$s;
+	}
+	else
+		ServerURL = "http://"$ServerName;
+
+	if(ListenPort != 80)
+		ServerURL = ServerURL $ ":"$string(ListenPort);
+
+	BindPort( ListenPort );
+	Listen();
+}
+
+event Destroyed()
+{
+	local int i;
+
+	for(i=0;i<10;i++)
+		if(ApplicationObjects[i] != None)
+		{
+			ApplicationObjects[i].Cleanup();
+			ApplicationObjects[i].Level = None;
+			ApplicationObjects[i].WebServer = None;
+			ApplicationObjects[i] = None;
+		}
+
+	Super.Destroyed();
+}
+
+event GainedChild( Actor C )
+{
+	Super.GainedChild(C);
+	ConnectionCount++;
+
+	// if too many connections, close down listen.
+	if(MaxConnections > 0 && ConnectionCount > MaxConnections && LinkState == STATE_Listening)
+	{
+		Log("WebServer: Too many connections - closing down Listen.");
+		Close();
+	}
+}
+
+event LostChild( Actor C )
+{
+	Super.LostChild(C);
+	ConnectionCount--;
+
+	// if closed due to too many connections, start listening again.
+	if(ConnectionCount <= MaxConnections && LinkState != STATE_Listening)
+	{
+		Log("WebServer: Listening again - connections have been closed.");
+		Listen();
+	}
+}
+
+function WebApplication GetApplication(string URI, out string SubURI)
+{
+	local int i, l;
+
+	SubURI = "";
+	for(i=0;i<10;i++)
+	{
+		if(ApplicationPaths[i] != "")
+		{
+			l = Len(ApplicationPaths[i]);
+			if(Left(URI, l) == ApplicationPaths[i] && (Len(URI) == l || Mid(URI, l, 1) == "/"))
+			{
+				SubURI = Mid(URI, l);
+				return ApplicationObjects[i];
+			}
+		}
+	}
+	return None;
+}
+
+defaultproperties
+{
+	ListenPort=80
+	LinkMode=MODE_Text
+	AcceptClass=class'WebConnection'
+	MaxConnections=30
+	DefaultApplication=-1
+}
+

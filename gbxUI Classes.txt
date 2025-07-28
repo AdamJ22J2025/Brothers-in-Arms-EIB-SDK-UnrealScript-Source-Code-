@@ -1,0 +1,1948 @@
+class DebugManager extends Actor
+	notplaceable;
+
+
+var PlayerController MyPlayerController;
+var vector vLocation;
+var bool bGodModeAll;
+var bool bGodUSA;
+var bool bGodAllies;
+
+var bool bRotateScreenshots;
+var int RotateCount;
+var int RotateYawIncrement;
+var int RotateScreenshotsTickDelay;
+var float RotateScreenshotsDeltaTime;
+var float RotateScreenshotsUpdateTime;
+var float RotateScreenshotsOriginalSlomo;
+
+
+// this is called by PlayerController.uc to initialize MyPlayerController...
+function Trigger( actor Other, pawn EventInstigator )
+{
+	local PlayerController PC;
+
+	// find the player controller that created this debug manager...
+	ForEach DynamicActors(class'Engine.PlayerController', PC)
+	{
+		if (PC.MyDebugManager == self)
+		{
+			MyPlayerController = PC;
+			break;
+		}
+	}
+}
+
+function Tick(float deltaTime)
+{
+	local rotator Rot;
+
+	if (bRotateScreenshots)
+	{
+		if (RotateScreenshotsTickDelay > 0)
+		{
+			RotateScreenshotsTickDelay--;
+			return;
+		}
+
+		if (RotateScreenshotsDeltaTime > 0)
+		{
+			if (RotateScreenshotsUpdateTime > Level.TimeSeconds)
+				return;  // not time to take a screenshot yet?
+
+			RotateScreenshotsUpdateTime = Level.TimeSeconds + RotateScreenshotsDeltaTime;
+			Log("Level.TimeSeconds = " $ Level.TimeSeconds $ "  RotateScreenShotsUpdateTime = " $ RotateScreenshotsUpdateTime);
+		}
+
+		MyPlayerController.ConsoleCommand( "shot" );
+
+		RotateCount--;
+
+		if (RotateCount > 0)
+		{
+			Rot = MyPlayerController.Rotation;
+			Rot.Yaw = (Rot.Yaw + RotateYawIncrement) & 65535;
+			MyPlayerController.SetRotation(Rot);
+		}
+		else
+		{
+			MyPlayerController.Pawn.bHidden = false;
+			MyPlayerController.Pawn.bInterpolating = false;
+
+			bRotateScreenshots = false;
+
+			if (RotateScreenshotsDeltaTime > 0.0)
+			{
+				Level.Game.SetGameSpeed(RotateScreenshotsOriginalSlomo);
+			}
+			else
+			{
+				MyPlayerController.Level.Pauser = None;  // unpause the game
+			}
+
+			// show the weapon, show the HUD, and return to first person view...
+			MyPlayerController.Handedness = 1;
+			MyPlayerController.SetHand(MyPlayerController.Handedness);
+			MyPlayerController.ConsoleCommand( "hidehud 0" );
+			MyPlayerController.ConsoleCommand( "viewself" );
+		}
+	}
+}
+
+exec function Demigod()
+{
+	// Player still takes damage, but won't totally die.
+	MyPlayerController.bDemigod = !MyPlayerController.bDemigod;
+}
+
+
+exec function GodAll()
+{
+	// Toggles all pawns in or out of god mode.
+
+	local Controller C;
+
+	if( bGodModeAll )
+	{
+		bGodModeAll = false;
+		MyPlayerController.ClientMessage("GodAll mode off");
+	}
+	else
+	{
+
+		bGodModeAll = true;
+		MyPlayerController.ClientMessage("GodAll mode on");
+	}
+
+
+	foreach DynamicActors( class'Controller', C )
+	{
+		C.bGodMode = bGodModeAll;
+	}
+}
+
+exec function GodUSA()
+{
+	// Toggles all pawns in or out of god mode.
+
+	local Controller C;
+
+	if( bGodUSA )
+	{
+		bGodUSA = false;
+		MyPlayerController.ClientMessage("GodUSA mode off");
+	}
+	else
+	{
+
+		bGodUSA = true;
+		MyPlayerController.ClientMessage("GodUSA mode on");
+	}
+
+
+	foreach DynamicActors( class'Controller', C )
+	{
+		if( C.Pawn.PawnTeam == TEAM_US )
+		{
+			C.bGodMode = bGodUSA;
+		}
+	}
+}
+
+exec function GodAllies()
+{
+	// Toggles all friendly pawns in or out of god mode.
+
+	local Controller C;
+
+	if( bGodAllies )
+	{
+		bGodAllies = false;
+		MyPlayerController.ClientMessage("GodAllies mode off");
+	}
+	else
+	{
+
+		bGodAllies = true;
+		MyPlayerController.ClientMessage("GodAllies mode on");
+	}
+
+
+	foreach DynamicActors( class'Controller', C )
+	{
+		//if( C.Pawn.PawnTeam == TEAM_US )	
+		if( !C.IsA('PlayerController') && Level.Game.IsPawnOnSameTeamAsPlayer(C.Pawn) )
+		{
+			C.bGodMode = bGodAllies;
+		}
+	}
+}
+
+exec function PrintNearbyStuff(name NotHidden)
+{
+	// useful when the little 'dragonheads' start showing up and you don't know what they are
+	// just stand on top of them an enter "printnearbystuff" to find out what they are
+	// (use "printnearbystuff true" to only print things that have bHidden=false)
+
+	local Actor a;
+
+	ForEach DynamicActors(class'Engine.Actor', a)
+	{
+		if (VSize(a.Location - MyPlayerController.Pawn.Location) < 100.0f)
+		{
+			if ((NotHidden == '1') || (NotHidden == 'true'))
+			{
+				if (a.bHidden == false)
+					Log("PrintNearbyStuff: found " $ a.name);
+			}
+			else
+				Log("PrintNearbyStuff: found " $ a.name);
+		}
+	}
+}
+
+exec function WhatIsThat()
+{
+	// Tells you what actor you're pointing at. The actor must have bBlockZeroExtentTraces.
+
+	local Actor HitActor;
+	local vector HitLocation, HitNormal, TraceStart, TraceEnd;
+	local string Msg;
+	local vector Extent;
+
+	TraceStart = MyPlayerController.Pawn.Location + MyPlayerController.Pawn.EyePosition();
+	// USE THE CONTROLLER'S ROTATION, NOT THE PAWN'S ROTATION, THE PAWN'S ROTATION.PITCH IS ALWAYS 0 WHEN NOT IN GHOST MODE!!!
+	TraceEnd = TraceStart + ( vect( 1,0,0 ) >> MyPlayerController.Rotation ) * 1000000;
+
+	HitActor = Trace( HitLocation, HitNormal, TraceEnd, TraceStart, true );
+
+	if ((HitActor == None) || (HitActor.IsA('LevelInfo')))
+	{
+		// try again with an extent...
+		Extent.X = 1.0;
+		Extent.Y = 1.0;
+		Extent.Z = 1.0;
+		HitActor = Trace( HitLocation, HitNormal, TraceEnd, TraceStart, true, Extent );
+	}
+
+	if ((HitActor != None) && (!HitActor.IsA('LevelInfo')))
+	{
+		if (HitActor.DrawType == DT_Sprite)
+			 Msg = "WhatIsThat found actor '" $ HitActor.name $ "'  Asset Name = " $ HitActor.Texture.name;
+		else if (HitActor.DrawType == DT_Mesh)
+			 Msg = "WhatIsThat found actor '" $ HitActor.name $ "'  Asset Name = " $ HitActor.Mesh.name;
+		else if (HitActor.DrawType == DT_StaticMesh)
+			 Msg = "WhatIsThat found actor '" $ HitActor.name $ "'  Asset Name = " $ HitActor.StaticMesh.name;
+		else
+			Msg = "WhatIsThat found actor '" $ HitActor.name $ "'";
+	}
+	else
+		Msg = "WhatIsThat didn't hit anything!";
+
+	Log( Msg );
+	MyPlayerController.ClientMessage( Msg );
+}
+
+exec function ViewThatPawn()
+{
+	local Actor HitActor;
+	local Vector HitLocation, HitNormal, TraceStart, TraceEnd;
+
+	TraceStart = (MyPlayerController.Pawn.Location + MyPlayerController.Pawn.EyePosition());
+	TraceEnd = (MyPlayerController.Pawn.Location + MyPlayerController.Pawn.EyePosition()) + (vect(15000, 0, 0) >> MyPlayerController.GetViewRotation());
+
+	HitActor = Trace( HitLocation, HitNormal, TraceEnd, TraceStart, true );
+
+	if ( HitActor.IsA( 'gbxPawn' ) )
+	{
+		MyPlayerController.ClientMessage( HitActor.GetHumanReadableName(), 'Event');
+		MyPlayerController.SetViewTarget( HitActor );
+		MyPlayerController.bBehindView = true;
+		MyPlayerController.FixFOV();
+
+		return;
+	}
+}
+
+exec function ViewPawn( Name PawnToView )
+{
+	local Pawn aPawn;
+	ForEach DynamicActors( class'Pawn', aPawn )
+	{
+		if ( aPawn.Name == PawnToView )
+		{
+			MyPlayerController.ClientMessage( aPawn.GetHumanReadableName(), 'Event');
+			MyPlayerController.SetViewTarget( aPawn );
+			MyPlayerController.bBehindView = true;
+			MyPlayerController.FixFOV();
+		}
+	}
+}
+
+exec function SquadLeader()
+{
+	local Unit U;
+	local name UnitName;
+	local int i;
+
+	UnitName = 'SquadUSADefault';
+
+	ForEach DynamicActors(class'Unit', U, UnitName)
+		break;
+
+	if ( U == None )
+	{
+		U = spawn(class'Unit');  // spawn a squad if none exists
+		U.Tag = UnitName;
+	}
+
+	for ( i=0; i < U.NumMembers; i++ )
+	{
+		if (U.Members[i] == gbxPawn(MyPlayerController.Pawn))
+			break;
+	}
+
+	if (i == U.NumMembers)  // player not already in Squad?
+	{
+		MyPlayerController.ClientMessage("Adding player to Unit " $ UnitName);
+		U.AddMember(Infantry(gbxPawn(MyPlayerController.Pawn)));
+	}
+
+	U.SetLeader(gbxPawn(MyPlayerController.Pawn));
+	MyPlayerController.ClientMessage("You are now the Squad Leader of " $ UnitName);
+}
+
+exec function ShowDesiredPosition(name show)
+{
+	local Pawn aPawn;
+
+	ForEach DynamicActors(class'Pawn', aPawn)
+	{
+		if ((show == '1') || (show == 'true'))
+			aPawn.bShowDesiredPosition  = true;  // display
+		else if ((show == '0') || (show == 'false'))
+			aPawn.bShowDesiredPosition  = false;  // hide
+		else
+			aPawn.bShowDesiredPosition = !aPawn.bShowDesiredPosition;  // toggle
+	}
+}
+
+exec function Tracers(int x)
+{
+	local gbxWeaponAttachment Attach;
+
+	ForEach DynamicActors(class'gbxWeaponAttachment', Attach)
+	{
+		if (x == 0)
+		{
+			Attach.TracersOff();
+		}
+		else
+		{
+			Attach.TracersOn();
+		}
+	}
+}
+
+// Temp debugging function.
+exec function ToggleHorizonTracers()
+{
+	local HorizonTracers HTracer;
+
+	ForEach AllActors(class'HorizonTracers', HTracer)
+	{
+		HTracer.ToggleStopTracers();
+	}
+}
+
+exec function WhichPathNode(name PathNodeLite)
+{
+	local NavigationPoint NavPoint;
+	local string Msg;
+
+	ForEach AllActors(class'NavigationPoint', NavPoint)
+	{
+		if (NavPoint.NavPointLite.name == PathNodeLite)
+		{
+			Msg = "WhichPathNode: " $ PathNodeLite $ " is owned by " $ NavPoint.name;
+			Log( Msg );
+			MyPlayerController.ClientMessage( Msg );
+		}
+	}
+}
+
+exec function SlowRefireRate()
+{
+	// Find all Thompsons, BARs, and MP40s and slow down their rate of fire to that of a K98.
+	local FireDEMP40_ MP40Fire;
+	local FireUSThompson ThompFire;
+	local FireUSBAR BARFire;
+	local FireUSM1_ M1Fire;
+
+	ForEach DynamicActors(class'FireDEMP40_', MP40Fire )
+	{
+		MP40Fire.FireRateSP = 0.75;
+		MP40Fire.FireRateMP = 0.75;
+		MP40Fire.AIFireRateSP = 0.75;
+		MP40Fire.AIFireRateMP = 0.75;
+	}
+	ForEach DynamicActors(class'FireUSThompson', ThompFire )
+	{
+		ThompFire.FireRateSP = 0.75;
+		ThompFire.FireRateMP = 0.75;
+		ThompFire.AIFireRateSP = 0.75;
+		ThompFire.AIFireRateMP = 0.75;
+	}
+	ForEach DynamicActors(class'FireUSBAR', BARFire )
+	{
+		BARFire.FireRateSP = 0.75;
+		BARFire.FireRateMP = 0.75;
+		BARFire.AIFireRateSP = 0.75;
+		BARFire.AIFireRateMP = 0.75;
+	}
+	ForEach DynamicActors(class'FireUSM1_', M1Fire )
+	{
+		M1Fire.FireRateSP = 0.75;
+		M1Fire.FireRateMP = 0.75;
+		M1Fire.AIFireRateSP = 0.75;
+		M1Fire.AIFireRateMP = 0.75;
+	}
+}
+
+exec function FastRefireRate()
+{
+	// Find all Thompsons, BARs, and MP40s and slow down their rate of fire to that of a K98.
+	local FireDEMP40_ MP40Fire;
+	local FireUSThompson ThompFire;
+	local FireUSBAR BARFire;
+	local FireUSM1_ M1Fire;
+
+	ForEach DynamicActors(class'FireDEMP40_', MP40Fire )
+	{
+		MP40Fire.FireRateSP = 0.08;
+		MP40Fire.FireRateMP = 0.08;
+		MP40Fire.AIFireRateSP = 0.08;
+		MP40Fire.AIFireRateMP = 0.08;
+	}
+	ForEach DynamicActors(class'FireUSThompson', ThompFire )
+	{
+		ThompFire.FireRateSP = 0.08;
+		ThompFire.FireRateMP = 0.08;
+		ThompFire.AIFireRateSP = 0.08;
+		ThompFire.AIFireRateMP = 0.08;
+	}
+	ForEach DynamicActors(class'FireUSBAR', BARFire )
+	{
+		BARFire.FireRateSP = 0.12;
+		BARFire.FireRateMP = 0.12;
+		BARFire.AIFireRateSP = 0.12;
+		BARFire.AIFireRateMP = 0.12;
+	}
+	ForEach DynamicActors(class'FireUSM1_', M1Fire )
+	{
+		M1Fire.FireRateSP = 0.25;
+		M1Fire.FireRateMP = 0.25;
+		M1Fire.AIFireRateSP = 0.25;
+		M1Fire.AIFireRateMP = 0.25;
+	}
+}
+
+exec function NoShellCasings()
+{
+	local gbxWeaponAttachment Attach;
+
+	ForEach DynamicActors(class'gbxWeaponAttachment', Attach)
+	{
+		Attach.bNoShellCasings = true;
+	}
+}
+
+exec function ShellCasings()
+{
+	local gbxWeaponAttachment Attach;
+
+	ForEach DynamicActors(class'gbxWeaponAttachment', Attach)
+	{
+		Attach.bNoShellCasings = false;
+	}
+}
+
+exec function DummyClaim()
+{
+	local ThreatDummy Dummy;
+	local ActorLite NavPoint;
+
+	ForEach DynamicActors( class'ThreatDummy', Dummy )
+		break;
+
+	for (NavPoint=Level.NavigationPointList; NavPoint!=None; NavPoint=NavPoint.nextNavigationPoint)
+	{
+		if (NavPoint.bIsNavigationPoint)
+		{
+			if (NavigationPoint(NavPoint).Tag == 'ThreatDummyPoint')
+				break;
+		}
+		else if (NavPoint.bIsNavigationPointLite)
+		{
+			if (NavigationPointLite(NavPoint).Tag == 'ThreatDummyPoint')
+				break;
+		}
+	}
+
+	if (NavPoint != None)
+	{
+		if (NavPoint.bIsNavigationPoint)
+			NavigationPoint(NavPoint).Claimant = Dummy;
+		else if (NavPoint.bIsNavigationPointLite)
+			NavigationPointLite(NavPoint).Claimant = Dummy;
+
+		Dummy.MyClaimedNavPoint = NavPoint;
+	}
+}
+
+exec function PrintBadNavPoints()
+{
+	local NavigationPoint NavPoint;
+	local NavigationPointLite NPL;
+	local ActorLite AL;
+
+	ForEach AllActors(class'NavigationPoint', NavPoint)
+	{
+		if (NavPoint.NavPointLite != None)
+		{
+			NPL = NavPoint.NavPointLite;
+
+			if (NPL.bPathsChanged)
+			{
+				Log("NavPoint " $ NavPoint.name $ " has NavPointLite " $ NPL.name $ " with bPathsChanged = true");
+			}
+		}
+	}
+
+	for (AL=Level.NavigationPointList; AL!=None; AL=AL.nextNavigationPoint)
+	{
+		if (AL.bIsNavigationPoint)
+		{
+			if (NavigationPoint(AL).bPathsChanged)
+				Log("NavPoint " $ AL.name $ " had bPathsChanged = true");
+		}
+		if (AL.bIsNavigationPointLite)
+		{
+			if (NavigationPointLite(AL).bPathsChanged)
+				Log("NavPoint " $ AL.name $ " had bPathsChanged = true");
+		}
+	}
+}
+
+exec function PrintPaths()
+{
+	local NavigationPoint NavPoint;
+	local ActorLite AL;
+	local int i;
+	local ReachSpec RS;
+
+	ForEach AllActors(class'NavigationPoint', NavPoint)
+	{
+		if (NavPoint.NavPointLite != None)
+			Log("NavPoint = " $ NavPoint.name $ " has NavPointLite = " $ NavPoint.NavPointLite.name);
+		else
+			Log("NavPoint = " $ NavPoint.name);
+	}
+
+	Log(" ");
+
+	for (AL=Level.NavigationPointList; AL!=None; AL=AL.nextNavigationPoint)
+	{
+		Log("NavPoint = " $ AL.name);
+
+		if (AL.bIsNavigationPoint)
+		{
+			for (i = 0; i < NavigationPoint(AL).PathList.Length; i++)
+			{
+				RS = NavigationPoint(AL).PathList[i];
+				Log("   ReachSpec  Start = " $ RS.Start.name $ "  End = " $ RS.End.name);
+			}
+		}
+		else if (AL.bIsNavigationPointLite)
+		{
+			for (i = 0; i < NavigationPointLite(AL).PathList.Length; i++)
+			{
+				RS = NavigationPointLite(AL).PathList[i];
+				Log("   ReachSpec  Start = " $ RS.Start.name $ "  End = " $ RS.End.name);
+			}
+		}
+	}
+}
+
+exec function PrintClaimedPathNodes()
+{
+	local ActorLite AL;
+
+	for (AL=Level.NavigationPointList; AL!=None; AL=AL.nextNavigationPoint)
+	{
+		if (AL.bIsNavigationPoint)
+		{
+			if (NavigationPoint(AL).Claimant != None)
+				Log("NavPoint " $ AL.name $ " claimed by " $ NavigationPoint(AL).Claimant.name);
+		}
+		if (AL.bIsNavigationPointLite)
+		{
+			if (NavigationPointLite(AL).Claimant != None)
+				Log("NavPoint " $ AL.name $ " claimed by " $ NavigationPointLite(AL).Claimant.name);
+		}
+	}
+}
+
+exec function PrintBlockedPathNodes()
+{
+	local ActorLite AL;
+
+	for (AL=Level.NavigationPointList; AL!=None; AL=AL.nextNavigationPoint)
+	{
+		if (AL.bIsNavigationPoint)
+		{
+			if (NavigationPoint(AL).bCodeBlocked)
+				Log("NavPoint " $ AL.name $ " is CodeBlocked");
+			if (NavigationPoint(AL).bVehicleBlocked)
+				Log("NavPoint " $ AL.name $ " is VehicleBlocked");
+			if (NavigationPoint(AL).bLevelDesignBlocked)
+				Log("NavPoint " $ AL.name $ " is LevelDesignBlocked");
+		}
+		if (AL.bIsNavigationPointLite)
+		{
+			if (NavigationPointLite(AL).bCodeBlocked)
+				Log("NavPoint " $ AL.name $ " is CodeBlocked");
+			if (NavigationPointLite(AL).bVehicleBlocked)
+				Log("NavPoint " $ AL.name $ " is VehicleBlocked");
+			if (NavigationPointLite(AL).bLevelDesignBlocked)
+				Log("NavPoint " $ AL.name $ " is LevelDesignBlocked");
+		}
+	}
+}
+
+exec function SetDifficulty( EDifficulty DiffLevel )
+{
+	Level.DifficultyManager.SetDifficulty( DiffLevel );
+}
+
+exec function LogSelect( Name PawnToWatch )
+{
+	local gbxAIController gbxAIC;
+	local Unit aUnit;
+	local UnitController aUnitCtrl;
+	
+	ForEach AllActors( class'gbxAIController', gbxAIC )
+	{
+		gbxAIC.SetPawnToWatch( PawnToWatch );
+	}
+
+	ForEach AllActors( class'Unit', aUnit )
+	{
+		aUnit.SetPawnToWatch( PawnToWatch );
+	}
+
+	ForEach AllActors( class'UnitController', aUnitCtrl )
+	{
+		aUnitCtrl.SetPawnToWatch( PawnToWatch );
+	}
+}
+
+exec function LogMarker( String Message )
+{
+	log("NAJ**************************************************************************", 'naj' );
+	log("NAJ**** LOGMARKER: "$Message, 'naj' );
+	log("NAJ**************************************************************************", 'naj' );
+}
+
+exec function SpawnThreatDummyMPUS()
+{
+	SpawnThreatDummyMP(class'ThreatDummyMPUSSpawner');
+}
+
+exec function SpawnThreatDummyMPGerman()
+{
+	SpawnThreatDummyMP(class'ThreatDummyMPGermanSpawner');
+}
+
+function SpawnThreatDummyMP(class<CharacterSpawnerMP> spawnerClass)
+{
+	local CharacterSpawner spawner;
+	local MultiplayerUnit mpunit;
+	local vector SpawnLoc;
+	local Name unitTag;
+
+	unitTag = spawnerClass.default.UnitToJoin;
+
+	if ( MyPlayerController.Pawn != None )
+	{
+		SpawnLoc = MyPlayerController.Pawn.Location;
+	}
+	else
+	{
+		SpawnLoc = Location;
+	}
+	
+	Log("DebugManager::SpawnThreatDummyMP(" $ spawnerClass $ ") looking for a MultiplayerUnit with Tag = " $ unitTag, 'JWS');
+
+	foreach DynamicActors(class'MultiplayerUnit', mpunit, unitTag)
+	{
+		Log("DebugManager::SpawnThreatDummyMP() found a MultiplayerUnit " $ mpunit $ " with Tag = " $ mpunit.Tag, 'JWS');
+		break;
+	}
+
+	if (mpunit == None) // first time through, create the unit
+	{
+		Log("DebugManager::SpawnThreatDummyMP() did not find a MultiplayerUnit with Tag = " $ unitTag $ ", spawning one", 'JWS');
+		mpunit = Spawn(class'MultiplayerUnit',,unitTag,SpawnLoc + 72 * Vector(Rotation) + vect(0,0,1) * 515 );
+		mpunit.Team = spawnerClass.default.Team;
+	}
+
+	Log("DebugManager::SpawnThreatDummyMP() spawning threat dummy", 'JWS');
+	spawner = Spawn( spawnerClass,,,SpawnLoc + 72 * Vector(Rotation) + vect(0,0,1) * 15 );
+	spawner.Destroy();
+}
+
+exec function KillAllThreatDummyMP()
+{
+	local ThreatDummyMP dummy;
+
+	foreach DynamicActors(class'ThreatDummyMP', dummy)
+	{
+		Log("DebugManager::KillAllThreatDummyMP() deleting dummy " $ dummy, 'JWS');
+		
+		dummy.Destroy();
+	}
+}
+
+exec function DifficultyUpdate()
+{
+	if (Level.NetMode != NM_Client)
+	{
+		DifficultyManager(Level.DifficultyManager).DifficultyChanged();	
+	}
+}
+
+exec function EnableGermanGrenades( bool bEnable )
+{
+	local gbxAIController gbxAIC;
+
+	foreach DynamicActors( class'gbxAIController', gbxAIC )
+	{
+		if ( gbxAIC.Pawn != None && gbxAIC.Pawn.PawnTeam == TEAM_German )
+		{
+			gbxAIC.EnableGrenades( bEnable );
+		}
+	}
+}
+
+exec function SetMortarTarget( Name ActorToTarget )
+{
+	local Actor TargetActor;
+	local WeapDEMortar TheMortar;
+
+	foreach DynamicActors( class'Actor', TargetActor, ActorToTarget )
+		break;
+
+	if ( TargetActor == None )
+		return;
+
+	foreach DynamicActors( class'WeapDEMortar', TheMortar )
+		break;
+
+	if ( TheMortar == None )
+		return;
+
+	TheMortar.SetFireParameters( TargetActor, MortarFire_Bracketing, 5, 5.0, 1500.0 );
+}
+
+exec function RotateScreenshots(int NumShots, optional float Distance)
+{
+	local Actor HitActor;
+	local Vector HitLocation, HitNormal, TraceStart, TraceEnd;
+
+	TraceStart = (MyPlayerController.Pawn.Location + MyPlayerController.Pawn.EyePosition());
+	TraceEnd = (MyPlayerController.Pawn.Location + MyPlayerController.Pawn.EyePosition()) + (vect(15000, 0, 0) >> MyPlayerController.GetViewRotation());
+
+	HitActor = Trace( HitLocation, HitNormal, TraceEnd, TraceStart, true );
+
+	if ( HitActor.IsA( 'Pawn' ) )
+	{
+		if (NumShots < 1)
+			NumShots = 10;
+
+		if (Distance < 1.0)
+			Distance = 9.0;
+
+		// hide the HUD and the weapon...
+		MyPlayerController.ConsoleCommand( "hidehud 1" );
+		MyPlayerController.Handedness = 2;
+		MyPlayerController.SetHand(MyPlayerController.Handedness);
+
+		MyPlayerController.SetViewTarget( HitActor );
+		MyPlayerController.bBehindView = true;
+		MyPlayerController.FixFOV();
+
+		// prevent player from rotating camera while screenshots are being taken...
+		MyPlayerController.Pawn.bInterpolating = true;
+
+		MyPlayerController.Pawn.bHidden = true;  // hide the pawn so it won't be seen as the camera rotates
+
+		MyPlayerController.CameraDist = Distance;
+
+		RotateCount = NumShots;  // number of shots remaining
+		RotateYawIncrement = 65536 / NumShots;
+
+		RotateScreenshotsTickDelay = 3;  // wait 3 ticks for 3rd person camera to become active
+		bRotateScreenshots = true;
+
+		RotateScreenshotsDeltaTime = 0.0f;  // not using slomo, so set this to 0.0 so Tick() will know
+
+		MyPlayerController.Level.Pauser = MyPlayerController.Pawn.PlayerReplicationInfo;
+	}
+}
+
+exec function RotateScreenshotsSloMoRate(float FrameUpdateTime)
+{
+	if (FrameUpdateTime > 0.0f)
+		RotateScreenshotsDeltaTime = FrameUpdateTime;
+	else
+		RotateScreenshotsDeltaTime = 0.05;
+}
+
+exec function RotateScreenshotsSloMo(int NumShots, optional float Distance)
+{
+	local Actor HitActor;
+	local Vector HitLocation, HitNormal, TraceStart, TraceEnd;
+
+	TraceStart = (MyPlayerController.Pawn.Location + MyPlayerController.Pawn.EyePosition());
+	TraceEnd = (MyPlayerController.Pawn.Location + MyPlayerController.Pawn.EyePosition()) + (vect(15000, 0, 0) >> MyPlayerController.GetViewRotation());
+
+	HitActor = Trace( HitLocation, HitNormal, TraceEnd, TraceStart, true );
+
+	if ( HitActor.IsA( 'Pawn' ) )
+	{
+		if (NumShots < 1)
+			NumShots = 10;
+
+		if (Distance < 1.0)
+			Distance = 9.0;
+
+		// hide the HUD and the weapon...
+		MyPlayerController.ConsoleCommand( "hidehud 1" );
+		MyPlayerController.Handedness = 2;
+		MyPlayerController.SetHand(MyPlayerController.Handedness);
+
+		MyPlayerController.SetViewTarget( HitActor );
+		MyPlayerController.bBehindView = true;
+		MyPlayerController.FixFOV();
+
+		// prevent player from rotating camera while screenshots are being taken...
+		MyPlayerController.Pawn.bInterpolating = true;
+
+		MyPlayerController.Pawn.bHidden = true;  // hide the pawn so it won't be seen as the camera rotates
+
+		MyPlayerController.CameraDist = Distance;
+
+		RotateCount = NumShots;  // number of shots remaining
+		RotateYawIncrement = 65536 / NumShots;
+
+		RotateScreenshotsTickDelay = 3;  // wait 3 ticks for 3rd person camera to become active
+		bRotateScreenshots = true;
+
+		Log("RotateScreenshotsDeltaTime = " $ RotateScreenshotsDeltaTime);
+
+		RotateScreenshotsUpdateTime = Level.TimeSeconds + RotateScreenshotsDeltaTime;
+
+		Log("Level.TimeSeconds = " $ Level.TimeSeconds $ "  RotateScreenShotsUpdateTime = " $ RotateScreenshotsUpdateTime);
+
+		RotateScreenshotsOriginalSlomo = Level.Game.GameSpeed;  // save this so we can restore it later
+
+		Level.TimeDilation = RotateScreenshotsDeltaTime;  // go into slomo
+		Level.Game.SetTimer(Level.TimeDilation, true);
+	}
+}
+
+// end
+defaultproperties
+{
+	bHidden=true
+
+	// bAlwaysTick is set to true so that the 'RotateScreenshots' command will work properly
+	// (i.e. "freezing the action and allowing multiple screenshots to be taken)
+	bAlwaysTick=true
+
+	RotateScreenshotsDeltaTime = 0.05;
+}
+class gbxRootWindow extends UDebugRootWindow
+	config;
+
+
+
+// IK_nnn to Xbox Controller key mapping...
+//   IK_Joy1  = 'A'
+//   IK_Joy2  = 'B'
+//   IK_Joy3  = 'X'
+//   IK_Joy4  = 'Y'
+//   IK_Joy5  = Black
+//   IK_Joy6  = White
+//   IK_Joy7  = Left Trigger
+//   IK_Joy8  = Right Trigger
+//   IK_Joy9  = DPAD Up
+//   IK_Joy10 = DPAD Down
+//   IK_Joy11 = DPAD Left
+//   IK_Joy12 = DPAD Right
+//   IK_Joy13 = Start
+//   IK_Joy14 = Back
+//   IK_Joy15 = Left Joystick Press
+//   IK_Joy16 = Right Joystick Press
+//
+
+var enum EActiveWindowType
+{
+	gRW_None,
+	gRW_Console,
+	gRW_Oracle,
+	gRW_Debug,
+	gRW_MainMenu
+} m_eActiveWindowType;
+
+var config byte OracleKey;
+var config byte DebugKey;
+var config bool bEnableDebugConsoleAndMenu;
+
+var class<gbxWindowOracleWindow> OracleClass;
+var gbxWindowOracleWindow OracleWindow;
+var class<gbxWindowDebugWindow> DebugClass;
+var gbxWindowDebugWindow DebugWindow;
+
+var bool bIsResizing;
+
+function Created()
+{
+	Super.Created();
+
+	if (bIsConsole)
+		SetScale(2);
+	else
+		SetScale(1);
+
+	if (OracleClass != None)
+	{
+		OracleWindow = gbxWindowOracleWindow(CreateWindow(OracleClass, 100, 100, 200, 200));
+		OracleWindow.HideWindow();
+	}
+
+	if (DebugClass != None)
+	{
+		DebugWindow = gbxWindowDebugWindow(CreateWindow(DebugClass, 100, 100, 200, 200));
+		DebugWindow.HideWindow();
+	}
+
+	bIsResizing = false;
+	bAutoRepeat = false;
+	bFastAutoRepeat = false;
+}
+
+function Resized()
+{
+	if ((!bIsResizing) && (!bIsConsole))
+	{
+		bIsResizing = true;  // prevent recusion problem
+
+		if (Root.WinWidth > 1023)
+			SetScale(2);  // big fonts for higher resolution
+		else
+			SetScale(1);  // little fonts for lower resolution
+
+		bIsResizing = false;
+	}
+
+	Super.Resized();
+}
+
+function bool KeyEvent( out EInputKey Key, out EInputAction Action, FLOAT Delta )
+{
+	if ( bEnableDebugConsoleAndMenu )
+	{
+		if (Action == IST_Press )
+		{
+			if (Key == IK_Tilde )
+			{
+				bAllowConsole = true;
+				GotoState('UWindows');
+				m_eActiveWindowType = gRW_Console;
+				return true;
+			}
+
+	//		if ((Key == OracleKey) || (Key == IK_Joy14))
+	//		{
+	//			GotoState('gbxOracle');
+	//			m_eActiveWindowType = gRW_Oracle;
+	//			return true;
+	//		}
+
+			if (Key == DebugKey)
+			{
+				GotoState('gbxDebug');
+				m_eActiveWindowType = gRW_Debug;
+				return true;
+			}
+		}
+
+		return Super.KeyEvent(Key,Action,Delta);
+	}
+	else
+	{
+		return Super(UWindowWindow).KeyEvent(Key,Action,Delta);
+	}
+}
+
+function Tick(float Delta)
+{
+	if (fDelayTime > 0.0f)
+		fDelayTime -= Delta / GetLevel().Game.GameSpeed;
+
+	if (bAutoRepeat)
+	{
+		fAutoRepeatTime -= Delta / GetLevel().Game.GameSpeed;
+
+		if (fAutoRepeatTime < 0)
+		{
+			if (iAutoRepeatCount > 0)
+			{
+				iAutoRepeatCount--;
+
+				if (iAutoRepeatCount == 0)
+					bFastAutoRepeat = true;
+			}
+
+			if (bFastAutoRepeat)
+				fAutoRepeatTime = 0.04;
+			else
+				fAutoRepeatTime = 0.1;
+
+			KeyEvent( AutoRepeat_Key, AutoRepeat_Action, 0.1 );
+		}
+	}
+
+	Super.Tick(Delta);
+}
+
+state UWindows
+{
+	function bool KeyEvent( EInputKey Key, EInputAction Action, FLOAT Delta )
+	{
+		if ((Action == IST_Press) && (Key == EInputKey.IK_Tilde))
+		{
+			CloseActiveWindow();
+			return true;
+		}
+		else
+		{
+			return Super.KeyEvent( Key, Action, Delta );
+		}
+	}
+}
+
+state gbxOracle
+{
+	function BeginState()
+	{
+		// Add code to initialize the uwindows system
+
+		bVisible 		= true;
+		bRequiresTick 	= true;
+
+		bWindowVisible = True;
+		bUWindowActive = true;
+
+		ViewportOwner.bShowWindowsMouse = True;
+		ViewportOwner.bSuspendPrecaching = True;
+
+		if (GetLevel().NetMode == NM_Standalone)
+			ViewportOwner.Actor.SetPause( True );
+
+		OracleWindow.ShowWindow();
+
+		bAutoRepeat = false;
+		bFastAutoRepeat = false;
+	}
+
+	function EndState()
+	{
+		// Add code to hide the window
+
+		bVisible		 = false;
+		bRequiresTick	 = false;
+
+		bUWindowActive = False;
+		bWindowVisible = False;
+
+		ViewportOwner.bShowWindowsMouse = False;
+		ViewportOwner.bSuspendPrecaching = False;
+
+		if (GetLevel().NetMode == NM_Standalone)
+			ViewportOwner.Actor.SetPause( False );
+
+		OracleWindow.HideWindow();
+	}
+
+	function bool KeyType(out EInputKey Key, optional string Unicode )
+	{
+		WindowEvent(WM_KeyType, None, MouseX, MouseY, Key);
+		return true;
+	}
+
+	function bool KeyEvent( out EInputKey Key, out EInputAction Action, FLOAT Delta )
+	{
+		local byte k;
+		k = Key;
+
+		if (OracleWindow != None)
+			OracleWindow.KeyEvent( Key, Action, Delta );
+
+		switch (Action)
+		{
+			case IST_Release:
+				switch (k)
+				{
+					case EInputKey.IK_Escape:
+						CloseActiveWindow();
+						break;
+					case EInputKey.IK_LeftMouse:
+						WindowEvent(WM_LMouseUp, None, MouseX, MouseY, k);
+						break;
+					case EInputKey.IK_RightMouse:
+						WindowEvent(WM_RMouseUp, None, MouseX, MouseY, k);
+						break;
+					case EInputKey.IK_MiddleMouse:
+						WindowEvent(WM_MMouseUp, None, MouseX, MouseY, k);
+						break;
+					default:
+						WindowEvent(WM_KeyUp, None, MouseX, MouseY, k);
+						break;
+				}
+				break;
+
+			case IST_Press:
+
+				switch (k)
+				{
+					case EInputKey.IK_Tilde:
+//					case OracleKey:
+//					case EInputKey.IK_Joy14:
+						CloseActiveWindow();
+						break;
+					case EInputKey.IK_LeftMouse:
+						WindowEvent(WM_LMouseDown, None, MouseX, MouseY, k);
+						break;
+					case EInputKey.IK_RightMouse:
+						WindowEvent(WM_RMouseDown, None, MouseX, MouseY, k);
+						break;
+					case EInputKey.IK_MiddleMouse:
+						WindowEvent(WM_MMouseDown, None, MouseX, MouseY, k);
+						break;
+					default:
+						WindowEvent(WM_KeyDown, None, MouseX, MouseY, k);
+						break;
+				}
+				break;
+			case IST_Axis:
+				switch (Key)
+				{
+					case IK_MouseX:
+						MouseX = MouseX + (MouseScale * Delta);
+						break;
+					case IK_MouseY:
+						MouseY = MouseY - (MouseScale * Delta);
+						break;
+				}
+			default:
+				break;
+		}
+		return true;
+	}
+
+}
+
+state gbxDebug
+{
+	function BeginState()
+	{
+		// Add code to initialize the uwindows system
+
+		bVisible 		= true;
+		bRequiresTick 	= true;
+
+		bWindowVisible = True;
+		bUWindowActive = true;
+
+		ViewportOwner.bShowWindowsMouse = True;
+		ViewportOwner.bSuspendPrecaching = True;
+
+		if (GetLevel().NetMode == NM_Standalone)
+			ViewportOwner.Actor.SetPause( True );
+
+		DebugWindow.ShowWindow();
+
+		bAutoRepeat = false;
+		bFastAutoRepeat = false;
+	}
+
+	function EndState()
+	{
+		// Add code to hide the window
+
+		bVisible		 = false;
+		bRequiresTick	 = false;
+
+		bUWindowActive = False;
+		bWindowVisible = False;
+
+		ViewportOwner.bShowWindowsMouse = False;
+		ViewportOwner.bSuspendPrecaching = False;
+
+		if (GetLevel().NetMode == NM_Standalone)
+			ViewportOwner.Actor.SetPause( False );
+
+		DebugWindow.HideWindow();
+	}
+
+	function bool KeyType(out EInputKey Key, optional string Unicode )
+	{
+		WindowEvent(WM_KeyType, None, MouseX, MouseY, Key);
+		return true;
+	}
+
+	function bool KeyEvent( out EInputKey Key, out EInputAction Action, FLOAT Delta )
+	{
+		local byte k;
+		k = Key;
+
+		if (Key == DebugKey)
+			Key = IK_Joy13;  // reassign since child doesn't know about 'DebugKey'
+
+		if (bIsConsole)
+		{
+			if (Action == IST_Release)
+			{
+				bAutoRepeat = false;
+				bFastAutoRepeat = false;
+			}
+			else if ((Action == IST_Press) && (!bAutoRepeat))
+			{
+				bAutoRepeat = true;
+				fAutoRepeatTime = 0.5;
+				iAutoRepeatCount = 5;
+				AutoRepeat_Key = Key;
+				AutoRepeat_Action = Action;
+			}
+		}
+
+		if (DebugWindow != None)
+			DebugWindow.KeyEvent( Key, Action, Delta );
+
+		switch (Action)
+		{
+			case IST_Release:
+
+				switch (k)
+				{
+					case EInputKey.IK_Escape:
+						CloseActiveWindow();
+						break;
+					case EInputKey.IK_LeftMouse:
+						WindowEvent(WM_LMouseUp, None, MouseX, MouseY, k);
+						break;
+					case EInputKey.IK_RightMouse:
+						WindowEvent(WM_RMouseUp, None, MouseX, MouseY, k);
+						break;
+					case EInputKey.IK_MiddleMouse:
+						WindowEvent(WM_MMouseUp, None, MouseX, MouseY, k);
+						break;
+					default:
+						WindowEvent(WM_KeyUp, None, MouseX, MouseY, k);
+						break;
+				}
+				break;
+
+			case IST_Press:
+
+				switch (k)
+				{
+					case EInputKey.IK_Tilde:
+					case DebugKey:
+					case EInputKey.IK_Joy13:
+						CloseActiveWindow();
+						break;
+					case EInputKey.IK_LeftMouse:
+						WindowEvent(WM_LMouseDown, None, MouseX, MouseY, k);
+						break;
+					case EInputKey.IK_RightMouse:
+						WindowEvent(WM_RMouseDown, None, MouseX, MouseY, k);
+						break;
+					case EInputKey.IK_MiddleMouse:
+						WindowEvent(WM_MMouseDown, None, MouseX, MouseY, k);
+						break;
+					default:
+						WindowEvent(WM_KeyDown, None, MouseX, MouseY, k);
+						break;
+				}
+				break;
+			case IST_Axis:
+				switch (Key)
+				{
+					case IK_MouseX:
+						MouseX = MouseX + (MouseScale * Delta);
+						break;
+					case IK_MouseY:
+						MouseY = MouseY - (MouseScale * Delta);
+						break;
+				}
+			default:
+				break;
+		}
+		return true;
+	}
+}
+
+function Message( coerce string Msg, float MsgLife)
+{
+	Super.Message( Msg, MsgLife );
+
+	if (ConsoleWindow!=None)
+  		ConsoleWindow.PropagateMessage(Msg,MsgLife);
+
+	if (OracleWindow != None)
+  		OracleWindow.PropagateMessage(Msg,MsgLife);
+
+	if (DebugWindow != None)
+  		DebugWindow.PropagateMessage(Msg,MsgLife);
+}
+
+defaultproperties
+{
+	m_eActiveWindowType=gRW_None
+	OracleKey=9
+	OracleClass=class'gbxWindowOracleWindow'
+	DebugKey=112
+	DebugClass=class'gbxWindowDebugWindow'
+	bEnableDebugConsoleAndMenu=false
+}
+class gbxWindowInventoryWindow extends UWindowDialogClientWindow;
+
+
+
+var gbxWindowListBox			ObjectiveListControl;
+var gbxWindowWrappedTextArea	ObjectiveDescControl;
+var int							m_nSelectedIdx;
+
+function Created()
+{
+	ObjectiveListControl = gbxWindowListBox(CreateWindow(class'gbxWindowListBox', 0, 0, WinWidth / 2, WinHeight));
+	ObjectiveDescControl = gbxWindowWrappedTextArea(CreateControl(class'gbxWindowWrappedTextArea', WinWidth / 2, 0, WinWidth / 2, WinHeight));
+	ObjectiveDescControl.SetFont(F_Normal);
+	Cursor = Root.NormalCursor;
+}
+
+function ShowWindow()
+{
+	local bool					bSetFirst;
+	local gbxWindowListBoxItem	aSelected;
+	local int					i, j;
+	local PlayerController		anOwner;
+	local Inventory				Inv;
+	local PickupUsableTrophy	aTrophy;
+
+	Super.ShowWindow();
+
+	bSetFirst = false;
+	anOwner = GetPlayerOwner();
+
+	if (anOwner == None)
+		return;
+
+	ObjectiveListControl.ClearList();
+
+	aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( "Primary Weapons" ));
+	aSelected.HelpText = "";
+	aSelected.ItemAlign = TA_Left;
+
+	i = 1;
+	for( Inv=anOwner.Pawn.Inventory; Inv!=None; Inv=Inv.Inventory )
+	{
+		if (Inv.ItemName != "")
+		{
+			aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( "     "$Inv.ItemName ));
+			aSelected.HelpText = Inv.ItemDesc;
+			aSelected.ItemAlign = TA_Left;
+			if (!bSetFirst)
+			{
+				ObjectiveDescControl.AddText( aSelected.HelpText );
+				ObjectiveListControl.SetSelectedItem( aSelected );
+				m_nSelectedIdx = i;
+				bSetFirst = true;
+			}
+		}
+		i++;
+	}
+
+	ObjectiveListControl.AddItem( "" );
+	aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( "Secondary Items" ));
+	aSelected.HelpText = "";
+	aSelected.ItemAlign = TA_Left;
+
+	if (Infantry(anOwner.Pawn) != None)
+	{
+		i = 0;
+		j = 0;
+
+		for( i = 0; i < (Infantry(anOwner.Pawn).MAX_SECONDARY_BUCKETS - 1); i++ )
+		{
+			for( Inv=Infantry(anOwner.Pawn).SecondaryInventory[i]; Inv!=None; Inv=Inv.Inventory )
+			{
+				if (Inv.ItemName != "")
+				{
+					aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( "     "$Inv.ItemName ));
+					aSelected.HelpText = Inv.ItemDesc;
+					aSelected.ItemAlign = TA_Left;
+					if (!bSetFirst)
+					{
+						ObjectiveDescControl.AddText( aSelected.HelpText );
+						ObjectiveListControl.SetSelectedItem( aSelected );
+						m_nSelectedIdx = j;
+						bSetFirst = true;
+					}
+					j++;
+				}
+			}
+		}
+	}
+
+	ObjectiveListControl.AddItem( "" );
+	aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( "Trophies" ));
+	aSelected.HelpText = "";
+	aSelected.ItemAlign = TA_Left;
+
+	ForEach anOwner.DynamicActors(class'PickupUsableTrophy', aTrophy)
+	{
+		if (aTrophy.m_szTrophyName != "")
+		{
+			aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( "     "$aTrophy.m_szTrophyName ));
+			aSelected.HelpText = aTrophy.m_szTrophyDesc;
+			aSelected.ItemAlign = TA_Left;
+			if (!bSetFirst)
+			{
+				ObjectiveDescControl.AddText( aSelected.HelpText );
+				ObjectiveListControl.SetSelectedItem( aSelected );
+				m_nSelectedIdx = j;
+				bSetFirst = true;
+			}
+			j++;
+		}
+	}
+
+	for( Inv=Infantry(anOwner.Pawn).SecondaryInventory[Infantry(anOwner.Pawn).MAX_SECONDARY_BUCKETS - 1]; Inv!=None; Inv=Inv.Inventory )
+	{
+		if (Inv.ItemName != "")
+		{
+			aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( "     "$Inv.ItemName ));
+			aSelected.HelpText = Inv.ItemDesc;
+			aSelected.ItemAlign = TA_Left;
+			if (!bSetFirst)
+			{
+				ObjectiveDescControl.AddText( aSelected.HelpText );
+				ObjectiveListControl.SetSelectedItem( aSelected );
+				m_nSelectedIdx = j;
+				bSetFirst = true;
+			}
+			j++;
+		}
+	}
+}
+
+function NextListItem()
+{
+	local	int	nCount;
+	local UWindowListBoxItem	aSelected;
+
+	nCount = ObjectiveListControl.Count();
+
+//	aSelected = ObjectiveListControl.GetItemAtIdx( m_nSelectedIdx );
+//	ObjectiveListControl.SetSelectedItem( aSelected );
+	do
+	{
+		m_nSelectedIdx++;
+		if (m_nSelectedIdx >= nCount)
+			m_nSelectedIdx = 0;
+		aSelected = ObjectiveListControl.GetItemAtIdx( m_nSelectedIdx );
+		ObjectiveListControl.SetSelectedItem( aSelected );
+		ObjectiveDescControl.Clear();
+		ObjectiveDescControl.AddText( aSelected.HelpText );
+	} until (aSelected.HelpText != "");
+}
+
+function PrevListItem()
+{
+	local	int	nCount;
+	local UWindowListBoxItem	aSelected;
+
+	nCount = ObjectiveListControl.Count();
+
+//	aSelected = ObjectiveListControl.GetItemAtIdx( m_nSelectedIdx );
+//	ObjectiveListControl.SetSelectedItem( aSelected );
+	do
+	{
+		m_nSelectedIdx--;
+		if (m_nSelectedIdx < 0)
+			m_nSelectedIdx = nCount - 1;
+		aSelected = ObjectiveListControl.GetItemAtIdx( m_nSelectedIdx );
+		ObjectiveListControl.SetSelectedItem( aSelected );
+		ObjectiveDescControl.Clear();
+		ObjectiveDescControl.AddText( aSelected.HelpText );
+	} until (aSelected.HelpText != "");
+}
+
+function bool KeyEvent( out EInputKey Key, out EInputAction Action, FLOAT Delta )
+{
+	if (Action == IST_Press)
+	{
+		switch (Key)
+		{
+			case IK_Joy10:		// Down
+			case IK_Down:
+				NextListItem();
+				break;
+			case IK_Joy9:		// Up
+			case IK_Up:
+				PrevListItem();
+				break;
+			case IK_Joy11:		// Left
+			case IK_Left:
+				break;
+			case IK_Joy12:		// Right
+			case IK_Right:
+				break;
+		}
+	}
+	if (Action == IST_Axis)
+	{
+	}
+
+	return Super.KeyEvent(Key,Action,Delta);
+}
+
+function Resized()
+{
+	Super.Resized();
+
+	ObjectiveListControl.SetSize( WinWidth / 2, WinHeight );
+	ObjectiveDescControl.WinLeft = WinWidth / 2;
+	ObjectiveDescControl.SetSize( WinWidth / 2, WinHeight );
+}
+/*
+function ResolutionChanged(float W, float H)
+{
+	Super.ResolutionChanged( W, H );
+	SetDimensions();
+}
+
+function SetDimensions()
+{
+	ObjectiveListControl.SetSize( WinWidth / 2, WinHeight );
+	ObjectiveDescControl.WinLeft = WinWidth / 2;
+	ObjectiveDescControl.SetSize( WinWidth / 2, WinHeight );
+}
+*/
+class gbxWindowObjectiveWindow extends UWindowDialogClientWindow;
+
+
+
+var gbxWindowListBox			ObjectiveListControl;
+var gbxWindowWrappedTextArea	ObjectiveDescControl;
+var int							m_nSelectedIdx;
+var	Color						m_CompleteColor;
+var	Color						m_FailedColor;
+
+function Created()
+{
+	ObjectiveListControl = gbxWindowListBox(CreateWindow(class'gbxWindowListBox', 0, 0, WinWidth / 2, WinHeight));
+	if (ObjectiveDescControl != None)
+	{
+		ObjectiveDescControl.Clear();
+		ObjectiveDescControl = gbxWindowWrappedTextArea(CreateControl(class'gbxWindowWrappedTextArea', WinWidth / 2, 0, WinWidth / 2, WinHeight));
+		ObjectiveDescControl.SetFont(F_Normal);
+	}
+	if (Root != None)
+		Cursor = Root.NormalCursor;
+}
+
+function ShowWindow()
+{
+	local ObjectiveList			anObjectiveList;
+	local bool					bSetFirst;
+	local gbxWindowListBoxItem	aSelected;
+	local int					i;
+	local PlayerController		anOwner;
+
+	Super.ShowWindow();
+
+	bSetFirst = false;
+	anOwner = GetPlayerOwner();
+
+	if (anOwner == None)
+		return;
+
+	ObjectiveListControl.ClearList();
+	ForEach anOwner.DynamicActors(class'ObjectiveList', anObjectiveList)
+	{
+		for( i = 0; i < anObjectiveList.Objectives.Length; i++ )
+		{
+			if (anObjectiveList.Objectives[ i ] != None)
+			{
+				if (anObjectiveList.Objectives[ i ].m_eComplete != OI_Inactive)
+				{
+					if (anObjectiveList.Objectives[ i ].m_eComplete == OI_Complete)
+					{
+						if (anObjectiveList.Objectives[i].m_fPrimary)
+							aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( ""$i+1$": Primary - "$anObjectiveList.Objectives[ i ].m_szShortDesc$" (Completed)" ));
+						else
+							aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( ""$i+1$": Secondary - "$anObjectiveList.Objectives[ i ].m_szShortDesc$" (Completed)" ));
+						aSelected.ItemColor = m_CompleteColor;
+					}
+					else if (anObjectiveList.Objectives[ i ].m_eComplete == OI_Failed)
+					{
+						if (anObjectiveList.Objectives[i].m_fPrimary)
+							aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( ""$i+1$": Primary - "$anObjectiveList.Objectives[ i ].m_szShortDesc$" (Failed)" ));
+						else
+							aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( ""$i+1$": Secondary - "$anObjectiveList.Objectives[ i ].m_szShortDesc$" (Failed)" ));
+						aSelected.ItemColor = m_FailedColor;
+					}
+					else
+						if (anObjectiveList.Objectives[i].m_fPrimary)
+							aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( ""$i+1$": Primary - "$anObjectiveList.Objectives[ i ].m_szShortDesc ));
+						else
+							aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( ""$i+1$": Secondary - "$anObjectiveList.Objectives[ i ].m_szShortDesc ));
+					aSelected.HelpText = anObjectiveList.Objectives[ i ].m_szLongDesc;
+					aSelected.ItemAlign = TA_Left;
+					if (!bSetFirst)
+					{
+						ObjectiveDescControl.AddText( aSelected.HelpText );
+						ObjectiveListControl.SetSelectedItem( aSelected );
+						m_nSelectedIdx = i;
+						bSetFirst = true;
+					}
+				}
+				else
+				{
+					aSelected = gbxWindowListBoxItem(ObjectiveListControl.AddItem( ""$i+1$": Objective Unknown" ));
+					aSelected.HelpText = "Objective not assigned yet";
+					aSelected.ItemAlign = TA_Left;
+				}
+			}
+		}
+	}
+}
+
+function NextListItem()
+{
+	local	int	nCount;
+	local UWindowListBoxItem	aSelected;
+
+	nCount = ObjectiveListControl.Count();
+
+//	aSelected = ObjectiveListControl.GetItemAtIdx( m_nSelectedIdx );
+//	ObjectiveListControl.SetSelectedItem( aSelected );
+	m_nSelectedIdx++;
+	if (m_nSelectedIdx >= nCount)
+		m_nSelectedIdx = 0;
+	aSelected = ObjectiveListControl.GetItemAtIdx( m_nSelectedIdx );
+	ObjectiveListControl.SetSelectedItem( aSelected );
+	ObjectiveDescControl.Clear();
+	ObjectiveDescControl.AddText( aSelected.HelpText );
+}
+
+function PrevListItem()
+{
+	local	int	nCount;
+	local UWindowListBoxItem	aSelected;
+
+	nCount = ObjectiveListControl.Count();
+
+//	aSelected = ObjectiveListControl.GetItemAtIdx( m_nSelectedIdx );
+//	ObjectiveListControl.SetSelectedItem( aSelected );
+	m_nSelectedIdx--;
+	if (m_nSelectedIdx < 0)
+		m_nSelectedIdx = nCount - 1;
+	aSelected = ObjectiveListControl.GetItemAtIdx( m_nSelectedIdx );
+	ObjectiveListControl.SetSelectedItem( aSelected );
+	ObjectiveDescControl.Clear();
+	ObjectiveDescControl.AddText( aSelected.HelpText );
+}
+
+function bool KeyEvent( out EInputKey Key, out EInputAction Action, FLOAT Delta )
+{
+	if (Action == IST_Press)
+	{
+		switch (Key)
+		{
+			case IK_Joy10:		// Down
+			case IK_Down:
+				NextListItem();
+				break;
+			case IK_Joy9:		// Up
+			case IK_Up:
+				PrevListItem();
+				break;
+			case IK_Joy11:		// Left
+			case IK_Left:
+				break;
+			case IK_Joy12:		// Right
+			case IK_Right:
+				break;
+		}
+	}
+	if (Action == IST_Axis)
+	{
+	}
+
+	return Super.KeyEvent(Key,Action,Delta);
+}
+
+function Resized()
+{
+	Super.Resized();
+
+	if ((ObjectiveListControl != None) && (ObjectiveDescControl != None))
+	{
+		ObjectiveListControl.SetSize( WinWidth / 2, WinHeight );
+		ObjectiveDescControl.WinLeft = WinWidth / 2;
+		ObjectiveDescControl.SetSize( WinWidth / 2, WinHeight );
+	}
+}
+/*
+function ResolutionChanged(float W, float H)
+{
+	Super.ResolutionChanged( W, H );
+	SetDimensions();
+}
+
+function SetDimensions()
+{
+	ObjectiveListControl.SetSize( WinWidth / 2, WinHeight );
+	ObjectiveDescControl.WinLeft = WinWidth / 2;
+	ObjectiveDescControl.SetSize( WinWidth / 2, WinHeight );
+}
+*/
+defaultproperties
+{
+	m_CompleteColor=(R=64,G=255,B=64,A=255)
+	m_FailedColor=(R=255,G=64,B=64,A=255)
+}
+class gbxWindowOracleWindow extends UWindowFramedWindow;
+
+
+
+const WOW_OBJECTIVE_WINDOW	=	0;
+const WOW_INVENTORY_WINDOW	=	1;
+const WOW_NUM_WINDOWS		=	2;
+
+var float OldParentWidth, OldParentHeight;
+var UWindowDialogClientWindow m_aSubWindows[2];
+var string m_szWindowTitles[2];
+var int		m_nCurWindow;
+
+function Created()
+{
+	local gbxWindowInventoryWindow anInventoryWindow;
+
+	Super.Created();
+	bSizable = True;
+	bStatusBar = True;
+	bLeaveOnScreen = True;
+
+	OldParentWidth = ParentWindow.WinWidth;
+	OldParentHeight = ParentWindow.WinHeight;
+
+	SetDimensions();
+
+	SetAcceptsFocus();
+
+	m_aSubWindows[WOW_OBJECTIVE_WINDOW] = UWindowDialogClientWindow(ClientArea);
+	m_szWindowTitles[WOW_OBJECTIVE_WINDOW] = "Objectives";
+	m_nCurWindow = WOW_OBJECTIVE_WINDOW;
+	anInventoryWindow = gbxWindowInventoryWindow(CreateWindow(class'gbxWindowInventoryWindow', 4, 16, WinWidth - 8, WinHeight - 20, OwnerWindow));
+	m_aSubWindows[WOW_INVENTORY_WINDOW] = anInventoryWindow;
+	m_szWindowTitles[WOW_INVENTORY_WINDOW] = "Inventory";
+	anInventoryWindow.HideWindow();
+}
+
+function ShowWindow()
+{
+	Super.ShowWindow();
+	if (ClientArea != None)
+		ClientArea.ShowWindow();
+
+	if(ParentWindow.WinWidth != OldParentWidth || ParentWindow.WinHeight != OldParentHeight)
+	{
+		SetDimensions();
+		if (ClientArea != None)
+			ClientArea.ResolutionChanged(WinWidth, WinHeight);
+		OldParentWidth = ParentWindow.WinWidth;
+		OldParentHeight = ParentWindow.WinHeight;
+	}
+}
+
+function PrevOracleWindow()
+{
+	m_nCurWindow++;
+	if (m_nCurWindow >= WOW_NUM_WINDOWS)
+		m_nCurWindow = 0;
+	ClientArea.HideWindow();
+	ClientArea = m_aSubWindows[m_nCurWindow];
+	if (ClientArea != None)
+	{
+		ClientArea.ShowWindow();
+	}
+}
+
+function NextOracleWindow()
+{
+	m_nCurWindow--;
+	if (m_nCurWindow < 0)
+		m_nCurWindow = WOW_NUM_WINDOWS - 1;
+	ClientArea.HideWindow();
+	ClientArea = m_aSubWindows[m_nCurWindow];
+	if (ClientArea != None)
+	{
+		ClientArea.ShowWindow();
+	}
+}
+
+function bool KeyEvent( out EInputKey Key, out EInputAction Action, FLOAT Delta )
+{
+	if (ClientArea != None)
+		ClientArea.KeyEvent( Key, Action, Delta );
+
+	if (Action == IST_Press)
+	{
+		switch (Key)
+		{
+			case IK_Joy7:		// Previous oracle page
+			case IK_PageUp:
+				PrevOracleWindow();
+				break;
+			case IK_Joy8:		// Next oracle page
+			case IK_PageDown:
+				NextOracleWindow();
+				break;
+		}
+	}
+
+	return Super.KeyEvent(Key,Action,Delta);
+}
+
+function ResolutionChanged(float W, float H)
+{
+	local	int	i;
+
+	SetDimensions();
+
+	for( i = 0; i < WOW_NUM_WINDOWS; i++ )
+		m_aSubWindows[i].ResolutionChanged( W, H );
+}
+
+function SetDimensions()
+{
+	if (ParentWindow.bIsConsole)
+		SetSize(250, 180);
+	else
+		SetSize(410, 310);
+
+	WinLeft = ParentWindow.WinWidth/2 - WinWidth/2;
+	WinTop = ParentWindow.WinHeight/2 - WinHeight/2;
+}
+
+function Resized()
+{
+	local Region	R;
+	local int		i;
+
+	Super.Resized();
+
+	if (LookAndFeel != None)
+	{
+		R = LookAndFeel.FW_GetClientArea(Self);
+
+		for( i = 0; i < WOW_NUM_WINDOWS; i++ )
+		{
+			if (m_aSubWindows[i] != None)
+			{
+				m_aSubWindows[i].WinLeft = R.X;
+				m_aSubWindows[i].WinTop = R.Y;
+
+				if((R.W != m_aSubWindows[i].WinWidth) || (R.H != m_aSubWindows[i].WinHeight))
+				{
+					m_aSubWindows[i].SetSize(R.W, R.H);
+				}
+			}
+		}
+	}
+}
+
+function Close(optional bool bByParent)
+{
+	ClientArea.Close(True);
+	Root.GotoState('');
+}
+
+defaultproperties
+{
+	WindowTitle="Oracle";
+	ClientClass=class'gbxWindowObjectiveWindow'
+}
+class gbxWindowWrappedTextArea extends UWindowTextAreaControl;
+
+
+
+function Paint( Canvas C, float X, float Y )
+{
+	local int i, Line;
+	local int TempHead, TempTail;
+	local float XL, YL;
+
+	C.Font = Root.Fonts[Font];
+	C.SetDrawColor(0,0,0);
+
+	TextSize(C, "TEST", XL, YL);
+	VisibleRows = WinHeight / YL;
+
+	if (bScrollable)
+	{
+		VertSB.SetRange(0, Lines, VisibleRows);
+	}
+
+	TempHead = Head;
+	TempTail = Tail;
+	Line = TempHead;
+	TextArea[Line] = Prompt;
+	if (bScrollable)
+	{
+		if (VertSB.MaxPos - VertSB.Pos > 0)
+		{
+			Line -= VertSB.MaxPos - VertSB.Pos;
+			TempTail -= VertSB.MaxPos - VertSB.Pos;
+		}
+	}
+	for (i=0; i<VisibleRows; i++)
+	{
+		WrapClipText(C, 2, YL*i, TextArea[i]);
+		Line--;
+		if (TempTail == Line)
+			break;
+		if (Line < 0)
+			Line = BufSize-1;
+	}
+}
+
+
